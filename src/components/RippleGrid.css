@@ -1,0 +1,14 @@
+.ripple-grid-container {
+  position: absolute;
+  inset: -8%;
+  z-index: 1;
+  width: 116%;
+  height: 116%;
+  pointer-events: auto;
+}
+
+.ripple-grid-container canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}

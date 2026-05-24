@@ -1,0 +1,12 @@
+<svg width="520" height="120" viewBox="0 0 520 120" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title id="title">StudyPilot wordmark</title>
+  <defs>
+    <linearGradient id="orbGradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#39D7FF"></stop>
+      <stop offset="55%" stop-color="#7C5CFF"></stop>
+      <stop offset="100%" stop-color="#FF4FD8"></stop>
+    </linearGradient>
+  </defs>
+  <text x="0" y="78" fill="#F8FAFC" font-size="72" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, &#39;Segoe UI&#39;, sans-serif" font-weight="650" letter-spacing="-2.4">StudyPilot</text>
+  <circle cx="392" cy="23" r="7" fill="url(#orbGradient)"></circle>
+</svg>

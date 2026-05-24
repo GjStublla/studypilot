@@ -1,0 +1,28 @@
+{
+  "brand": "StudyPilot",
+  "description": "AI-powered study assistant/browser extension with live voice orb.",
+  "colors": {
+    "background": "#03050A",
+    "surface": "#080B12",
+    "surface2": "#0D111C",
+    "text": "#F8FAFC",
+    "muted": "#A6ADBB",
+    "cyan": "#39D7FF",
+    "blue": "#5BB8FF",
+    "violet": "#7C5CFF",
+    "purple": "#A855F7",
+    "pink": "#FF4FD8"
+  },
+  "gradients": {
+    "orb": "radial-gradient(circle at 30% 25%, #39D7FF 0%, #5C6CFF 42%, #A855F7 72%, #FF4FD8 100%)",
+    "line": "linear-gradient(90deg, #5BB8FF, #7C5CFF, #F04CFF)"
+  },
+  "recommended_font": "Inter or SF Pro style system font stack",
+  "assets": {
+    "primary_svg": "svg/studypilot-full-lockup.svg",
+    "mark_svg": "svg/studypilot-mark.svg",
+    "app_icon_svg": "svg/studypilot-app-icon.svg",
+    "wordmark_svg": "svg/studypilot-wordmark.svg",
+    "monochrome_svg": "svg/studypilot-monochrome-lockup.svg"
+  }
+}

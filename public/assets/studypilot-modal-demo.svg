@@ -1,0 +1,196 @@
+<svg width="430" height="820" viewBox="0 0 430 820" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Study Pilot browser extension modal">
+  <style>
+    .wave-bar { animation: pulse 1s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+    .wave-bar:nth-of-type(2) { animation-delay: .06s; }
+    .wave-bar:nth-of-type(3) { animation-delay: .12s; }
+    .wave-bar:nth-of-type(4) { animation-delay: .18s; }
+    .wave-bar:nth-of-type(5) { animation-delay: .24s; }
+    .wave-bar:nth-of-type(6) { animation-delay: .30s; }
+    .wave-bar:nth-of-type(7) { animation-delay: .36s; }
+    .ring { animation: breathe 3.2s ease-in-out infinite; transform-box: view-box; transform-origin: 215px 234px; }
+    .ring.r2 { animation-delay: .18s; }
+    .ring.r3 { animation-delay: .36s; }
+    .ring.r4 { animation-delay: .54s; }
+    @keyframes pulse { 0%,100% { transform: scaleY(.65); opacity:.72; } 50% { transform: scaleY(1.18); opacity:1; } }
+    @keyframes breathe { 0%,100% { transform: scale(.965); opacity:.2; } 50% { transform: scale(1.018); opacity:.62; } }
+  </style>
+  <defs>
+    <linearGradient id="panelGrad" x1="215" y1="0" x2="215" y2="820" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#08152A" />
+      <stop offset="0.48" stop-color="#061020" />
+      <stop offset="1" stop-color="#050D19" />
+    </linearGradient>
+    <radialGradient id="topGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(215 150) rotate(90) scale(255)">
+      <stop offset="0" stop-color="#235CFF" stop-opacity="0.34" />
+      <stop offset="0.42" stop-color="#143FAE" stop-opacity="0.12" />
+      <stop offset="1" stop-color="#081326" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="orbInner" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(215 232) rotate(90) scale(76)">
+      <stop offset="0" stop-color="#3E8BFF" stop-opacity="0.66" />
+      <stop offset="0.58" stop-color="#10265B" />
+      <stop offset="1" stop-color="#071633" />
+    </radialGradient>
+    <linearGradient id="borderGlow" x1="16" y1="492" x2="414" y2="547" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6653FF" />
+      <stop offset="0.5" stop-color="#2F9DFF" />
+      <stop offset="1" stop-color="#7B55FF" />
+    </linearGradient>
+    <linearGradient id="sendGrad" x1="380" y1="516" x2="414" y2="550" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8060FF" />
+      <stop offset="1" stop-color="#405DFF" />
+    </linearGradient>
+    <linearGradient id="micGrad" x1="77" y1="452" x2="122" y2="499" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2E8CFF" />
+      <stop offset="1" stop-color="#514DFF" />
+    </linearGradient>
+    <linearGradient id="orbRing" x1="110" y1="132" x2="316" y2="337" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#27F8FF" />
+      <stop offset="0.24" stop-color="#1E6DFF" />
+      <stop offset="0.48" stop-color="#874BFF" />
+      <stop offset="0.67" stop-color="#FF7CFF" />
+      <stop offset="0.83" stop-color="#754CFF" />
+      <stop offset="1" stop-color="#20EFFF" />
+    </linearGradient>
+    <filter id="softGlow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="10" result="blur" />
+      <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+    </filter>
+    <filter id="orbShadow" x="-70%" y="-70%" width="240%" height="240%">
+      <feGaussianBlur stdDeviation="13" result="coloredBlur" />
+      <feColorMatrix in="coloredBlur" type="matrix" values="0 0 0 0 0.2  0 0 0 0 0.55  0 0 0 0 1  0 0 0 .82 0" />
+      <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
+    </filter>
+    <filter id="smallGlow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+    </filter>
+    <clipPath id="clipPanel">
+      <rect x="0" y="0" width="430" height="820" rx="22" />
+    </clipPath>
+    <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse">
+      <path d="M 28 0 L 0 0 0 28" fill="none" stroke="white" stroke-opacity="0.045" stroke-width="1" />
+    </pattern>
+  </defs>
+
+  <g clip-path="url(#clipPanel)" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+    <rect width="430" height="820" rx="22" fill="url(#panelGrad)" />
+    <rect width="430" height="820" rx="22" fill="url(#topGlow)" />
+    <rect width="430" height="820" fill="url(#grid)" opacity="0.65" />
+    <rect x="0.5" y="0.5" width="429" height="819" rx="21.5" fill="none" stroke="#63718A" stroke-opacity="0.5" />
+
+    <rect x="0" y="0" width="430" height="66" fill="#07101F" opacity="0.96" />
+    <line x1="0" y1="66" x2="430" y2="66" stroke="#FFFFFF" stroke-opacity="0.1" />
+    <path d="M31 20 L34 29 L43 32 L34 35 L31 44 L28 35 L19 32 L28 29 Z" fill="#67E8F9" opacity="0.96" filter="url(#smallGlow)" />
+    <text x="59" y="39" fill="#F8FAFC" font-size="22" font-weight="750" letter-spacing="-0.5">Study Pilot</text>
+    <path d="M355 22 h12 M361 22 v22 M355 44 h12 M358 22 c0 6 6 6 6 0 M358 44 c0-6 6-6 6 0" fill="none" stroke="#F8FAFC" stroke-opacity="0.86" stroke-width="2" stroke-linecap="round" />
+    <circle cx="402" cy="26" r="2" fill="#F8FAFC" />
+    <circle cx="402" cy="33" r="2" fill="#F8FAFC" />
+    <circle cx="402" cy="40" r="2" fill="#F8FAFC" />
+
+    <rect x="110" y="82" width="210" height="38" rx="15" fill="#FFFFFF" fill-opacity="0.075" stroke="#FFFFFF" stroke-opacity="0.14" />
+    <g stroke="#67E8F9" stroke-width="2" stroke-linecap="round">
+      <path d="M130 101 v4" />
+      <path d="M136 97 v12" />
+      <path d="M142 93 v20" />
+      <path d="M148 98 v10" />
+    </g>
+    <text x="161" y="106" fill="#FFFFFF" font-size="13" font-weight="650">Gemini 3.1 Flash Live</text>
+    <path d="M291 98 l5 5 l5 -5" fill="none" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+
+    <circle cx="91" cy="102" r="1.6" fill="#34D399" opacity="0.9" filter="url(#smallGlow)" />
+    <circle cx="304" cy="182" r="1.8" fill="#60A5FA" opacity="0.8" filter="url(#smallGlow)" />
+
+    <circle class="ring r1" cx="215" cy="234" r="78" fill="none" stroke="#60A5FA" stroke-opacity="0.24" />
+    <circle class="ring r2" cx="215" cy="234" r="95" fill="none" stroke="#60A5FA" stroke-opacity="0.22" />
+    <circle class="ring r3" cx="215" cy="234" r="113" fill="none" stroke="#3B82F6" stroke-opacity="0.18" />
+    <circle class="ring r4" cx="215" cy="234" r="132" fill="none" stroke="#2563EB" stroke-opacity="0.14" />
+    <circle cx="215" cy="234" r="104" fill="#2563EB" opacity="0.13" filter="url(#softGlow)" />
+    <circle cx="215" cy="234" r="91" fill="none" stroke="url(#orbRing)" stroke-width="12" opacity="0.95" filter="url(#orbShadow)" />
+    <circle cx="215" cy="234" r="75" fill="url(#orbInner)" stroke="#66EFFF" stroke-opacity="0.38" />
+    <circle cx="215" cy="234" r="108" fill="#22D3EE" opacity="0.11" filter="url(#softGlow)" />
+
+    <g fill="#FFFFFF" filter="url(#smallGlow)">
+      <rect class="wave-bar" x="188" y="227" width="4" height="14" rx="2" />
+      <rect class="wave-bar" x="196" y="221" width="4" height="27" rx="2" />
+      <rect class="wave-bar" x="204" y="213" width="4" height="43" rx="2" />
+      <rect class="wave-bar" x="212" y="205" width="4" height="60" rx="2" />
+      <rect class="wave-bar" x="220" y="210" width="4" height="51" rx="2" />
+      <rect class="wave-bar" x="228" y="218" width="4" height="35" rx="2" />
+      <rect class="wave-bar" x="236" y="224" width="4" height="22" rx="2" />
+    </g>
+
+    <text x="215" y="365" text-anchor="middle" fill="#67E8F9" font-size="16" font-weight="750">Listening...</text>
+    <text x="215" y="390" text-anchor="middle" fill="#FFFFFF" fill-opacity="0.82" font-size="15">Ask anything about this page</text>
+
+    <g>
+      <circle cx="101" cy="449" r="25" fill="url(#micGrad)" stroke="#A5F3FC" stroke-opacity="0.48" filter="url(#smallGlow)" />
+      <path d="M101 435 a6 6 0 0 0 -6 6 v9 a6 6 0 0 0 12 0 v-9 a6 6 0 0 0 -6 -6 Z M90 450 a11 11 0 0 0 22 0 M101 461 v9 M95 470 h12" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" />
+      <circle cx="175" cy="449" r="25" fill="#FFFFFF" fill-opacity="0.055" stroke="#FFFFFF" stroke-opacity="0.14" />
+      <path d="M166 452 h5 l8 7 v-20 l-8 7 h-5 Z M184 445 c3 3 3 7 0 10 M190 440 c6 6 6 16 0 22" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.92" />
+      <circle cx="249" cy="449" r="25" fill="#FFFFFF" fill-opacity="0.055" stroke="#FFFFFF" stroke-opacity="0.14" />
+      <rect x="241" y="439" width="4" height="20" rx="2" fill="#FFFFFF" opacity="0.92" />
+      <rect x="253" y="439" width="4" height="20" rx="2" fill="#FFFFFF" opacity="0.92" />
+      <circle cx="323" cy="449" r="25" fill="#FFFFFF" fill-opacity="0.055" stroke="#A78BFA" stroke-opacity="0.52" />
+      <path d="M323 437 l2 5 l5 1 l-3.4 4 l.8 5 l-4.4 -2.4 l-4.4 2.4 l.8 -5 l-3.4 -4 l5 -1 Z" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round" opacity="0.92" />
+    </g>
+
+    <rect x="16" y="492" width="398" height="55" rx="14" fill="url(#borderGlow)" />
+    <rect x="18" y="494" width="394" height="51" rx="12" fill="#0B1324" opacity="0.97" />
+    <text x="34" y="526" fill="#FFFFFF" fill-opacity="0.58" font-size="14">Ask a question or say something...</text>
+    <circle cx="394" cy="520" r="17" fill="url(#sendGrad)" />
+    <path d="M388 514 l13 6 l-13 6 l3 -6 Z" fill="#FFFFFF" />
+
+    <g font-size="12" font-weight="700" fill="#FFFFFF">
+      <rect x="16" y="562" width="95" height="48" rx="9" fill="#FFFFFF" fill-opacity="0.075" stroke="#FFFFFF" stroke-opacity="0.08" />
+      <g transform="translate(30 576)">
+        <rect width="14" height="17" rx="2.5" fill="#38BDF8" opacity="0.82" />
+        <path d="M4 6 h6 M4 10 h6" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="1.2" stroke-linecap="round" />
+      </g>
+      <text x="51" y="591">Summarize</text>
+
+      <rect x="119" y="562" width="85" height="48" rx="9" fill="#FFFFFF" fill-opacity="0.075" stroke="#FFFFFF" stroke-opacity="0.08" />
+      <g transform="translate(135 576)" fill="none" stroke="#FACC15" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 1 a7 7 0 0 0 -4 12 v3 h8 v-3 a7 7 0 0 0 -4 -12 Z" />
+        <path d="M5 19 h6" />
+      </g>
+      <text x="154" y="591">Explain</text>
+
+      <rect x="212" y="562" width="87" height="48" rx="9" fill="#FFFFFF" fill-opacity="0.075" stroke="#FFFFFF" stroke-opacity="0.08" />
+      <g transform="translate(227 577)">
+        <circle cx="8" cy="8" r="8" fill="#34D399" opacity="0.82" />
+        <text x="8" y="12" text-anchor="middle" font-size="12" fill="#042F2E" font-weight="900">?</text>
+      </g>
+      <text x="249" y="591">Quiz Me</text>
+
+      <rect x="307" y="562" width="107" height="48" rx="9" fill="#FFFFFF" fill-opacity="0.075" stroke="#FFFFFF" stroke-opacity="0.08" />
+      <g transform="translate(322 577)">
+        <rect x="3" y="1" width="13" height="14" rx="2" fill="#A855F7" opacity="0.54" />
+        <rect width="13" height="14" rx="2" fill="#A855F7" opacity="0.85" />
+        <path d="M3 5 h7 M3 9 h7" stroke="#FFFFFF" stroke-opacity="0.85" stroke-linecap="round" />
+      </g>
+      <text x="344" y="591">Flashcards</text>
+    </g>
+
+    <rect x="16" y="624" width="398" height="128" rx="15" fill="#FFFFFF" fill-opacity="0.045" stroke="#FFFFFF" stroke-opacity="0.11" />
+    <text x="34" y="654" fill="#FFFFFF" font-size="15" font-weight="750">Photosynthesis explained</text>
+    <text x="215" y="654" fill="#FFFFFF" fill-opacity="0.58" font-size="12">Just now</text>
+    <path d="M382 646 l5 5 l5 -5" fill="none" stroke="#CBD5E1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+    <text x="34" y="684" fill="#FFFFFF" fill-opacity="0.88" font-size="14.5">
+      <tspan x="34" dy="0">Photosynthesis converts light energy into chemical</tspan>
+      <tspan x="34" dy="19">energy. Plants use light, water, and carbon dioxide</tspan>
+      <tspan x="34" dy="19">to produce glucose and oxygen in two stages:</tspan>
+      <tspan x="34" dy="19">light reactions, then the Calvin cycle.</tspan>
+    </text>
+
+    <rect x="407" y="646" width="4" height="90" rx="2" fill="#FFFFFF" fill-opacity="0.08" />
+    <rect x="408" y="654" width="2" height="70" rx="1" fill="#FFFFFF" fill-opacity="0.14" />
+
+    <rect x="0" y="766" width="430" height="54" fill="#07101F" opacity="0.96" />
+    <line x1="0" y1="766" x2="430" y2="766" stroke="#FFFFFF" stroke-opacity="0.1" />
+    <path d="M31 780 L33 787 L40 790 L33 793 L31 800 L28 793 L21 790 L28 787 Z" fill="#67E8F9" opacity="0.95" filter="url(#smallGlow)" />
+    <text x="58" y="795" fill="#FFFFFF" fill-opacity="0.88" font-size="13" font-weight="650">Study smarter with voice AI</text>
+    <rect x="355" y="777" width="59" height="29" rx="14.5" fill="#7E22CE" fill-opacity="0.74" stroke="#C084FC" stroke-opacity="0.25" />
+    <text x="376" y="796" fill="#FFFFFF" font-size="13" font-weight="800">Pro</text>
+    <path d="M365 786 l3 4 l4 -6 l4 6 l3 -4 l-2 8 h-10 Z" fill="none" stroke="#C4B5FD" stroke-width="1.4" stroke-linejoin="round" />
+  </g>
+</svg>
