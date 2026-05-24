@@ -16,6 +16,7 @@ import {
   MessageCircle,
   Mic,
   MicOff,
+  Moon,
   MoreHorizontal,
   PanelLeft,
   PanelRight,
@@ -26,6 +27,7 @@ import {
   Settings as SettingsIcon,
   ShieldCheck,
   Sparkles,
+  Sun,
 } from 'lucide-react';
 
 /* ============================================================================
@@ -42,6 +44,25 @@ type View =
   | 'rubrics'
   | 'action-items'
   | 'settings';
+
+type Theme = 'dark' | 'light';
+
+const THEME_STORAGE_KEY = 'studypilot.dashboard-theme';
+
+function getInitialTheme(): Theme {
+  if (typeof window === 'undefined') return 'dark';
+  try {
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+    if (stored === 'light' || stored === 'dark') return stored;
+  } catch {
+    /* localStorage unavailable */
+  }
+  if (typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-color-scheme: light)').matches) {
+    return 'light';
+  }
+  return 'dark';
+}
 
 type LucideIcon = ComponentType<SVGProps<SVGSVGElement> & { size?: number | string }>;
 
@@ -293,6 +314,20 @@ export default function Dashboard() {
   const [activeRubricId, setActiveRubricId] = useState<string>('r1');
   const [selectedSessionId, setSelectedSessionId] = useState<string>('s1');
   const [chatContextSessionId, setChatContextSessionId] = useState<string>('s1');
+  const [theme, setTheme] = useState<Theme>(getInitialTheme);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const root = document.documentElement;
+    if (theme === 'light') {
+      root.classList.add('theme-light');
+    } else {
+      root.classList.remove('theme-light');
+    }
+    return () => {
+      root.classList.remove('theme-light');
+    };
+  }, [theme]);
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     if (typeof window === 'undefined') return true;
     return window.innerWidth >= 760;
@@ -374,6 +409,17 @@ export default function Dashboard() {
 
   const toggleSidebar = useCallback(() => setSidebarOpen((v) => !v), []);
   const toggleContext = useCallback(() => setContextOpen((v) => !v), []);
+  const toggleTheme = useCallback(() => {
+    setTheme((prev) => {
+      const next: Theme = prev === 'dark' ? 'light' : 'dark';
+      try {
+        window.localStorage.setItem(THEME_STORAGE_KEY, next);
+      } catch {
+        /* localStorage unavailable */
+      }
+      return next;
+    });
+  }, []);
   const continueLatestInChat = useCallback(() => openInChat(SESSIONS[0].id), [openInChat]);
   const openChatSessionDetail = useCallback(
     () => openSessionDetail(chatSession.id),
@@ -404,6 +450,7 @@ export default function Dashboard() {
     <main
       className={[
         'app-dashboard',
+        theme === 'light' ? 'is-light' : '',
         sidebarOpen ? '' : 'is-collapsed',
         contextOpen ? '' : 'is-context-collapsed',
       ]
@@ -421,9 +468,11 @@ export default function Dashboard() {
       <section className="ds-main">
         <TopBar
           view={view}
+          theme={theme}
           contextOpen={contextOpen}
           onToggleSidebar={toggleSidebar}
           onToggleContext={toggleContext}
+          onToggleTheme={toggleTheme}
         />
 
         <div className="ds-canvas">
@@ -488,7 +537,20 @@ export default function Dashboard() {
             />
           )}
 
-          {view === 'settings' && <SettingsView student={STUDENT} />}
+          {view === 'settings' && (
+            <SettingsView
+              student={STUDENT}
+              theme={theme}
+              onSetTheme={(nextTheme) => {
+                setTheme(nextTheme);
+                try {
+                  window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+                } catch {
+                  /* localStorage unavailable */
+                }
+              }}
+            />
+          )}
         </div>
       </section>
 
@@ -533,11 +595,27 @@ const Sidebar = memo(function Sidebar({
   return (
     <aside className="ds-sidebar">
       <div className="ds-brand">
-        <img
-          src="/assets/studypilot-monochrome-lockup.svg"
-          alt="StudyPilot"
-          className="ds-brand-lockup"
-        />
+        <svg
+          viewBox="0 0 200 180"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          role="img"
+          className="ds-brand-logo"
+        >
+          <title>StudyPilot</title>
+          <g strokeLinecap="round" strokeLinejoin="round">
+            <path d="M34 72V38c0-9.9 8.1-18 18-18h96c9.9 0 18 8.1 18 18v34" fill="none" stroke="currentColor" strokeWidth="4" />
+            <path d="M34 48h132" fill="none" stroke="currentColor" strokeWidth="3" opacity="0.6" />
+            <circle cx="52" cy="34" r="4.5" fill="currentColor" />
+            <circle cx="66" cy="34" r="4.5" fill="currentColor" opacity="0.82" />
+            <circle cx="80" cy="34" r="4.5" fill="currentColor" opacity="0.64" />
+            <circle cx="100" cy="92" r="44" fill="currentColor" opacity="0.15" />
+            <path d="M100 61l19 58-19-13-19 13 19-58z" fill="none" stroke="currentColor" strokeWidth="4" />
+            <path d="M100 155c-23-16-49-22-86-22" fill="none" stroke="currentColor" strokeWidth="4" />
+            <path d="M100 155c23-16 49-22 86-22" fill="none" stroke="currentColor" strokeWidth="4" />
+            <path d="M100 9l4 11 11 4-11 4-4 11-4-11-11-4 11-4 4-11z" fill="currentColor" />
+          </g>
+        </svg>
         <span className="ds-brand-env">Dashboard</span>
       </div>
 
@@ -598,16 +676,21 @@ const Sidebar = memo(function Sidebar({
 
 const TopBar = memo(function TopBar({
   view,
+  theme,
   contextOpen,
   onToggleSidebar,
   onToggleContext,
+  onToggleTheme,
 }: {
   view: View;
+  theme: Theme;
   contextOpen: boolean;
   onToggleSidebar: () => void;
   onToggleContext: () => void;
+  onToggleTheme: () => void;
 }) {
   const t = VIEW_TITLES[view];
+  const isLight = theme === 'light';
 
   return (
     <header className="ds-topbar">
@@ -631,6 +714,15 @@ const TopBar = memo(function TopBar({
           <input placeholder="Search sessions, rubrics, action items…" />
           <kbd>⌘K</kbd>
         </div>
+        <button
+          type="button"
+          className="ds-icon-btn ds-theme-toggle"
+          onClick={onToggleTheme}
+          aria-label={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
+          title={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
+        >
+          {isLight ? <Moon size={14} strokeWidth={1.6} /> : <Sun size={14} strokeWidth={1.6} />}
+        </button>
         <button type="button" className="ds-icon-btn" aria-label="More">
           <MoreHorizontal size={15} strokeWidth={1.6} />
         </button>
@@ -1438,7 +1530,15 @@ const ActionItemsView = memo(function ActionItemsView({
    Settings view
    ============================================================================ */
 
-const SettingsView = memo(function SettingsView({ student }: { student: typeof STUDENT }) {
+const SettingsView = memo(function SettingsView({
+  student,
+  theme,
+  onSetTheme,
+}: {
+  student: typeof STUDENT;
+  theme: Theme;
+  onSetTheme: (theme: Theme) => void;
+}) {
   const [coachMode, setCoachMode] = useState<CoachMode>('essay');
 
   return (
@@ -1487,6 +1587,35 @@ const SettingsView = memo(function SettingsView({ student }: { student: typeof S
                 {m.label}
               </button>
             ))}
+          </div>
+        </article>
+
+        <article className="ds-card">
+          <div className="ds-card-eyebrow">
+            <span>Appearance</span>
+          </div>
+          <p className="ds-card-sub">
+            Customize the dashboard look. Toggling updates the colors instantly.
+          </p>
+          <div className="ds-segment" role="radiogroup">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={theme === 'dark'}
+              className={`ds-segment-btn ${theme === 'dark' ? 'is-active' : ''}`}
+              onClick={() => onSetTheme('dark')}
+            >
+              Dark mode
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={theme === 'light'}
+              className={`ds-segment-btn ${theme === 'light' ? 'is-active' : ''}`}
+              onClick={() => onSetTheme('light')}
+            >
+              Light mode
+            </button>
           </div>
         </article>
 
@@ -1698,11 +1827,18 @@ const EmptyState = memo(function EmptyState({ title, body }: { title: string; bo
 
 const StudyPilotMark = memo(function StudyPilotMark({ size = 18 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 200 200" fill="none" aria-hidden="true">
-      <circle cx="100" cy="100" r="84" fill="#f4f5fb" />
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 200 200"
+      fill="none"
+      aria-hidden="true"
+      className="ds-spmark"
+    >
+      <circle cx="100" cy="100" r="84" className="ds-spmark-bg" />
       <path
         d="M100 56l26 84-26-18-26 18 26-84z"
-        stroke="#050610"
+        className="ds-spmark-arrow"
         strokeWidth="6"
         strokeLinejoin="round"
         strokeLinecap="round"

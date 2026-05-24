@@ -323,7 +323,7 @@ function HeroNav() {
   return (
     <header className="hero-nav">
       <a href="#" className="brand">
-        <StudyPilotMark size={56} />
+        <StudyPilotMark size={80} />
         <span className="brand-text">studypilot.</span>
       </a>
       <nav aria-label="Primary">

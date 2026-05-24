@@ -274,6 +274,11 @@ button { font: inherit; }
   color: var(--ink);
 }
 
+.brand svg {
+  margin: -11px -6px -11px -14px;
+  transition: transform 0.2s var(--ease-out);
+}
+
 .brand-text {
   font-family: var(--serif);
   font-size: 23px;
@@ -1538,4 +1543,27 @@ button { font: inherit; }
   .footer-bottom nav {
     flex-wrap: wrap;
   }
+}
+
+/* ===== Light Theme Global scrollbar overrides ===== */
+html.theme-light {
+  scrollbar-color: rgba(124, 92, 255, 0.35) rgba(247, 243, 234, 0.45);
+  color-scheme: light;
+}
+
+html.theme-light ::-webkit-scrollbar-track {
+  background: rgba(247, 243, 234, 0.45);
+  border-left: 1px solid rgba(20, 17, 12, 0.05);
+}
+
+html.theme-light ::-webkit-scrollbar-thumb {
+  background: rgba(124, 92, 255, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(20, 17, 12, 0.03);
+}
+
+html.theme-light ::-webkit-scrollbar-thumb:hover {
+  background-image: linear-gradient(180deg, #0c7c9e, #5a30c5, #a51b6f);
+  box-shadow: 
+    inset 0 0 0 1px rgba(20, 17, 12, 0.12),
+    0 0 8px rgba(90, 48, 197, 0.4);
 }
