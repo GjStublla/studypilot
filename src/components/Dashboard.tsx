@@ -113,7 +113,20 @@ type SessionRow = {
 
 /* ---------- Mock data ---------- */
 
-const STUDENT = { name: 'Maya', initials: 'M', email: 'maya.l@northcrest.edu' };
+/* ---------- Read logged-in user from localStorage ---------- */
+
+function getLoggedInStudent() {
+  try {
+    const email = localStorage.getItem('sp_email') ?? 'student@university.edu';
+    const name = email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    const initials = name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
+    return { name, initials, email };
+  } catch {
+    return { name: 'Student', initials: 'S', email: '' };
+  }
+}
+
+const STUDENT = getLoggedInStudent();
 
 const RUBRICS: Rubric[] = [
   {

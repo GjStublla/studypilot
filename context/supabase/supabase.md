@@ -283,6 +283,8 @@ VITE_SUPABASE_ANON_KEY
 
 Run this SQL in the Supabase SQL Editor.
 
+> **Note on table order:** `sessions` must be created before `knowledge_documents` because `knowledge_documents` has a foreign key to `sessions`. The `rubrics ↔ knowledge_documents` circular FK is handled at the end with `ALTER TABLE`.
+
 ```sql
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
@@ -314,6 +316,8 @@ FOR EACH ROW
 EXECUTE FUNCTION trigger_set_timestamp();
 
 -- Rubrics
+-- Note: knowledge_document_id FK is added later via ALTER TABLE
+-- because knowledge_documents does not exist yet at this point.
 CREATE TABLE public.rubrics (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
@@ -350,8 +354,26 @@ CREATE TABLE public.rubric_criteria (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Sessions imported from extension
+-- Must be created before knowledge_documents because knowledge_documents references sessions.
+CREATE TABLE public.sessions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    rubric_id UUID REFERENCES public.rubrics(id) ON DELETE SET NULL,
+    title TEXT NOT NULL,
+    source TEXT DEFAULT 'Chrome Extension',
+    mode TEXT NOT NULL CHECK (mode IN ('Essay Coach', 'Presentation Coach', 'Study Coach', 'Lecture', 'Research Reader')),
+    duration_seconds INT NOT NULL DEFAULT 0,
+    page_title TEXT,
+    page_url TEXT,
+    summary TEXT,
+    when_timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Knowledge documents indexed into Gemini File Search.
 -- This table is the Supabase-side metadata source for managed RAG documents.
+-- Depends on sessions existing above.
 CREATE TABLE public.knowledge_documents (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
@@ -392,22 +414,6 @@ CREATE TRIGGER set_timestamp_knowledge_documents
 BEFORE UPDATE ON public.knowledge_documents
 FOR EACH ROW
 EXECUTE FUNCTION trigger_set_timestamp();
-
--- Sessions imported from extension
-CREATE TABLE public.sessions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-    rubric_id UUID REFERENCES public.rubrics(id) ON DELETE SET NULL,
-    title TEXT NOT NULL,
-    source TEXT DEFAULT 'Chrome Extension',
-    mode TEXT NOT NULL CHECK (mode IN ('Essay Coach', 'Presentation Coach', 'Study Coach', 'Lecture', 'Research Reader')),
-    duration_seconds INT NOT NULL DEFAULT 0,
-    page_title TEXT,
-    page_url TEXT,
-    summary TEXT,
-    when_timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
 
 CREATE TABLE public.session_messages (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

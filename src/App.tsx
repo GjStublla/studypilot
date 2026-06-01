@@ -21,6 +21,8 @@ import {
 } from 'framer-motion';
 import { Button } from './components/ui/button';
 import GradientBlinds from './components/GradientBlinds';
+import AuthPage from './components/AuthPage';
+import './components/AuthPage.css';
 
 const loadDashboard = () => import('./components/Dashboard');
 const Dashboard = lazy(loadDashboard);
@@ -112,8 +114,33 @@ const staggerParent: Variants = {
   },
 };
 
+// ─── Auth helpers ─────────────────────────────────────────────────────────────
+
+function getStoredUser() {
+  try {
+    const token = localStorage.getItem('sp_access_token');
+    const email = localStorage.getItem('sp_email');
+    if (!token || !email) return null;
+    // Derive display name from email (e.g. john.smith@uni.edu → John Smith)
+    const name = email
+      .split('@')[0]
+      .replace(/[._]/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+    const initials = name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
+    return { token, email, name, initials };
+  } catch {
+    return null;
+  }
+}
+
 function App() {
   const [hash, setHash] = useState(() => (typeof window !== 'undefined' ? window.location.hash : ''));
+  const [user, setUser] = useState(() => getStoredUser());
+
+  // Re-read auth state whenever hash changes (e.g. after login redirects to #dashboard)
+  useEffect(() => {
+    setUser(getStoredUser());
+  }, [hash]);
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -126,17 +153,41 @@ function App() {
   }, []);
 
   const isDashboard = hash.startsWith('#dashboard');
+  const isAuth = hash.startsWith('#auth');
+
+  // Block dashboard access if not logged in
   if (isDashboard) {
+    if (!user) {
+      // Redirect to auth
+      window.location.hash = '#auth';
+      return null;
+    }
     return (
       <Suspense fallback={null}>
         <Dashboard />
       </Suspense>
     );
   }
+
+  if (isAuth) {
+    // Already logged in — go straight to dashboard
+    if (user) {
+      window.location.hash = '#dashboard';
+      return null;
+    }
+    return <AuthPage />;
+  }
+
   return (
     <LazyMotion features={domAnimation}>
       <div className="site-shell">
-        <Hero />
+        <Hero user={user} onLogout={() => {
+          localStorage.removeItem('sp_access_token');
+          localStorage.removeItem('sp_refresh_token');
+          localStorage.removeItem('sp_user_id');
+          localStorage.removeItem('sp_email');
+          setUser(null);
+        }} />
         <Compatibility />
         <Capabilities />
         <Workflow />
@@ -148,7 +199,7 @@ function App() {
   );
 }
 
-function Hero() {
+function Hero({ user, onLogout }: { user: ReturnType<typeof getStoredUser>; onLogout: () => void }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = useReducedMotion();
   const { scrollYProgress } = useScroll({
@@ -207,7 +258,7 @@ function Hero() {
       <div className="hero-mask" aria-hidden="true" />
       <div className="hero-grain" aria-hidden="true" />
 
-      <HeroNav />
+      <HeroNav user={user} onLogout={onLogout} />
 
       <div className="hero-frame">
         <div className="hero-grid">
@@ -319,7 +370,7 @@ function Hero() {
   );
 }
 
-function HeroNav() {
+function HeroNav({ user, onLogout }: { user: ReturnType<typeof getStoredUser>; onLogout: () => void }) {
   return (
     <header className="hero-nav">
       <a href="#" className="brand">
@@ -331,18 +382,39 @@ function HeroNav() {
         <a href="#capabilities">Modes</a>
         <a href="#workflow">Workflow</a>
         <a href="#install">Install</a>
-        <a href="#dashboard" onMouseEnter={prefetchDashboard} onFocus={prefetchDashboard}>
-          Dashboard
-        </a>
+        {user ? (
+          <a href="#dashboard" onMouseEnter={prefetchDashboard} onFocus={prefetchDashboard}>
+            Dashboard
+          </a>
+        ) : (
+          <span className="hero-nav-disabled" title="Sign in to access the dashboard">
+            Dashboard
+          </span>
+        )}
         <a href="#privacy">
           <Globe2 size={13} />
           EN
         </a>
       </nav>
-      <a href="#install" className="login-button">
-        Add to Chrome
-        <ArrowRight size={13} />
-      </a>
+
+      {user ? (
+        <div className="nav-user">
+          <span className="nav-user-avatar" aria-hidden="true">{user.initials}</span>
+          <span className="nav-user-name">{user.name}</span>
+          <button
+            className="nav-user-logout"
+            onClick={onLogout}
+            aria-label="Sign out"
+          >
+            Sign out
+          </button>
+        </div>
+      ) : (
+        <a href="#auth" className="login-button">
+          Log in
+          <ArrowRight size={13} />
+        </a>
+      )}
     </header>
   );
 }
