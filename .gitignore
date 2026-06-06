@@ -73,3 +73,12 @@ design.tar.gz
 # Python virtual environment
 .venv/
 venv/
+
+# Python cache and build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+pip-wheel-metadata/
+.pytest_cache/
+.mypy_cache/
