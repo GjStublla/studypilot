@@ -69,3 +69,7 @@ dist-ssr/
 design.tar.gz
 *.png
 # Avoid tracking large mock data or test snapshots if needed, but keeping this basic.
+
+# Python virtual environment
+.venv/
+venv/
