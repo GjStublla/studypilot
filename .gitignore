@@ -82,3 +82,7 @@ __pycache__/
 pip-wheel-metadata/
 .pytest_cache/
 .mypy_cache/
+
+# Supabase CLI local state (project ref, org id, pooler URL — not for version control)
+supabase/.temp/
+supabase/.branches/
