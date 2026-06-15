@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Header, status
 from pydantic import BaseModel
 
-from supabase_client import supabase, supabase_admin
+from supabase_client import supabase, get_user_client
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -66,11 +66,13 @@ def get_me(authorization: str = Header(...)):
 
     user_id = str(auth_response.user.id)
 
-    # --- Step 3: Query the profiles table using the admin client ---
-    # We use supabase_admin (service role) here so RLS doesn't block the query.
-    # The JWT was already verified above — this is safe.
+    # --- Step 3: Query the profiles table as the user (RLS-enforced) ---
+    # Use a client scoped to the caller's verified JWT so the profiles RLS policy
+    # (auth.uid() = id) limits the read to their own row. No service-role key on
+    # this path — defense in depth.
     try:
-        result = supabase_admin.table("profiles").select("*").eq("id", user_id).single().execute()
+        user_client = get_user_client(token)
+        result = user_client.table("profiles").select("*").eq("id", user_id).single().execute()
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

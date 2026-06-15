@@ -1,21 +1,10 @@
 import { useState } from 'react';
 import { ArrowRight, Eye, EyeOff, Loader } from 'lucide-react';
+import { apiPost, storeAuth, type AuthTokens } from '../lib/api';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type Mode = 'login' | 'signup';
-
-interface AuthResponse {
-  access_token: string;
-  refresh_token: string;
-  user_id: string;
-  email: string;
-}
-
-// ─── Config ──────────────────────────────────────────────────────────────────
-
-// Point this at your FastAPI server
-const API_BASE = 'http://localhost:8000';
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -80,12 +69,7 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-
+      const res = await apiPost('/auth/login', { email, password });
       const data = await res.json();
 
       if (!res.ok) {
@@ -93,13 +77,8 @@ function LoginForm() {
         return;
       }
 
-      const auth = data as AuthResponse;
-
-      // Store the JWT so the rest of the app can use it
-      localStorage.setItem('sp_access_token', auth.access_token);
-      localStorage.setItem('sp_refresh_token', auth.refresh_token);
-      localStorage.setItem('sp_user_id', auth.user_id);
-      localStorage.setItem('sp_email', auth.email);
+      // Store the JWT (+ refresh token) so the rest of the app can use it.
+      storeAuth(data as AuthTokens);
 
       // Redirect to dashboard
       window.location.hash = '#dashboard';
@@ -200,12 +179,7 @@ function SignupForm({ onSuccess }: { onSuccess: () => void }) {
     setLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE}/auth/signup`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password }),
-      });
-
+      const res = await apiPost('/auth/signup', { name, email, password });
       const data = await res.json();
 
       if (!res.ok) {

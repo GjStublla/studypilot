@@ -2,3 +2,4 @@ fastapi[standard]==0.115.5
 supabase==2.10.0
 python-dotenv==1.0.1
 pydantic[email]==2.10.3
+slowapi==0.1.9
