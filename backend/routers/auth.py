@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException, Header, status
-from pydantic import BaseModel, EmailStr
+from fastapi import APIRouter, HTTPException, Header, Request, status
+from pydantic import BaseModel, EmailStr, Field
 
+from rate_limit import limiter
 from supabase_client import supabase
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -10,7 +11,10 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 class SignUpRequest(BaseModel):
     email: EmailStr
-    password: str
+    # Enforced server-side so it can't be bypassed by calling the API directly
+    # (the client also checks). Keep in sync with the Supabase dashboard password
+    # policy (Auth → Policies) since there is no supabase/config.toml.
+    password: str = Field(min_length=8)
     name: str
 
 
@@ -27,7 +31,9 @@ class AuthResponse(BaseModel):
     access_token: str
     refresh_token: str
     user_id: str
-    email: str
+    # The Supabase SDK can return a user with no email in some flows, so allow None
+    # rather than risk a 500 from response-model validation.
+    email: str | None = None
 
 
 class SignupPendingResponse(BaseModel):
@@ -46,7 +52,8 @@ class MessageResponse(BaseModel):
     status_code=status.HTTP_201_CREATED,
     summary="Register a new student account",
 )
-def signup(body: SignUpRequest):
+@limiter.limit("5/minute")
+def signup(request: Request, body: SignUpRequest):
     """
     Creates a new Supabase Auth user.
     The auth trigger in the database automatically creates a profiles row.
@@ -67,30 +74,29 @@ def signup(body: SignUpRequest):
             },
         })
     except Exception as e:
+        # Log the real error server-side, but return a generic message so we don't
+        # leak SDK internals or whether the email is already registered.
+        print(f"[signup] sign_up failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
+            detail="Could not create account. Please try again.",
         )
 
-    if response.user is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Signup failed. The email may already be registered.",
+    # Email confirmation OFF (or auto-confirm) — a session is returned, log in now.
+    if response.session is not None and response.user is not None:
+        return AuthResponse(
+            access_token=response.session.access_token,
+            refresh_token=response.session.refresh_token,
+            user_id=str(response.user.id),
+            email=response.user.email or body.email,
         )
 
-    # Email confirmation is ON — session is None until user confirms email
-    if response.session is None:
-        return SignupPendingResponse(
-            message="Account created. Please check your email to confirm your account, then sign in.",
-            email_confirmation_required=True,
-        )
-
-    # Email confirmation is OFF — return JWT immediately
-    return AuthResponse(
-        access_token=response.session.access_token,
-        refresh_token=response.session.refresh_token,
-        user_id=str(response.user.id),
-        email=response.user.email,
+    # Email confirmation ON (our configuration): Supabase returns no session and
+    # deliberately obfuscates whether the email already existed. Return the *same*
+    # response in every case so this endpoint can't be used to enumerate accounts.
+    return SignupPendingResponse(
+        message="Account created. Please check your email to confirm your account, then sign in.",
+        email_confirmation_required=True,
     )
 
 
@@ -101,7 +107,8 @@ def signup(body: SignUpRequest):
     response_model=AuthResponse,
     summary="Sign in with email and password",
 )
-def login(body: LoginRequest):
+@limiter.limit("5/minute")
+def login(request: Request, body: LoginRequest):
     """
     Authenticates an existing user with email and password.
 
@@ -130,7 +137,7 @@ def login(body: LoginRequest):
         access_token=response.session.access_token,
         refresh_token=response.session.refresh_token,
         user_id=str(response.user.id),
-        email=response.user.email,
+        email=response.user.email or body.email,
     )
 
 
