@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentType, MouseEvent, ReactNode, SVGProps } from 'react';
+import { apiFetch } from '../lib/api';
 import './Dashboard.css';
 import {
   ArrowRight,
@@ -328,6 +329,32 @@ export default function Dashboard() {
   const [selectedSessionId, setSelectedSessionId] = useState<string>('s1');
   const [chatContextSessionId, setChatContextSessionId] = useState<string>('s1');
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
+  // Real profile from the backend; starts as the email-derived guess so first
+  // paint isn't blank, then gets replaced with the actual name/initials/email.
+  const [student, setStudent] = useState(STUDENT);
+
+  // Load the signed-in user's real profile. apiFetch refreshes the token on a
+  // 401 and, if that fails, redirects to #auth — so this doubles as the session
+  // validity check on dashboard entry (no longer trusting mere token presence).
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch('/users/me')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((profile) => {
+        if (cancelled || !profile) return;
+        setStudent({
+          name: profile.name,
+          email: profile.email,
+          initials: profile.initials,
+        });
+      })
+      .catch(() => {
+        /* network error or expired session (already redirected) — keep fallback */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -471,6 +498,7 @@ export default function Dashboard() {
         .join(' ')}
     >
       <Sidebar
+        student={student}
         view={view}
         setView={setView}
         openCount={openActionItems.length}
@@ -491,7 +519,7 @@ export default function Dashboard() {
         <div className="ds-canvas">
           {view === 'home' && (
             <HomeView
-              student={STUDENT}
+              student={student}
               activeRubric={activeRubric}
               latestSession={SESSIONS[0]}
               latestSessionOpenCount={latestSessionOpenCount}
@@ -505,6 +533,7 @@ export default function Dashboard() {
 
           {view === 'chat' && (
             <ChatView
+              student={student}
               activeRubric={activeRubric}
               session={chatSession}
               onOpenSession={openChatSessionDetail}
@@ -552,7 +581,7 @@ export default function Dashboard() {
 
           {view === 'settings' && (
             <SettingsView
-              student={STUDENT}
+              student={student}
               theme={theme}
               onSetTheme={(nextTheme) => {
                 setTheme(nextTheme);
@@ -569,7 +598,7 @@ export default function Dashboard() {
 
       <ContextPanel
         view={view}
-        student={STUDENT}
+        student={student}
         activeRubric={activeRubric}
         chatSession={chatSession}
         selectedSession={selectedSession}
@@ -587,12 +616,14 @@ export default function Dashboard() {
    ============================================================================ */
 
 const Sidebar = memo(function Sidebar({
+  student,
   view,
   setView,
   openCount,
   sessionsCount,
   rubricsCount,
 }: {
+  student: typeof STUDENT;
   view: View;
   setView: (v: View) => void;
   openCount: number;
@@ -671,11 +702,11 @@ const Sidebar = memo(function Sidebar({
 
         <button type="button" className="ds-account">
           <span className="ds-account-avatar" aria-hidden="true">
-            {STUDENT.initials}
+            {student.initials}
           </span>
           <span className="ds-account-body">
-            <b>{STUDENT.name}</b>
-            <em>{STUDENT.email}</em>
+            <b>{student.name}</b>
+            <em>{student.email}</em>
           </span>
         </button>
       </div>
@@ -958,10 +989,12 @@ const SEED_MESSAGES: Message[] = [
 ];
 
 const ChatView = memo(function ChatView({
+  student,
   activeRubric,
   session,
   onOpenSession,
 }: {
+  student: typeof STUDENT;
   activeRubric: Rubric;
   session: Session;
   onOpenSession: () => void;
@@ -1054,7 +1087,7 @@ const ChatView = memo(function ChatView({
 
       <div className="ds-messages" ref={messagesRef}>
         {messages.map((m) => (
-          <MessageBubble key={m.id} message={m} />
+          <MessageBubble key={m.id} message={m} student={student} />
         ))}
       </div>
 
@@ -1118,15 +1151,21 @@ const ChatView = memo(function ChatView({
   );
 });
 
-const MessageBubble = memo(function MessageBubble({ message }: { message: Message }) {
+const MessageBubble = memo(function MessageBubble({
+  message,
+  student,
+}: {
+  message: Message;
+  student: typeof STUDENT;
+}) {
   return (
     <article className={`ds-msg ds-msg-${message.role}`}>
       <div className="ds-msg-avatar" aria-hidden="true">
-        {message.role === 'ai' ? <StudyPilotMark size={14} /> : <span>{STUDENT.initials}</span>}
+        {message.role === 'ai' ? <StudyPilotMark size={14} /> : <span>{student.initials}</span>}
       </div>
       <div className="ds-msg-body">
         <div className="ds-msg-meta">
-          <b>{message.role === 'ai' ? 'StudyPilot' : STUDENT.name}</b>
+          <b>{message.role === 'ai' ? 'StudyPilot' : student.name}</b>
           <time>{message.time}</time>
         </div>
         {message.lines.map((line, i) => (
