@@ -22,6 +22,7 @@ import {
 import { Button } from './components/ui/button';
 import GradientBlinds from './components/GradientBlinds';
 import AuthPage from './components/AuthPage';
+import { clearAuth } from './lib/api';
 import './components/AuthPage.css';
 
 const loadDashboard = () => import('./components/Dashboard');
@@ -182,10 +183,7 @@ function App() {
     <LazyMotion features={domAnimation}>
       <div className="site-shell">
         <Hero user={user} onLogout={() => {
-          localStorage.removeItem('sp_access_token');
-          localStorage.removeItem('sp_refresh_token');
-          localStorage.removeItem('sp_user_id');
-          localStorage.removeItem('sp_email');
+          clearAuth();
           setUser(null);
         }} />
         <Compatibility />
