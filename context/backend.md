@@ -13,10 +13,11 @@ A Python backend lives in `backend/`. It sits between the React frontend and Sup
 ```text
 backend/
   main.py               ← FastAPI app entry point, CORS config
-  supabase_client.py    ← Supabase connections (anon + admin)
+  supabase_client.py    ← Supabase connections (anon + admin) + get_user_client()
+  rate_limit.py         ← shared slowapi limiter (kept separate to avoid a circular import)
   routers/
-    auth.py             ← signup, login, logout, refresh
-    users.py            ← GET /users/me
+    auth.py             ← signup, login, logout, refresh (rate-limited)
+    users.py            ← GET /users/me (RLS-scoped read)
   .env                  ← secrets (never committed)
   .env.example          ← template for new developers
   requirements.txt      ← Python dependencies
@@ -85,7 +86,33 @@ GEMINI_API_KEY=                 ← from Google AI Studio
 Rules:
 - Never commit `.env` — it is in `.gitignore`
 - Never expose `SUPABASE_SERVICE_ROLE_KEY` or `GEMINI_API_KEY` to the frontend or extension
-- The frontend may only use `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
+- The frontend may only use public `VITE_*` vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_API_BASE_URL`
+
+### Frontend env
+
+The web app talks to this backend through `src/lib/api.ts`, which reads
+`VITE_API_BASE_URL` (set it in a root `.env`) and falls back to
+`http://localhost:8000` when unset — so no `.env` is needed for local dev.
+
+### Security notes
+
+- **Token storage.** The access + refresh tokens are kept in `localStorage`.
+  Convenient, but readable by any script on the page, so it is exposed to XSS — a
+  strict CSP and dependency hygiene are the practical mitigations during the
+  beta. Moving to httpOnly cookies (with CSRF protection) is the planned
+  post-beta hardening. Refresh-on-`401` is handled centrally by `apiFetch()` in
+  `src/lib/api.ts`.
+- **Password policy.** Signup enforces a minimum length server-side via
+  `Field(min_length=8)` on `SignUpRequest` (the client check is only UX). Because
+  there is no `supabase/config.toml`, also set the matching minimum in the
+  Supabase dashboard (Auth → Policies) and enable leaked-password protection in
+  production.
+- **Rate limiting.** `/auth/login` and `/auth/signup` are capped at 5
+  requests/minute per IP (slowapi). Storage is in-memory — use a Redis backend if
+  you run multiple workers.
+- **Anti-enumeration.** Signup returns the same "check your email" response
+  whether or not the email already exists, so it can't be used to discover which
+  accounts are registered.
 
 ---
 
@@ -167,96 +194,50 @@ On every page load, `App.tsx` checks `localStorage` for `sp_access_token`. If fo
 
 ---
 
-## 6. What the Frontend Team Needs to Do
+## 6. Frontend API Client (`src/lib/api.ts`)
 
-### 6.1 Fetch real profile after login
+Auth and profile wiring is implemented in `src/lib/api.ts` — reuse it instead of
+calling `fetch` directly:
 
-After a successful login, call `GET /users/me` and store the result:
+- `apiPost(path, body)` — unauthenticated POST (login / signup / refresh).
+- `apiFetch(path, options)` — authenticated fetch: attaches the bearer token and,
+  on a `401`, refreshes once and retries; if refresh fails it clears the stored
+  tokens and redirects to `#auth`. So token expiry is handled for you.
+- `storeAuth(tokens)` / `clearAuth()` / `getAccessToken()` — helpers over the
+  `sp_*` localStorage keys.
 
-```typescript
-const profileRes = await fetch('http://localhost:8000/users/me', {
-  headers: { Authorization: `Bearer ${auth.access_token}` }
-});
-const profile = await profileRes.json();
+`AuthPage.tsx` already uses `apiPost` + `storeAuth`. `Dashboard.tsx` loads the
+real profile on mount with `apiFetch('/users/me')` and threads it through as the
+`student` prop (the old email-derived `STUDENT` guess is now just the first-paint
+fallback).
 
-// Store for use across the app
-localStorage.setItem('sp_profile', JSON.stringify(profile));
-```
+### 6.1 Wiring the remaining mock data
 
-Then read it anywhere:
-
-```typescript
-const profile = JSON.parse(localStorage.getItem('sp_profile') || '{}');
-// profile.name, profile.initials, profile.theme, profile.default_coach_mode
-```
-
-### 6.2 Replace mock data in Dashboard.tsx
-
-`Dashboard.tsx` currently uses hardcoded mock data at the top of the file:
+`Dashboard.tsx` still has mock `RUBRICS`, `SESSIONS`, and `ACTION_ITEMS_INITIAL`.
+Once the endpoints in section 7 exist, replace each with the same pattern:
 
 ```typescript
-const STUDENT = { name: 'Maya', initials: 'M', email: 'maya.l@northcrest.edu' }
-const RUBRICS = [...]
-const SESSIONS = [...]
-const ACTION_ITEMS_INITIAL = [...]
-```
-
-These need to be replaced with API calls. The backend endpoints for this are not built yet — they are listed in section 7 below.
-
-When the endpoints are ready, replace each constant with a `useEffect` + `useState` fetch:
-
-```typescript
-const [sessions, setSessions] = useState([]);
-
+const [sessions, setSessions] = useState<Session[]>([]);
 useEffect(() => {
-  const token = localStorage.getItem('sp_access_token');
-  fetch('http://localhost:8000/sessions', {
-    headers: { Authorization: `Bearer ${token}` }
-  })
-    .then(r => r.json())
-    .then(setSessions);
+  apiFetch('/sessions')
+    .then((r) => (r.ok ? r.json() : []))
+    .then(setSessions)
+    .catch(() => {}); // expired session already redirects to #auth
 }, []);
 ```
 
-### 6.3 Handle token expiry
-
-When any API call returns `401`, call `/auth/refresh` with the stored refresh token:
+### 6.2 Logout
 
 ```typescript
-async function refreshToken() {
-  const refresh_token = localStorage.getItem('sp_refresh_token');
-  const res = await fetch('http://localhost:8000/auth/refresh', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refresh_token })
-  });
+import { apiFetch, clearAuth } from '../lib/api';
 
-  if (!res.ok) {
-    // Refresh failed — force logout
-    localStorage.clear();
-    window.location.hash = '#auth';
-    return null;
-  }
-
-  const data = await res.json();
-  localStorage.setItem('sp_access_token', data.access_token);
-  localStorage.setItem('sp_refresh_token', data.refresh_token);
-  return data.access_token;
-}
-```
-
-### 6.4 Logout
-
-Call `/auth/logout` before clearing localStorage:
-
-```typescript
 async function logout() {
-  const token = localStorage.getItem('sp_access_token');
-  await fetch('http://localhost:8000/auth/logout', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  localStorage.clear();
+  try {
+    await apiFetch('/auth/logout', { method: 'POST' }); // best-effort
+  } catch {
+    /* ignore — we clear locally regardless */
+  }
+  clearAuth();
   window.location.hash = '#';
 }
 ```
@@ -289,6 +270,6 @@ Before deploying:
 - [ ] Enable email confirmation in Supabase Auth
 - [ ] Set up a custom SMTP provider (Resend, SendGrid, or Brevo) to avoid the 2 email/hour limit
 - [ ] Enable leaked password protection (requires Supabase Pro)
-- [ ] Change API_BASE in AuthPage.tsx from localhost to the production backend URL
+- [ ] Set VITE_API_BASE_URL to the production backend URL (read by src/lib/api.ts)
 - [ ] Deploy FastAPI to a server (Railway, Render, or Fly.io recommended)
 ```
