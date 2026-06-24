@@ -152,7 +152,8 @@ def login(request: Request, body: LoginRequest):
     response_model=MessageResponse,
     summary="Sign out the current user",
 )
-def logout(authorization: str = Header(...)):
+@limiter.limit("20/minute")
+def logout(request: Request, authorization: str = Header(...)):
     """
     Signs out the current user by invalidating their session on Supabase.
     Uses the service-role admin client, which is the only client permitted
@@ -186,7 +187,8 @@ def logout(authorization: str = Header(...)):
     response_model=AuthResponse,
     summary="Refresh an expired access token",
 )
-def refresh(body: RefreshRequest):
+@limiter.limit("30/minute")
+def refresh(request: Request, body: RefreshRequest):
     """
     Exchanges a refresh token for a new access token.
     Call this when the frontend gets a 401 on any protected endpoint.
