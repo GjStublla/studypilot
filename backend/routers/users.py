@@ -73,10 +73,21 @@ def get_me(authorization: str = Header(...)):
     try:
         user_client = get_user_client(token)
         result = user_client.table("profiles").select("*").eq("id", user_id).single().execute()
-    except Exception:
+    except Exception as e:
+        error_str = str(e).lower()
+        # PostgREST returns "PGRST116" when .single() finds no rows — that's a
+        # genuine 404. Any other exception is an infrastructure or auth problem
+        # and should surface as 500 so the client doesn't misdiagnose it as a
+        # missing profile and attempt to re-create the account.
+        if "pgrst116" in error_str or "no rows" in error_str:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Profile not found. The account may not have been set up correctly.",
+            )
+        print(f"[users/me] profile query failed for user {user_id}: {e}")
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Profile not found. The account may not have been set up correctly.",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not retrieve profile. Please try again.",
         )
 
     profile = result.data

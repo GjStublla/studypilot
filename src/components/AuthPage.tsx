@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { ArrowRight, Eye, EyeOff, Loader } from 'lucide-react';
 import { apiPost, storeAuth, type AuthTokens } from '../lib/api';
+import { supabase } from '../lib/supabase';
+
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -10,6 +12,10 @@ type Mode = 'login' | 'signup';
 
 export default function AuthPage() {
   const [mode, setMode] = useState<Mode>('login');
+
+  // If the OAuth callback redirected back here with ?error=oauth, show a
+  // clear message so the user knows what happened and can try again.
+  const oauthFailed = window.location.hash.includes('error=oauth');
 
   return (
     <div className="auth-shell">
@@ -22,6 +28,14 @@ export default function AuthPage() {
           <StudyPilotMark size={40} />
           <span className="auth-brand-text">studypilot.</span>
         </div>
+
+        {/* OAuth error banner — shown when Google sign-in fails at the
+            callback stage (e.g. denied consent, expired link, wrong redirect URI) */}
+        {oauthFailed && (
+          <p className="auth-error auth-error--banner" role="alert">
+            Google sign-in failed. Please try again or use email and password.
+          </p>
+        )}
 
         {/* Tab switcher */}
         <div className="auth-tabs" role="tablist">
@@ -43,7 +57,7 @@ export default function AuthPage() {
           </button>
         </div>
 
-        {/* Form */}
+        {/* Forms — each one owns its own divider + Google button placement */}
         {mode === 'login' ? (
           <LoginForm />
         ) : (
@@ -51,6 +65,93 @@ export default function AuthPage() {
         )}
       </div>
     </div>
+  );
+}
+
+// ─── Google OAuth button ──────────────────────────────────────────────────────
+
+function GoogleButton() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleGoogle() {
+    setError('');
+    setLoading(true);
+    try {
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          // Supabase redirects back to the app root after Google confirms
+          // the user. The session tokens arrive in the URL fragment
+          // (#access_token=...&type=...) and are handled by App.tsx.
+          redirectTo: window.location.origin + '/',
+        },
+      });
+
+      if (oauthError) {
+        // This fires if the OAuth request itself couldn't be initiated
+        // (e.g. Google provider not enabled in Supabase, network error).
+        // If the user denies consent on Google's side, the error surfaces
+        // at the callback stage in App.tsx instead.
+        console.error('[OAuth] signInWithOAuth error:', oauthError.message);
+        setError('Could not start Google sign-in. Please try again.');
+        setLoading(false);
+        return;
+      }
+      // If no error, the browser is navigating to Google — nothing more to do.
+    } catch (err) {
+      // Unexpected failure (e.g. Supabase client not initialised, offline)
+      console.error('[OAuth] unexpected error:', err);
+      setError('Something went wrong. Check your connection and try again.');
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="auth-oauth">
+      <button
+        type="button"
+        className="auth-google-btn"
+        onClick={handleGoogle}
+        disabled={loading}
+        aria-label="Continue with Google"
+      >
+        {loading ? (
+          <Loader size={16} className="auth-spinner" />
+        ) : (
+          <GoogleLogo />
+        )}
+        Continue with Google
+      </button>
+      {error && (
+        <p className="auth-error" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function GoogleLogo() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <path
+        d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 01-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"
+        fill="#4285F4"
+      />
+      <path
+        d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z"
+        fill="#34A853"
+      />
+      <path
+        d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"
+        fill="#FBBC05"
+      />
+      <path
+        d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"
+        fill="#EA4335"
+      />
+    </svg>
   );
 }
 
@@ -148,6 +249,9 @@ function LoginForm() {
           </>
         )}
       </button>
+
+      <div className="auth-divider" aria-hidden="true"><span>or</span></div>
+      <GoogleButton />
     </form>
   );
 }
@@ -290,6 +394,9 @@ function SignupForm({ onSuccess }: { onSuccess: () => void }) {
           </>
         )}
       </button>
+
+      <div className="auth-divider" aria-hidden="true"><span>or</span></div>
+      <GoogleButton />
 
       <p className="auth-legal">
         By creating an account you agree to our{' '}
