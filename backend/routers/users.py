@@ -1,13 +1,21 @@
-from fastapi import APIRouter, HTTPException, Header, status
+"""
+Users router — /users
+
+Endpoints:
+    GET /users/me    Return the logged-in user's profile row
+"""
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
-from supabase_client import supabase, get_user_client
+from dependencies import verify_token, get_token
+from supabase_client import get_user_client
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-# ---------- Response model ----------
-# Matches the columns in the public.profiles table
+# ─── Response model ───────────────────────────────────────────────────────────
+# Matches the columns returned from public.profiles
 
 class ProfileResponse(BaseModel):
     user_id: str
@@ -18,72 +26,44 @@ class ProfileResponse(BaseModel):
     default_coach_mode: str
 
 
-# ---------- GET /users/me ----------
+# ─── Routes ───────────────────────────────────────────────────────────────────
 
 @router.get(
     "/me",
     response_model=ProfileResponse,
     summary="Get the logged-in user's profile",
 )
-def get_me(authorization: str = Header(...)):
+def get_me(
+    user_id: str = Depends(verify_token),
+    token: str = Depends(get_token),
+):
     """
     Returns the full profile for the currently logged-in user.
 
-    The frontend must send:
-        Authorization: Bearer <access_token>
-
-    Steps:
-    1. Extract the JWT from the Authorization header
-    2. Ask Supabase Auth to verify it and return the user
-    3. Use the user's ID to query the profiles table
-    4. Return the profile data
+    JWT verification is handled by the verify_token dependency.
+    The profile query runs as the verified user (RLS-scoped) so the DB
+    policy (auth.uid() = id) limits the read to their own row.
     """
-
-    # --- Step 1: Extract the token from "Bearer <token>" ---
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization header format.",
-        )
-
-    token = authorization.replace("Bearer ", "")
-
-    # --- Step 2: Verify the JWT with Supabase Auth ---
-    # This confirms the token is real and not expired
     try:
-        auth_response = supabase.auth.get_user(token)
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token is invalid or expired. Please log in again.",
+        client = get_user_client(token)
+        result = (
+            client.table("profiles")
+            .select("id, name, email, initials, theme, default_coach_mode")
+            .eq("id", user_id)
+            .single()
+            .execute()
         )
-
-    if auth_response.user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token is invalid or expired. Please log in again.",
-        )
-
-    user_id = str(auth_response.user.id)
-
-    # --- Step 3: Query the profiles table as the user (RLS-enforced) ---
-    # Use a client scoped to the caller's verified JWT so the profiles RLS policy
-    # (auth.uid() = id) limits the read to their own row. No service-role key on
-    # this path — defense in depth.
-    try:
-        user_client = get_user_client(token)
-        result = user_client.table("profiles").select("*").eq("id", user_id).single().execute()
     except Exception as e:
         error_str = str(e).lower()
-        # PostgREST returns "PGRST116" when .single() finds no rows — that's a
-        # genuine 404. Any other exception is an infrastructure or auth problem
-        # and should surface as 500 so the client doesn't misdiagnose it as a
-        # missing profile and attempt to re-create the account.
+        # PGRST116 = .single() found no rows → genuine 404 (trigger may not
+        # have run yet, or the profile was manually deleted).
         if "pgrst116" in error_str or "no rows" in error_str:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Profile not found. The account may not have been set up correctly.",
             )
+        # Any other error is an infrastructure problem — log it and return 500
+        # so the client doesn't misdiagnose it as a missing profile.
         print(f"[users/me] profile query failed for user {user_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -91,14 +71,12 @@ def get_me(authorization: str = Header(...)):
         )
 
     profile = result.data
-
     if not profile:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Profile not found.",
         )
 
-    # --- Step 4: Return the profile ---
     return ProfileResponse(
         user_id=user_id,
         name=profile["name"],
