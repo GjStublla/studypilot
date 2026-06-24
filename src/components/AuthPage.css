@@ -210,6 +210,13 @@
   line-height: 1.5;
 }
 
+/* Full-width banner variant — used for OAuth callback errors shown
+   at the top of the card before the tab switcher */
+.auth-error--banner {
+  margin-bottom: 16px;
+  text-align: center;
+}
+
 /* ─── Submit button ────────────────────────────────────────── */
 
 .auth-submit {
@@ -330,4 +337,82 @@
   .auth-field input {
     transition: none;
   }
+}
+
+/* ─── Google OAuth ─────────────────────────────────────────── */
+
+.auth-oauth {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.auth-google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 46px;
+  width: 100%;
+  padding: 0 20px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 180ms ease, border-color 180ms ease, transform 140ms var(--ease-out), box-shadow 180ms ease;
+  -webkit-font-smoothing: antialiased;
+}
+
+.auth-google-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.18);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+}
+
+.auth-google-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.auth-google-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.auth-google-btn:focus-visible {
+  outline: 2px solid rgba(57, 215, 255, 0.85);
+  outline-offset: 4px;
+}
+
+/* ─── Divider ──────────────────────────────────────────────── */
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+  margin-bottom: 6px;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.auth-divider span {
+  color: var(--whisper);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  flex-shrink: 0;
 }

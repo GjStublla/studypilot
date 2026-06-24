@@ -10,6 +10,7 @@
     "backend": "cd backend && python -m uvicorn main:app --reload"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.108.2",
     "@vitejs/plugin-react": "^5.1.1",
     "framer-motion": "^12.23.24",
     "lucide-react": "^0.468.0",

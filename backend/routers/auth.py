@@ -1,8 +1,9 @@
 from fastapi import APIRouter, HTTPException, Header, Request, status
 from pydantic import BaseModel, EmailStr, Field
+from typing import Union
 
 from rate_limit import limiter
-from supabase_client import supabase
+from supabase_client import supabase, supabase_admin
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -49,6 +50,9 @@ class MessageResponse(BaseModel):
 
 @router.post(
     "/signup",
+    # Two possible responses: tokens (email confirm off) or pending message (email confirm on).
+    # Union lets FastAPI document both shapes in OpenAPI and validate whichever is returned.
+    response_model=Union[AuthResponse, SignupPendingResponse],
     status_code=status.HTTP_201_CREATED,
     summary="Register a new student account",
 )
@@ -151,15 +155,26 @@ def login(request: Request, body: LoginRequest):
 def logout(authorization: str = Header(...)):
     """
     Signs out the current user by invalidating their session on Supabase.
+    Uses the service-role admin client, which is the only client permitted
+    to call sign_out() on behalf of another user's token.
     The frontend should also clear the stored JWT after calling this.
     """
-    if authorization.startswith("Bearer "):
-        token = authorization.replace("Bearer ", "")
-        try:
-            # Sign out this specific user's session using their token
-            supabase.auth.admin.sign_out(token)
-        except Exception:
-            pass  # Always return success — client clears token regardless
+    # Reject malformed headers rather than silently skipping the sign-out.
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authorization header format.",
+        )
+
+    token = authorization.replace("Bearer ", "", 1)
+    try:
+        # admin.sign_out() requires the service-role client — the anon client
+        # does not have permission to invalidate sessions.
+        supabase_admin.auth.admin.sign_out(token)
+    except Exception:
+        # Always return success — the client clears its token regardless,
+        # and leaking sign-out errors could aid session enumeration.
+        pass
 
     return MessageResponse(message="Logged out successfully.")
 
@@ -186,6 +201,13 @@ def refresh(body: RefreshRequest):
         )
 
     if response.session is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token is invalid or expired. Please log in again.",
+        )
+
+    # Guard both session and user — either being None would cause an AttributeError below.
+    if response.user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Refresh token is invalid or expired. Please log in again.",

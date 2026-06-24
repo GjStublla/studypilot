@@ -22,7 +22,8 @@ import {
 import { Button } from './components/ui/button';
 import GradientBlinds from './components/GradientBlinds';
 import AuthPage from './components/AuthPage';
-import { clearAuth } from './lib/api';
+import { clearAuth, storeAuth, type AuthTokens } from './lib/api';
+import { supabase } from './lib/supabase';
 import './components/AuthPage.css';
 
 const loadDashboard = () => import('./components/Dashboard');
@@ -155,6 +156,46 @@ function App() {
 
   const isDashboard = hash.startsWith('#dashboard');
   const isAuth = hash.startsWith('#auth');
+  // Supabase appends tokens as the hash fragment after the redirect:
+  //   http://127.0.0.1:5173/#access_token=...&refresh_token=...&type=signup
+  // We anchor the check to the start of the hash so a random page section
+  // named "#access_token" can't accidentally trigger this handler.
+  const isSupabaseCallback = hash.startsWith('#access_token=') && hash.includes('type=');
+  const isAuthCallback = hash.startsWith('#auth/callback');
+
+  // ── Google OAuth callback ──────────────────────────────────────────────────
+  // After the user approves on Google's consent screen, Supabase redirects
+  // back here with the session tokens in the URL fragment. We read the
+  // session, store the tokens via storeAuth(), then forward to #dashboard.
+  // This runs in a useEffect so it only fires once per mount, not on every
+  // render cycle.
+  useEffect(() => {
+    if (!isSupabaseCallback && !isAuthCallback) return;
+
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (error || !data.session) {
+        // Session exchange failed — could be an expired link, a denied
+        // consent, or a misconfigured redirect URI. Send the user back to
+        // the auth page; the #oauth-error flag lets AuthPage show a message.
+        console.error('[OAuth] getSession failed:', error?.message ?? 'no session returned');
+        window.location.hash = '#auth?error=oauth';
+        return;
+      }
+
+      // Session is valid — persist tokens and go to the dashboard.
+      storeAuth({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+        user_id: data.session.user.id,
+        email: data.session.user.email ?? '',
+      } satisfies AuthTokens);
+      window.location.hash = '#dashboard';
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally empty — only run on the initial mount of this route
+
+  // Render nothing while the async session exchange completes
+  if (isSupabaseCallback || isAuthCallback) return null;
 
   // Block dashboard access if not logged in
   if (isDashboard) {
@@ -170,7 +211,7 @@ function App() {
     );
   }
 
-  if (isAuth) {
+  if (isAuth && !isAuthCallback && !isSupabaseCallback) {
     // Already logged in — go straight to dashboard
     if (user) {
       window.location.hash = '#dashboard';
