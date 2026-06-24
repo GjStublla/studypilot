@@ -1,10 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from rate_limit import limiter
 from routers import auth, users, sessions, rubrics, action_items
+from supabase_client import supabase
 
 app = FastAPI(title="StudyPilot API", version="1.0.0")
 
@@ -35,4 +37,21 @@ app.include_router(action_items.router)
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    """
+    Liveness + readiness probe.
+    Checks that the Supabase PostgREST connection is reachable so a load
+    balancer or uptime monitor can detect a broken DB connection, not just
+    a crashed process.  Returns 503 if the DB is unreachable.
+    """
+    try:
+        # Lightweight query — fetches zero rows, just validates connectivity.
+        supabase.table("profiles").select("id").limit(1).execute()
+        db_status = "ok"
+    except Exception as e:
+        print(f"[health] DB connectivity check failed: {e}")
+        db_status = "unreachable"
+
+    payload = {"status": "ok", "db": db_status}
+    if db_status != "ok":
+        return JSONResponse(content=payload, status_code=503)
+    return payload
