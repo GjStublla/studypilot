@@ -4,7 +4,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from rate_limit import limiter
-from routers import auth, users
+from routers import auth, users, sessions, rubrics, action_items
 
 app = FastAPI(title="StudyPilot API", version="1.0.0")
 
@@ -28,6 +28,9 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(users.router)
+app.include_router(sessions.router)
+app.include_router(rubrics.router)
+app.include_router(action_items.router)
 
 
 @app.get("/health")

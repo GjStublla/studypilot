@@ -16,7 +16,7 @@ class SignUpRequest(BaseModel):
     # (the client also checks). Keep in sync with the Supabase dashboard password
     # policy (Auth → Policies) since there is no supabase/config.toml.
     password: str = Field(min_length=8)
-    name: str
+    name: str = Field(min_length=1, max_length=100, strip_whitespace=True)
 
 
 class LoginRequest(BaseModel):
