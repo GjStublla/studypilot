@@ -147,24 +147,24 @@ def update_me(
             client.table("profiles")
             .update(updates)
             .eq("id", user_id)
-            .select("id, name, email, initials, theme, default_coach_mode")
-            .single()
             .execute()
         )
     except Exception as e:
-        error_str = str(e).lower()
-        if "pgrst116" in error_str or "no rows" in error_str:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Profile not found.",
-            )
         print(f"[users/me PATCH] update failed for user {user_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Could not update profile. Please try again.",
         )
 
-    profile = result.data
+    # An update that matches no row (missing profile, or RLS blocked it) comes
+    # back as an empty list rather than raising — surface that as a 404.
+    if not result.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Profile not found.",
+        )
+
+    profile = result.data[0]
     return ProfileResponse(
         user_id=user_id,
         name=profile["name"],

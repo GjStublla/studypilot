@@ -350,8 +350,6 @@ def create_session(
         result = (
             client.table("sessions")
             .insert(insert_data)
-            .select("id, title")
-            .single()
             .execute()
         )
     except Exception as e:
@@ -369,7 +367,14 @@ def create_session(
             detail="Could not save session. Please try again.",
         )
 
-    return CreateSessionResponse(id=result.data["id"], title=result.data["title"])
+    if not result.data:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not save session. Please try again.",
+        )
+
+    row = result.data[0]
+    return CreateSessionResponse(id=row["id"], title=row["title"])
 
 
 @router.post(
@@ -425,8 +430,6 @@ def create_message(
                 "message_text": body.message_text,
                 "time_offset_seconds": body.time_offset_seconds,
             })
-            .select("id")
-            .single()
             .execute()
         )
     except Exception as e:
@@ -436,4 +439,10 @@ def create_message(
             detail="Could not save message. Please try again.",
         )
 
-    return CreateMessageResponse(id=result.data["id"])
+    if not result.data:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not save message. Please try again.",
+        )
+
+    return CreateMessageResponse(id=result.data[0]["id"])

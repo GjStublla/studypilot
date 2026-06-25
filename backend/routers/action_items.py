@@ -107,26 +107,24 @@ def toggle_action_item(
             .update({"done": body.done})
             .eq("id", item_id)
             .eq("user_id", user_id)   # belt-and-suspenders on top of RLS
-            .select("id, text, session_id, rubric_id, done")
-            .single()
             .execute()
         )
     except Exception as e:
-        error_str = str(e).lower()
-        # PGRST116: .single() found no rows → item doesn't exist or belongs to
-        # another user.  Return 404 in both cases (don't leak ownership).
-        if "pgrst116" in error_str or "no rows" in error_str:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Action item not found.",
-            )
         print(f"[action-items] toggle_action_item failed for item {item_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Could not update action item. Please try again.",
         )
 
-    row = result.data
+    # No matching row → item doesn't exist or belongs to another user. Return 404
+    # in both cases (don't leak whether the ID exists).
+    if not result.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Action item not found.",
+        )
+
+    row = result.data[0]
     return ActionItemResponse(
         id=row["id"],
         text=row["text"],
