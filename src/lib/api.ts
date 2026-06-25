@@ -9,6 +9,16 @@
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
 
+if (!import.meta.env.VITE_API_BASE_URL) {
+  // Only warn in production builds — in dev the localhost fallback is intentional.
+  if (import.meta.env.PROD) {
+    console.error(
+      '[StudyPilot] VITE_API_BASE_URL is not set. ' +
+      'All API calls will target http://localhost:8000, which will fail in production.',
+    );
+  }
+}
+
 const ACCESS_KEY = 'sp_access_token';
 const REFRESH_KEY = 'sp_refresh_token';
 const USER_ID_KEY = 'sp_user_id';
@@ -113,14 +123,18 @@ function refreshTokens(): Promise<boolean> {
  * #auth, and throws — so callers can treat a thrown error as "session ended".
  */
 export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
-  const send = (token: string | null) =>
-    fetch(`${API_BASE}${path}`, {
+  const send = (token: string | null) => {
+    // Auto-set Content-Type for JSON bodies so callers don't have to remember.
+    const isJsonBody = typeof options.body === 'string';
+    return fetch(`${API_BASE}${path}`, {
       ...options,
       headers: {
+        ...(isJsonBody ? { 'Content-Type': 'application/json' } : {}),
         ...options.headers,
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
     });
+  };
 
   let res = await send(getAccessToken());
   if (res.status !== 401) return res;

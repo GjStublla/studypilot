@@ -172,10 +172,10 @@ def logout(request: Request, authorization: str = Header(...)):
         # admin.sign_out() requires the service-role client — the anon client
         # does not have permission to invalidate sessions.
         supabase_admin.auth.admin.sign_out(token)
-    except Exception:
-        # Always return success — the client clears its token regardless,
+    except Exception as e:
+        # Log but still return success — the client clears its token regardless,
         # and leaking sign-out errors could aid session enumeration.
-        pass
+        print(f"[logout] sign_out failed (session may still be valid server-side): {e}")
 
     return MessageResponse(message="Logged out successfully.")
 
@@ -219,5 +219,7 @@ def refresh(request: Request, body: RefreshRequest):
         access_token=response.session.access_token,
         refresh_token=response.session.refresh_token,
         user_id=str(response.user.id),
-        email=response.user.email,
+        # email can be None for OAuth users in some Supabase flows — fall back
+        # to empty string so the frontend never stores the literal "null".
+        email=response.user.email or "",
     )

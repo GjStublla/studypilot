@@ -22,7 +22,7 @@ import {
 import { Button } from './components/ui/button';
 import GradientBlinds from './components/GradientBlinds';
 import AuthPage from './components/AuthPage';
-import { clearAuth, storeAuth, type AuthTokens } from './lib/api';
+import { clearAuth, storeAuth, apiFetch, type AuthTokens } from './lib/api';
 import { supabase } from './lib/supabase';
 import './components/AuthPage.css';
 
@@ -161,7 +161,6 @@ function App() {
   // We anchor the check to the start of the hash so a random page section
   // named "#access_token" can't accidentally trigger this handler.
   const isSupabaseCallback = hash.startsWith('#access_token=') && hash.includes('type=');
-  const isAuthCallback = hash.startsWith('#auth/callback');
 
   // ── Google OAuth callback ──────────────────────────────────────────────────
   // After the user approves on Google's consent screen, Supabase redirects
@@ -170,7 +169,7 @@ function App() {
   // This runs in a useEffect so it only fires once per mount, not on every
   // render cycle.
   useEffect(() => {
-    if (!isSupabaseCallback && !isAuthCallback) return;
+    if (!isSupabaseCallback) return;
 
     supabase.auth.getSession().then(({ data, error }) => {
       if (error || !data.session) {
@@ -195,7 +194,7 @@ function App() {
   }, []); // intentionally empty — only run on the initial mount of this route
 
   // Render nothing while the async session exchange completes
-  if (isSupabaseCallback || isAuthCallback) return null;
+  if (isSupabaseCallback) return null;
 
   // Block dashboard access if not logged in
   if (isDashboard) {
@@ -211,7 +210,7 @@ function App() {
     );
   }
 
-  if (isAuth && !isAuthCallback && !isSupabaseCallback) {
+  if (isAuth && !isSupabaseCallback) {
     // Already logged in — go straight to dashboard
     if (user) {
       window.location.hash = '#dashboard';
@@ -223,7 +222,14 @@ function App() {
   return (
     <LazyMotion features={domAnimation}>
       <div className="site-shell">
-        <Hero user={user} onLogout={() => {
+        <Hero user={user} onLogout={async () => {
+          // Invalidate the session server-side first (best-effort),
+          // then clear local tokens regardless of whether it succeeded.
+          try {
+            await apiFetch('/auth/logout', { method: 'POST' });
+          } catch {
+            /* session may already be expired — clear locally regardless */
+          }
           clearAuth();
           setUser(null);
         }} />

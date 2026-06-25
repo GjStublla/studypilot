@@ -15,7 +15,8 @@ export default function AuthPage() {
 
   // If the OAuth callback redirected back here with ?error=oauth, show a
   // clear message so the user knows what happened and can try again.
-  const oauthFailed = window.location.hash.includes('error=oauth');
+  // Anchor to startsWith('#auth') so arbitrary hashes can't trigger this.
+  const oauthFailed = window.location.hash.startsWith('#auth') && window.location.hash.includes('error=oauth');
 
   return (
     <div className="auth-shell">
@@ -266,6 +267,7 @@ function SignupForm({ onSuccess }: { onSuccess: () => void }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [needsConfirmation, setNeedsConfirmation] = useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -293,14 +295,14 @@ function SignupForm({ onSuccess }: { onSuccess: () => void }) {
 
       // Email confirmation required — no token yet
       if (data.email_confirmation_required) {
+        setNeedsConfirmation(true);
         setSuccess(true);
         setTimeout(() => onSuccess(), 3000);
         return;
       }
 
+      // Email confirmation off — tokens returned immediately
       setSuccess(true);
-
-      // Auto-switch to login after 2 seconds
       setTimeout(() => onSuccess(), 2000);
     } catch {
       setError('Could not connect to the server. Is the backend running?');
@@ -313,7 +315,11 @@ function SignupForm({ onSuccess }: { onSuccess: () => void }) {
     return (
       <div className="auth-success">
         <div className="auth-success-icon">✓</div>
-        <p>Account created. Check your email to confirm, then sign in.</p>
+        <p>
+          {needsConfirmation
+            ? 'Account created. Check your email to confirm, then sign in.'
+            : 'Account created. Taking you to sign in…'}
+        </p>
       </div>
     );
   }
