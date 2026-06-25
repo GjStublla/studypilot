@@ -1,37 +1,38 @@
 # Backend & Auth Manual
 
-This document explains the FastAPI backend, the auth system, and what the frontend team needs to do to connect the dashboard to real data.
+This document explains the FastAPI backend, the auth system, and what the
+frontend team needs to do to connect the dashboard to real data.
 
 ---
 
-## 1. What Was Built
-
-### FastAPI Backend
-
-A Python backend lives in `backend/`. It sits between the React frontend and Supabase, handling auth and data operations.
+## 1. File Structure
 
 ```text
 backend/
-  main.py               ← FastAPI app entry point, CORS config
-  supabase_client.py    ← Supabase connections (anon + admin) + get_user_client()
-  rate_limit.py         ← shared slowapi limiter (kept separate to avoid a circular import)
+  main.py               ← FastAPI app, CORS, rate limiting, router registration
+  supabase_client.py    ← Supabase client singletons + get_user_client()
+  dependencies.py       ← Shared verify_token / get_token Depends() helpers
+  rate_limit.py         ← Shared slowapi Limiter instance
   routers/
-    auth.py             ← signup, login, logout, refresh (rate-limited)
-    users.py            ← GET /users/me (RLS-scoped read)
+    auth.py             ← /auth/* — signup, login, logout, refresh
+    users.py            ← /users/me — GET + PATCH profile
+    sessions.py         ← /sessions/* — list, detail, create, messages
+    rubrics.py          ← /rubrics — list with criteria
+    action_items.py     ← /action-items — list + toggle
   .env                  ← secrets (never committed)
   .env.example          ← template for new developers
-  requirements.txt      ← Python dependencies
+  requirements.txt      ← pinned Python dependencies
 ```
 
-### Auth Page
+### Auth page
 
-A login/signup UI lives at `src/components/AuthPage.tsx` with matching styles in `src/components/AuthPage.css`.
+`src/components/AuthPage.tsx` — login, signup, and Google OAuth.
+Rendered when the hash is `#auth`.
 
-It is rendered when the hash is `#auth`.
+### Protected dashboard
 
-### Protected Dashboard
-
-The `#dashboard` route now requires a valid JWT. If no token is found in `localStorage`, the user is redirected to `#auth`.
+`#dashboard` requires a valid JWT in `localStorage`. Missing token redirects
+to `#auth`.
 
 ---
 
@@ -42,6 +43,14 @@ Install dependencies (first time only):
 ```bash
 cd backend
 pip install -r requirements.txt
+```
+
+Activate the project virtualenv first — the backend uses `.venv` inside
+the repo root:
+
+```powershell
+# Windows PowerShell
+.\.venv\Scripts\Activate.ps1
 ```
 
 Start the backend:
@@ -58,8 +67,7 @@ python -m uvicorn main:app --reload
 ```
 
 The backend runs on `http://localhost:8000`.
-
-Interactive API docs are available at `http://localhost:8000/docs`.
+Interactive API docs: `http://localhost:8000/docs`
 
 You need two terminals running simultaneously:
 
@@ -74,91 +82,175 @@ port 5173           port 8000
 
 ## 3. Environment Variables
 
-Copy `.env.example` to `.env` inside the `backend/` folder and fill in the values:
+### Backend (`backend/.env`)
+
+Copy `backend/.env.example` and fill in the values:
 
 ```env
-SUPABASE_URL=https://rqszloxxegvxaedptcqj.supabase.co
-SUPABASE_ANON_KEY=eyJ...        ← from Supabase Project Settings → API → anon/public
-SUPABASE_SERVICE_ROLE_KEY=eyJ...← from Supabase Project Settings → API → service_role
-GEMINI_API_KEY=                 ← from Google AI Studio
+SUPABASE_URL=https://<ref>.supabase.co
+SUPABASE_ANON_KEY=eyJ...        ← Project Settings → API → anon/public
+SUPABASE_SERVICE_ROLE_KEY=eyJ...← Project Settings → API → service_role (SECRET)
+GEMINI_API_KEY=                 ← Google AI Studio
 ```
 
-Rules:
-- Never commit `.env` — it is in `.gitignore`
-- Never expose `SUPABASE_SERVICE_ROLE_KEY` or `GEMINI_API_KEY` to the frontend or extension
-- The frontend may only use public `VITE_*` vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_API_BASE_URL`
+### Frontend (root `.env`)
 
-### Frontend env
+Copy the root `.env.example` and fill in:
 
-The web app talks to this backend through `src/lib/api.ts`, which reads
-`VITE_API_BASE_URL` (set it in a root `.env`) and falls back to
-`http://localhost:8000` when unset — so no `.env` is needed for local dev.
+```env
+VITE_SUPABASE_URL=https://<ref>.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJ...   ← same anon key as above
+VITE_API_BASE_URL=              ← leave blank for localhost:8000 fallback in dev
+```
+
+### Rules
+
+- Never commit either `.env` file — both are gitignored
+- Never expose `SUPABASE_SERVICE_ROLE_KEY` or `GEMINI_API_KEY` to the browser
+- The frontend may only use `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`,
+  and `VITE_API_BASE_URL`
 
 ### Security notes
 
-- **Token storage.** The access + refresh tokens are kept in `localStorage`.
-  Convenient, but readable by any script on the page, so it is exposed to XSS — a
-  strict CSP and dependency hygiene are the practical mitigations during the
-  beta. Moving to httpOnly cookies (with CSRF protection) is the planned
-  post-beta hardening. Refresh-on-`401` is handled centrally by `apiFetch()` in
-  `src/lib/api.ts`.
-- **Password policy.** Signup enforces a minimum length server-side via
-  `Field(min_length=8)` on `SignUpRequest` (the client check is only UX). Because
-  there is no `supabase/config.toml`, also set the matching minimum in the
-  Supabase dashboard (Auth → Policies) and enable leaked-password protection in
-  production.
-- **Rate limiting.** `/auth/login` and `/auth/signup` are capped at 5
-  requests/minute per IP (slowapi). Storage is in-memory — use a Redis backend if
-  you run multiple workers.
-- **Anti-enumeration.** Signup returns the same "check your email" response
-  whether or not the email already exists, so it can't be used to discover which
-  accounts are registered.
+- **Token storage.** Access + refresh tokens live in `localStorage` (XSS-exposed).
+  A strict CSP and dependency hygiene are the mitigations during beta.
+  httpOnly cookies with CSRF protection is the planned post-beta hardening.
+- **Password policy.** `min_length=8` is enforced server-side on `SignUpRequest`.
+  Also set the matching policy in Supabase dashboard → Auth → Policies.
+- **Rate limiting.** In-memory slowapi limiter. Use a Redis backend if running
+  multiple workers.
+- **Anti-enumeration.** Signup always returns the same response regardless of
+  whether the email already exists.
 
 ---
 
-## 4. API Endpoints
+## 4. How Auth Works
 
-### Auth
+### Email / password
 
-| Method | Endpoint | Body | Description |
-|--------|----------|------|-------------|
-| `POST` | `/auth/signup` | `{ email, password, name }` | Register new user |
-| `POST` | `/auth/login` | `{ email, password }` | Sign in, returns JWT |
-| `POST` | `/auth/logout` | — | Invalidates session (send Bearer token) |
-| `POST` | `/auth/refresh` | `{ refresh_token }` | Get new access token |
+```text
+1. User submits login form
+2. React POSTs to /auth/login
+3. FastAPI → Supabase Auth → JWT returned
+4. React stores tokens in localStorage:
+     sp_access_token, sp_refresh_token, sp_user_id, sp_email
+5. React calls GET /users/me, stores full profile
+6. Redirected to #dashboard
+```
 
-### Users
+### Google OAuth
 
-| Method | Endpoint | Headers | Description |
-|--------|----------|---------|-------------|
-| `GET` | `/users/me` | `Authorization: Bearer <token>` | Get logged-in user's profile |
+```text
+1. User clicks "Continue with Google"
+2. supabase.auth.signInWithOAuth() → browser redirects to Google
+3. Google → Supabase → redirects back to app root with #access_token=... in URL
+4. App.tsx detects the fragment, calls supabase.auth.getSession()
+5. Tokens stored via storeAuth(), redirected to #dashboard
+6. FastAPI sees the same Supabase JWT — no backend changes needed
+```
 
-### Signup response
+### Token refresh
 
-If email confirmation is enabled in Supabase, signup returns:
+`apiFetch()` in `src/lib/api.ts` handles refresh automatically. On a `401` it
+calls `POST /auth/refresh` once and retries. If that also fails it clears tokens
+and redirects to `#auth`.
 
-```json
-{
-  "message": "Account created. Please check your email to confirm your account, then sign in.",
-  "email_confirmation_required": true
+---
+
+## 5. Frontend API Client (`src/lib/api.ts`)
+
+Always use these helpers — never call `fetch` directly:
+
+| Helper | Use for |
+|--------|---------|
+| `apiPost(path, body)` | Unauthenticated POST (login, signup, refresh) |
+| `apiFetch(path, options)` | Authenticated requests — handles token refresh + redirect on expiry |
+| `storeAuth(tokens)` | Save tokens after login / OAuth callback |
+| `clearAuth()` | Wipe tokens on logout |
+| `getAccessToken()` | Read the current access token |
+
+### Pattern for replacing mock data
+
+```typescript
+const [sessions, setSessions] = useState<Session[]>([]);
+
+useEffect(() => {
+  apiFetch('/sessions')
+    .then((r) => (r.ok ? r.json() : []))
+    .then(setSessions)
+    .catch(() => {}); // expired session already redirects to #auth
+}, []);
+```
+
+### Logout
+
+```typescript
+async function logout() {
+  try {
+    await apiFetch('/auth/logout', { method: 'POST' }); // best-effort
+  } catch { /* ignore */ }
+  clearAuth();
+  window.location.hash = '#';
 }
 ```
 
-If email confirmation is disabled, signup returns a full `AuthResponse` with tokens.
+### Saving profile changes
 
-### Login / Signup success response
-
-```json
-{
-  "access_token": "eyJ...",
-  "refresh_token": "eyJ...",
-  "user_id": "uuid",
-  "email": "user@example.com"
-}
+```typescript
+await apiFetch('/users/me', {
+  method: 'PATCH',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ theme: 'light' }),          // send only changed fields
+});
 ```
 
-### GET /users/me response
+---
 
+## 6. API Reference
+
+All protected endpoints require:
+```
+Authorization: Bearer <access_token>
+```
+
+---
+
+### Auth — `/auth`
+
+| Method | Endpoint | Rate limit | Body | Description |
+|--------|----------|-----------|------|-------------|
+| `POST` | `/auth/signup` | 5/min | `{ email, password, name }` | Register new user |
+| `POST` | `/auth/login` | 5/min | `{ email, password }` | Sign in, returns JWT |
+| `POST` | `/auth/logout` | 20/min | — | Invalidate session (send Bearer token) |
+| `POST` | `/auth/refresh` | 30/min | `{ refresh_token }` | Exchange refresh token for new access token |
+
+#### POST /auth/signup — responses
+
+Email confirmation **on** (default):
+```json
+{ "message": "...", "email_confirmation_required": true }
+```
+
+Email confirmation **off**:
+```json
+{ "access_token": "eyJ...", "refresh_token": "eyJ...", "user_id": "uuid", "email": "..." }
+```
+
+#### POST /auth/login — response
+```json
+{ "access_token": "eyJ...", "refresh_token": "eyJ...", "user_id": "uuid", "email": "..." }
+```
+
+---
+
+### Users — `/users`
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/users/me` | Get the logged-in user's full profile |
+| `PATCH` | `/users/me` | Update name, theme, or default_coach_mode |
+
+#### GET /users/me — response
 ```json
 {
   "user_id": "uuid",
@@ -170,106 +262,224 @@ If email confirmation is disabled, signup returns a full `AuthResponse` with tok
 }
 ```
 
----
-
-## 5. How Auth Works
-
-```text
-1. User submits login form
-2. React POSTs to /auth/login
-3. FastAPI calls Supabase Auth with email + password
-4. Supabase returns a JWT
-5. FastAPI returns the JWT to React
-6. React stores it in localStorage:
-     sp_access_token
-     sp_refresh_token
-     sp_user_id
-     sp_email
-7. React immediately calls GET /users/me with the token
-8. Stores the full profile for use across the app
-9. User is redirected to #dashboard
+#### PATCH /users/me — request body
+All fields are optional — send only the ones you want to change.
+```json
+{
+  "name": "Alex Johnson",
+  "theme": "light",
+  "default_coach_mode": "lecture"
+}
 ```
+Valid values: `theme` → `"dark" | "light"`, `default_coach_mode` → `"essay" | "lecture" | "reader"`.
 
-On every page load, `App.tsx` checks `localStorage` for `sp_access_token`. If found, the user is considered logged in. If not, `#dashboard` redirects to `#auth`.
+Updating `name` automatically recomputes `initials`.
+
+Returns the full updated profile (same shape as GET /users/me).
 
 ---
 
-## 6. Frontend API Client (`src/lib/api.ts`)
+### Sessions — `/sessions`
 
-Auth and profile wiring is implemented in `src/lib/api.ts` — reuse it instead of
-calling `fetch` directly:
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/sessions` | List all sessions (summary, no transcript) |
+| `GET` | `/sessions/{id}` | Full session: metadata + transcript + action items |
+| `POST` | `/sessions` | Create a new session (called by the extension) |
+| `POST` | `/sessions/{id}/messages` | Append a transcript message to a session |
 
-- `apiPost(path, body)` — unauthenticated POST (login / signup / refresh).
-- `apiFetch(path, options)` — authenticated fetch: attaches the bearer token and,
-  on a `401`, refreshes once and retries; if refresh fails it clears the stored
-  tokens and redirects to `#auth`. So token expiry is handled for you.
-- `storeAuth(tokens)` / `clearAuth()` / `getAccessToken()` — helpers over the
-  `sp_*` localStorage keys.
-
-`AuthPage.tsx` already uses `apiPost` + `storeAuth`. `Dashboard.tsx` loads the
-real profile on mount with `apiFetch('/users/me')` and threads it through as the
-`student` prop (the old email-derived `STUDENT` guess is now just the first-paint
-fallback).
-
-### 6.1 Wiring the remaining mock data
-
-`Dashboard.tsx` still has mock `RUBRICS`, `SESSIONS`, and `ACTION_ITEMS_INITIAL`.
-Once the endpoints in section 7 exist, replace each with the same pattern:
-
-```typescript
-const [sessions, setSessions] = useState<Session[]>([]);
-useEffect(() => {
-  apiFetch('/sessions')
-    .then((r) => (r.ok ? r.json() : []))
-    .then(setSessions)
-    .catch(() => {}); // expired session already redirects to #auth
-}, []);
-```
-
-### 6.2 Logout
-
-```typescript
-import { apiFetch, clearAuth } from '../lib/api';
-
-async function logout() {
-  try {
-    await apiFetch('/auth/logout', { method: 'POST' }); // best-effort
-  } catch {
-    /* ignore — we clear locally regardless */
+#### GET /sessions — response
+```json
+[
+  {
+    "id": "uuid",
+    "title": "Research Essay Draft",
+    "source": "Chrome Extension",
+    "mode": "Essay Coach",
+    "duration": "24m",
+    "when": "Today · 2:38 PM",
+    "rubric_id": "uuid or null",
+    "summary": "StudyPilot noticed your thesis..."
   }
-  clearAuth();
-  window.location.hash = '#';
+]
+```
+Ordered by most recent first.
+
+#### GET /sessions/{id} — response
+```json
+{
+  "id": "uuid",
+  "title": "Research Essay Draft",
+  "source": "Chrome Extension",
+  "mode": "Essay Coach",
+  "duration": "24m",
+  "when": "Today · 2:38 PM",
+  "rubric_id": "uuid or null",
+  "summary": "...",
+  "transcript": [
+    { "id": "uuid", "who": "You", "text": "Can you check my thesis?", "t": "2:39" },
+    { "id": "uuid", "who": "StudyPilot", "text": "Your thesis is clear but...", "t": "2:39" }
+  ],
+  "action_items": [
+    { "id": "uuid", "text": "Make the thesis more specific", "done": false }
+  ]
 }
 ```
 
+#### POST /sessions — request body
+```json
+{
+  "title": "Research Essay Draft",
+  "mode": "Essay Coach",
+  "duration_seconds": 1440,
+  "rubric_id": "uuid (optional)",
+  "page_title": "My Essay - Google Docs (optional)",
+  "page_url": "https://docs.google.com/... (optional)",
+  "summary": "Session summary text (optional)",
+  "source": "Chrome Extension"
+}
+```
+Valid `mode` values: `"Essay Coach"`, `"Presentation Coach"`, `"Study Coach"`, `"Lecture"`, `"Research Reader"`.
+
+Returns: `{ "id": "uuid", "title": "..." }`  — status 201.
+
+#### POST /sessions/{id}/messages — request body
+```json
+{
+  "role": "user",
+  "message_text": "Can you check my thesis?",
+  "time_offset_seconds": 159
+}
+```
+Valid `role` values: `"user"`, `"ai"`, `"system"`.
+
+Returns: `{ "id": "uuid" }` — status 201.
+
 ---
 
-## 7. Backend Endpoints Still To Build
+### Rubrics — `/rubrics`
 
-These are needed to replace the mock data in the dashboard:
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/rubrics` | List all rubrics with their criteria |
 
-```text
-GET  /sessions              → list user's sessions
-GET  /sessions/{id}         → session detail + transcript + action items
-GET  /rubrics               → list user's rubrics with criteria
-GET  /action-items          → list user's action items
-PATCH /action-items/{id}    → toggle done/undone
-POST /sessions              → save a new session from the extension
-POST /sessions/{id}/messages → save transcript messages
+#### GET /rubrics — response
+```json
+[
+  {
+    "id": "uuid",
+    "title": "Argumentative Essay Rubric",
+    "course": "ENG 102 · Composition II",
+    "uploaded_at": "2026-04-12T10:00:00+00:00",
+    "active": true,
+    "sessions_count": 3,
+    "file_search_status": "indexed",
+    "criteria": [
+      { "id": "uuid", "name": "Thesis clarity", "score": 3, "max_score": 4 },
+      { "id": "uuid", "name": "Evidence quality", "score": 2, "max_score": 4 }
+    ]
+  }
+]
+```
+Ordered by most recently uploaded first.
+
+---
+
+### Action Items — `/action-items`
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/action-items` | List all action items (open first, then done) |
+| `PATCH` | `/action-items/{id}` | Toggle done state |
+
+#### GET /action-items — response
+```json
+[
+  {
+    "id": "uuid",
+    "text": "Make the thesis more specific",
+    "session_id": "uuid or null",
+    "rubric_id": "uuid or null",
+    "done": false
+  }
+]
+```
+Open items (`done: false`) come before completed ones.
+
+#### PATCH /action-items/{id} — request body
+```json
+{ "done": true }
+```
+Returns the full updated action item (same shape as list item).
+
+---
+
+### Health — `/health`
+
+```
+GET /health
+```
+Returns `200` when the server and DB are reachable:
+```json
+{ "status": "ok", "db": "ok" }
+```
+Returns `503` if the DB is unreachable:
+```json
+{ "status": "ok", "db": "unreachable" }
 ```
 
 ---
 
-## 8. Production Checklist
+## 7. Security Model
+
+Every protected route uses `Depends(verify_token)` from `dependencies.py`:
+
+```text
+Request arrives
+  → verify_token() extracts Bearer token
+  → supabase.auth.get_user(token) validates JWT with Supabase
+  → returns verified user_id
+  → route handler runs with trusted user_id
+
+DB queries use get_user_client(token):
+  → creates anon Supabase client scoped to the user's JWT
+  → PostgREST runs as that user
+  → RLS policies enforce row-level ownership at the DB
+  → even if application logic has a bug, the DB won't return other users' data
+```
+
+The service-role client (`supabase_admin`) is used **only** in:
+- `POST /auth/logout` — to call `admin.sign_out()` which requires elevated permissions
+
+---
+
+## 8. What the Frontend Still Needs to Wire Up
+
+`Dashboard.tsx` currently uses hardcoded mock constants. Replace each with a
+real API call using the pattern in section 5:
+
+| Mock constant | Replace with |
+|---------------|-------------|
+| `SESSIONS` | `GET /sessions` |
+| Session detail | `GET /sessions/{id}` |
+| `RUBRICS` | `GET /rubrics` |
+| `ACTION_ITEMS_INITIAL` | `GET /action-items` |
+| `toggleAction` (local state only) | `PATCH /action-items/{id}` then update local state |
+| Settings save | `PATCH /users/me` |
+
+---
+
+## 9. Production Checklist
 
 Before deploying:
 
 ```text
-- [ ] Set SUPABASE_SERVICE_ROLE_KEY and GEMINI_API_KEY as environment variables on the server
-- [ ] Update CORS origins in main.py to include the real production domain
+- [ ] Remove localhost entries from CORS origins in main.py
+- [ ] Set all env vars on the server (SUPABASE_*, GEMINI_API_KEY)
+- [ ] Set VITE_API_BASE_URL to the production backend URL
 - [ ] Enable email confirmation in Supabase Auth
-- [ ] Set up a custom SMTP provider (Resend, SendGrid, or Brevo) to avoid the 2 email/hour limit
-- [ ] Enable leaked password protection (requires Supabase Pro)
-- [ ] Set VITE_API_BASE_URL to the production backend URL (read by src/lib/api.ts)
-- [ ] Deploy FastAPI to a server (Railway, Render, or Fly.io recommended)
+- [ ] Set up custom SMTP (Resend, SendGrid, or Brevo) — free tier is 2 emails/hour
+- [ ] Enable leaked password protection in Supabase (Pro plan)
+- [ ] Switch rate limiter to Redis backend if running multiple workers
+- [ ] Deploy FastAPI to Railway, Render, or Fly.io
 ```

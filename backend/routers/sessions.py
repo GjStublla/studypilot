@@ -13,7 +13,7 @@ user, so the DB enforces that users can only read/write their own rows.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, NoReturn
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -49,26 +49,32 @@ def _when_str(ts: str | None) -> str:
         dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
         now = datetime.now(timezone.utc)
         delta = (now.date() - dt.date()).days
-        time_str = dt.strftime("%-I:%M %p").lstrip("0") if hasattr(dt, "strftime") else ""
-        # strftime on Windows doesn't support %-I; fall back gracefully
-        try:
-            time_str = dt.strftime("%#I:%M %p")  # Windows-compatible
-        except ValueError:
-            time_str = dt.strftime("%I:%M %p").lstrip("0")
+
+        # Format hour:minute AM/PM without a leading zero.
+        # strftime %-I is Linux-only; %#I is Windows-only.
+        # Use %I and strip the leading zero manually for cross-platform safety.
+        time_str = dt.strftime("%I:%M %p").lstrip("0")
+
         if delta == 0:
             return f"Today · {time_str}"
         if delta == 1:
             return f"Yesterday · {time_str}"
-        return dt.strftime("%b %-d · ") + time_str
+        # Use %d and strip leading zero manually — %-d is not portable either.
+        day = str(dt.day)
+        month = dt.strftime("%b")
+        return f"{month} {day} · {time_str}"
     except Exception:
-        return ts
+        return ts or ""
 
 
-def _handle_postgrest_error(e: Exception, context: str) -> None:
+def _handle_postgrest_error(e: Exception, context: str) -> NoReturn:
     """
     Re-raise Supabase/PostgREST exceptions as appropriate HTTP errors.
     PGRST116 means .single() found no rows → 404.
     Everything else is an infrastructure problem → 500 with server-side log.
+
+    Typed as NoReturn because it always raises — callers don't need a
+    guard `return` after calling this.
     """
     error_str = str(e).lower()
     if "pgrst116" in error_str or "no rows" in error_str:

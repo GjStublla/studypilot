@@ -83,8 +83,8 @@ def list_rubrics(
             RubricCriterion(
                 id=c["id"],
                 name=c["name"],
-                score=c["score"] or 0,
-                max_score=c["max_score"] or 4,
+                score=c["score"] if c["score"] is not None else 0,
+                max_score=c["max_score"] if c["max_score"] is not None else 4,
             )
             # PostgREST returns the nested table under the relation name
             for c in (row.get("rubric_criteria") or [])
