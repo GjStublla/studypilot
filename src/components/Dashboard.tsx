@@ -1,6 +1,17 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentType, MouseEvent, ReactNode, SVGProps } from 'react';
-import { apiFetch } from '../lib/api';
+import { apiFetch, clearAuth } from '../lib/api';
+import {
+  fetchSessions,
+  fetchRubrics,
+  fetchActionItems,
+  fetchSessionTranscript,
+  setActionItemDone,
+  type Session,
+  type Rubric,
+  type ActionItem,
+  type TranscriptLine,
+} from '../lib/dashboardApi';
 import './Dashboard.css';
 import {
   ArrowRight,
@@ -67,37 +78,6 @@ function getInitialTheme(): Theme {
 
 type LucideIcon = ComponentType<SVGProps<SVGSVGElement> & { size?: number | string }>;
 
-type Rubric = {
-  id: string;
-  title: string;
-  course: string;
-  uploaded: string;
-  active?: boolean;
-  criteria: { name: string; score?: number; max?: number }[];
-  sessionsCount: number;
-};
-
-type Session = {
-  id: string;
-  title: string;
-  source: 'Chrome Extension';
-  mode: 'Essay Coach' | 'Lecture' | 'Research Reader';
-  duration: string;
-  when: string;
-  rubricId: string;
-  summary: string;
-  transcript: { who: 'You' | 'StudyPilot'; text: string; t: string }[];
-  actionItemIds: string[];
-};
-
-type ActionItem = {
-  id: string;
-  text: string;
-  sessionId: string;
-  rubricId: string;
-  done: boolean;
-};
-
 type Message = {
   id: string;
   role: 'ai' | 'user';
@@ -128,131 +108,6 @@ function getLoggedInStudent() {
 }
 
 const STUDENT = getLoggedInStudent();
-
-const RUBRICS: Rubric[] = [
-  {
-    id: 'r1',
-    title: 'Argumentative Essay Rubric',
-    course: 'ENG 102 · Composition II',
-    uploaded: 'Apr 12',
-    active: true,
-    sessionsCount: 3,
-    criteria: [
-      { name: 'Thesis clarity', score: 3, max: 4 },
-      { name: 'Evidence quality', score: 2, max: 4 },
-      { name: 'Analysis', score: 3, max: 4 },
-      { name: 'Organization', score: 3, max: 4 },
-      { name: 'Conclusion strength', score: 2, max: 4 },
-    ],
-  },
-  {
-    id: 'r2',
-    title: 'Primary Source Analysis Rubric',
-    course: 'HIS 214 · Modern Memory',
-    uploaded: 'Mar 30',
-    sessionsCount: 2,
-    criteria: [
-      { name: 'Context', score: 3, max: 4 },
-      { name: 'Author intent', score: 2, max: 4 },
-      { name: 'Argument support', score: 3, max: 4 },
-      { name: 'Evaluation', score: 2, max: 4 },
-    ],
-  },
-  {
-    id: 'r3',
-    title: 'Lab Report Rubric',
-    course: 'BIO 110 · Intro Bio Lab',
-    uploaded: 'Mar 22',
-    sessionsCount: 1,
-    criteria: [
-      { name: 'Hypothesis', score: 4, max: 4 },
-      { name: 'Methods', score: 3, max: 4 },
-      { name: 'Data presentation', score: 3, max: 4 },
-      { name: 'Discussion', score: 2, max: 4 },
-      { name: 'Citations', score: 3, max: 4 },
-    ],
-  },
-];
-
-const ACTION_ITEMS_INITIAL: ActionItem[] = [
-  { id: 'a1', text: 'Make the thesis more specific', sessionId: 's1', rubricId: 'r1', done: false },
-  { id: 'a2', text: 'Add analysis after the quote in paragraph 2', sessionId: 's1', rubricId: 'r1', done: false },
-  { id: 'a3', text: 'Connect the conclusion back to the central claim', sessionId: 's1', rubricId: 'r1', done: false },
-  { id: 'a4', text: 'Check rubric criterion for evidence and explanation', sessionId: 's1', rubricId: 'r1', done: true },
-  { id: 'a5', text: 'Rewrite topic sentence in paragraph 3', sessionId: 's2', rubricId: 'r1', done: false },
-  { id: 'a6', text: 'Cite the Atlantic article in MLA, not APA', sessionId: 's2', rubricId: 'r1', done: true },
-  { id: 'a7', text: 'Identify the author’s implicit assumption', sessionId: 's3', rubricId: 'r2', done: false },
-  { id: 'a8', text: 'Add one counter-source from the syllabus reader', sessionId: 's3', rubricId: 'r2', done: true },
-];
-
-const SESSIONS: Session[] = [
-  {
-    id: 's1',
-    title: 'Research Essay Draft',
-    source: 'Chrome Extension',
-    mode: 'Essay Coach',
-    duration: '24m',
-    when: 'Today · 2:38 PM',
-    rubricId: 'r1',
-    summary:
-      'StudyPilot noticed your thesis is understandable but too broad. The strongest revision opportunity is adding analysis after your evidence instead of only summarizing sources.',
-    transcript: [
-      { who: 'You', text: 'I’m about to write the second body paragraph — can you check my thesis first?', t: '2:39' },
-      {
-        who: 'StudyPilot',
-        text: 'Your thesis is clear, but the rubric asks for stronger evidence. Paragraph 2 summarizes the source instead of analyzing it.',
-        t: '2:39',
-      },
-      { who: 'You', text: 'What should I add?', t: '2:40' },
-      {
-        who: 'StudyPilot',
-        text: 'I can’t write the introduction for you, but I can help you improve it. What is the main claim you want your reader to believe?',
-        t: '2:40',
-      },
-    ],
-    actionItemIds: ['a1', 'a2', 'a3', 'a4'],
-  },
-  {
-    id: 's2',
-    title: 'Cover Letter — Internship',
-    source: 'Chrome Extension',
-    mode: 'Essay Coach',
-    duration: '11m',
-    when: 'Yesterday · 8:12 PM',
-    rubricId: 'r1',
-    summary:
-      'Your opening is direct, but the third paragraph drifts from the role. We tightened the framing to keep the reader inside one argument.',
-    transcript: [
-      { who: 'You', text: 'Read this opener.', t: '8:12' },
-      {
-        who: 'StudyPilot',
-        text: 'Clear and specific — good. Paragraph 3 reads like a CV summary. Want me to surface where it loses focus?',
-        t: '8:13',
-      },
-    ],
-    actionItemIds: ['a5', 'a6'],
-  },
-  {
-    id: 's3',
-    title: 'Primary Source — 1853 Pamphlet',
-    source: 'Chrome Extension',
-    mode: 'Research Reader',
-    duration: '18m',
-    when: 'Apr 21 · 10:02 AM',
-    rubricId: 'r2',
-    summary:
-      'You located the central argument but did not surface the author’s assumption. The strongest move next is naming it explicitly before you evaluate.',
-    transcript: [
-      { who: 'You', text: 'Walk me through what this author is doing.', t: '10:03' },
-      {
-        who: 'StudyPilot',
-        text: 'They’re arguing from a moral frame — not an economic one. The assumption underneath is that progress equals discipline. Worth naming that before you evaluate.',
-        t: '10:04',
-      },
-    ],
-    actionItemIds: ['a7', 'a8'],
-  },
-];
 
 const QUICK_PROMPTS = [
   'What should I revise first?',
@@ -324,14 +179,25 @@ function createMessage(message: Omit<Message, 'lines'>): Message {
 
 export default function Dashboard() {
   const [view, setView] = useState<View>('home');
-  const [actionItems, setActionItems] = useState<ActionItem[]>(ACTION_ITEMS_INITIAL);
-  const [activeRubricId, setActiveRubricId] = useState<string>('r1');
-  const [selectedSessionId, setSelectedSessionId] = useState<string>('s1');
-  const [chatContextSessionId, setChatContextSessionId] = useState<string>('s1');
+
+  // ── Live data from the backend ──────────────────────────────────────────────
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [rubrics, setRubrics] = useState<Rubric[]>([]);
+  const [actionItems, setActionItems] = useState<ActionItem[]>([]);
+  const [transcripts, setTranscripts] = useState<Record<string, TranscriptLine[]>>({});
+  const [transcriptLoading, setTranscriptLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+
+  const [activeRubricId, setActiveRubricId] = useState<string>('');
+  const [selectedSessionId, setSelectedSessionId] = useState<string>('');
+  const [chatContextSessionId, setChatContextSessionId] = useState<string>('');
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
   // Real profile from the backend; starts as the email-derived guess so first
   // paint isn't blank, then gets replaced with the actual name/initials/email.
   const [student, setStudent] = useState(STUDENT);
+  // Default coach mode also comes from the profile; persisted back via PATCH /users/me.
+  const [coachMode, setCoachMode] = useState<CoachMode>('essay');
 
   // Load the signed-in user's real profile. apiFetch refreshes the token on a
   // 401 and, if that fails, redirects to #auth — so this doubles as the session
@@ -347,9 +213,49 @@ export default function Dashboard() {
           email: profile.email,
           initials: profile.initials,
         });
+        if (profile.default_coach_mode) {
+          setCoachMode(profile.default_coach_mode as CoachMode);
+        }
+        // Backend is authoritative for a logged-in user — adopt the saved theme
+        // (React bails out if it already matches, so no needless re-render/flash).
+        if (profile.theme === 'light' || profile.theme === 'dark') {
+          setTheme(profile.theme);
+          try {
+            window.localStorage.setItem(THEME_STORAGE_KEY, profile.theme);
+          } catch {
+            /* localStorage unavailable */
+          }
+        }
       })
       .catch(() => {
         /* network error or expired session (already redirected) — keep fallback */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Load sessions, rubrics, and action items in parallel. allSettled means one
+  // failing endpoint doesn't blank the whole dashboard — we render whatever loaded.
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    Promise.allSettled([fetchSessions(), fetchRubrics(), fetchActionItems()])
+      .then(([s, r, a]) => {
+        if (cancelled) return;
+        if (s.status === 'fulfilled') setSessions(s.value);
+        if (r.status === 'fulfilled') {
+          setRubrics(r.value);
+          const active = r.value.find((x) => x.active) ?? r.value[0];
+          if (active) setActiveRubricId((prev) => prev || active.id);
+        }
+        if (a.status === 'fulfilled') setActionItems(a.value);
+        if (s.status === 'rejected' && r.status === 'rejected' && a.status === 'rejected') {
+          setLoadError(true);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
@@ -376,114 +282,181 @@ export default function Dashboard() {
     if (typeof window === 'undefined') return true;
     return window.innerWidth >= 1180;
   });
+  // Global search query — filters the sessions, rubrics, and action-items lists.
+  const [query, setQuery] = useState('');
 
   const rubricsById = useMemo(
-    () => new Map(RUBRICS.map((rubric) => [rubric.id, rubric])),
-    [],
+    () => new Map(rubrics.map((rubric) => [rubric.id, rubric])),
+    [rubrics],
   );
   const sessionsById = useMemo(
-    () => new Map(SESSIONS.map((session) => [session.id, session])),
-    [],
+    () => new Map(sessions.map((session) => [session.id, session])),
+    [sessions],
   );
-  const activeRubric = useMemo(
-    () => rubricsById.get(activeRubricId) ?? RUBRICS[0],
-    [activeRubricId, rubricsById],
+  const activeRubric = useMemo<Rubric | undefined>(
+    () => rubricsById.get(activeRubricId) ?? rubrics.find((r) => r.active) ?? rubrics[0],
+    [activeRubricId, rubricsById, rubrics],
   );
-  const selectedSession = useMemo(
-    () => sessionsById.get(selectedSessionId) ?? SESSIONS[0],
-    [selectedSessionId, sessionsById],
+  const latestSession: Session | undefined = sessions[0];
+  const selectedSession = useMemo<Session | undefined>(
+    () => sessionsById.get(selectedSessionId) ?? sessions[0],
+    [selectedSessionId, sessionsById, sessions],
   );
-  const chatSession = useMemo(
-    () => sessionsById.get(chatContextSessionId) ?? SESSIONS[0],
-    [chatContextSessionId, sessionsById],
+  const chatSession = useMemo<Session | undefined>(
+    () => sessionsById.get(chatContextSessionId) ?? sessions[0],
+    [chatContextSessionId, sessionsById, sessions],
   );
 
   const openActionItems = useMemo(() => actionItems.filter((a) => !a.done), [actionItems]);
   const doneActionItems = useMemo(() => actionItems.filter((a) => a.done), [actionItems]);
-  const openActionIds = useMemo(
-    () => new Set(openActionItems.map((item) => item.id)),
-    [openActionItems],
-  );
   const sessionRows = useMemo<SessionRow[]>(
     () =>
-      SESSIONS.map((session) => ({
+      sessions.map((session) => ({
         session,
-        rubric: rubricsById.get(session.rubricId),
-        openCount: session.actionItemIds.reduce(
-          (count, id) => count + (openActionIds.has(id) ? 1 : 0),
-          0,
-        ),
+        rubric: session.rubricId ? rubricsById.get(session.rubricId) : undefined,
+        openCount: actionItems.filter((a) => a.sessionId === session.id && !a.done).length,
       })),
-    [openActionIds, rubricsById],
+    [sessions, rubricsById, actionItems],
   );
   const homeActionItems = useMemo(() => openActionItems.slice(0, 4), [openActionItems]);
   const latestSessionOpenCount = useMemo(
     () =>
-      SESSIONS[0].actionItemIds.reduce(
-        (count, id) => count + (openActionIds.has(id) ? 1 : 0),
-        0,
-      ),
-    [openActionIds],
+      latestSession
+        ? actionItems.filter((a) => a.sessionId === latestSession.id && !a.done).length
+        : 0,
+    [latestSession, actionItems],
   );
   const selectedSessionActionItems = useMemo(
-    () => actionItems.filter((a) => selectedSession.actionItemIds.includes(a.id)),
+    () => (selectedSession ? actionItems.filter((a) => a.sessionId === selectedSession.id) : []),
     [actionItems, selectedSession],
   );
-  const selectedSessionRubric = rubricsById.get(selectedSession.rubricId) ?? RUBRICS[0];
+  const selectedSessionRubric =
+    selectedSession && selectedSession.rubricId
+      ? rubricsById.get(selectedSession.rubricId)
+      : undefined;
+  const selectedTranscript = selectedSession ? transcripts[selectedSession.id] ?? [] : [];
+  // Memoized so the reference is stable between unrelated renders — the ChatView
+  // effect that seeds messages from it depends on this not changing every render.
+  const chatTranscript = useMemo(
+    () => (chatSession ? transcripts[chatSession.id] ?? [] : []),
+    [chatSession, transcripts],
+  );
+  // "Recent activity" derived from the user's real sessions (most recent first).
+  const recentActivity = useMemo(
+    () => sessions.slice(0, 5).map((s) => ({ id: s.id, time: s.when, title: s.title })),
+    [sessions],
+  );
 
-  const toggleAction = useCallback((id: string) => {
-    setActionItems((items) =>
-      items.map((a) => (a.id === id ? { ...a, done: !a.done } : a)),
-    );
-  }, []);
+  const toggleAction = useCallback(
+    (id: string) => {
+      const current = actionItems.find((a) => a.id === id);
+      if (!current) return;
+      const nextDone = !current.done;
+      // Optimistic flip; revert if the PATCH fails so the UI never lies.
+      setActionItems((items) => items.map((a) => (a.id === id ? { ...a, done: nextDone } : a)));
+      setActionItemDone(id, nextDone).catch(() => {
+        setActionItems((items) =>
+          items.map((a) => (a.id === id ? { ...a, done: current.done } : a)),
+        );
+      });
+    },
+    [actionItems],
+  );
 
-  const openInChat = useCallback((sessionId: string) => {
-    setChatContextSessionId(sessionId);
-    setView('chat');
-  }, []);
+  // Fetch a session's transcript the first time it's needed, then cache it.
+  const ensureTranscript = useCallback(
+    (sessionId: string) => {
+      if (transcripts[sessionId] !== undefined) return;
+      setTranscriptLoading(true);
+      fetchSessionTranscript(sessionId)
+        .then((lines) => setTranscripts((prev) => ({ ...prev, [sessionId]: lines })))
+        .catch(() => setTranscripts((prev) => ({ ...prev, [sessionId]: [] })))
+        .finally(() => setTranscriptLoading(false));
+    },
+    [transcripts],
+  );
 
-  const openSessionDetail = useCallback((sessionId: string) => {
-    setSelectedSessionId(sessionId);
-    setView('session-detail');
-  }, []);
+  const openInChat = useCallback(
+    (sessionId: string) => {
+      setChatContextSessionId(sessionId);
+      setView('chat');
+      ensureTranscript(sessionId); // so the chat opens on the real conversation
+    },
+    [ensureTranscript],
+  );
+
+  const openSessionDetail = useCallback(
+    (sessionId: string) => {
+      setSelectedSessionId(sessionId);
+      setView('session-detail');
+      ensureTranscript(sessionId);
+    },
+    [ensureTranscript],
+  );
 
   const toggleSidebar = useCallback(() => setSidebarOpen((v) => !v), []);
   const toggleContext = useCallback(() => setContextOpen((v) => !v), []);
-  const toggleTheme = useCallback(() => {
-    setTheme((prev) => {
-      const next: Theme = prev === 'dark' ? 'light' : 'dark';
-      try {
-        window.localStorage.setItem(THEME_STORAGE_KEY, next);
-      } catch {
-        /* localStorage unavailable */
-      }
-      return next;
+  const applyTheme = useCallback((next: Theme) => {
+    setTheme(next);
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, next);
+    } catch {
+      /* localStorage unavailable */
+    }
+    // Persist to the profile so the choice follows the user across devices.
+    apiFetch('/users/me', {
+      method: 'PATCH',
+      body: JSON.stringify({ theme: next }),
+    }).catch(() => {
+      /* best-effort — the local theme is already applied */
     });
   }, []);
-  const continueLatestInChat = useCallback(() => openInChat(SESSIONS[0].id), [openInChat]);
-  const openChatSessionDetail = useCallback(
-    () => openSessionDetail(chatSession.id),
-    [chatSession.id, openSessionDetail],
+  const toggleTheme = useCallback(
+    () => applyTheme(theme === 'dark' ? 'light' : 'dark'),
+    [applyTheme, theme],
   );
-  const continueSelectedInChat = useCallback(
-    () => openInChat(selectedSession.id),
-    [openInChat, selectedSession.id],
-  );
-  const continueContextInChat = useCallback(
-    () => openInChat(chatSession.id),
-    [chatSession.id, openInChat],
-  );
+  const continueLatestInChat = useCallback(() => {
+    if (latestSession) openInChat(latestSession.id);
+  }, [latestSession, openInChat]);
+  const openChatSessionDetail = useCallback(() => {
+    if (chatSession) openSessionDetail(chatSession.id);
+  }, [chatSession, openSessionDetail]);
+  const continueSelectedInChat = useCallback(() => {
+    if (selectedSession) openInChat(selectedSession.id);
+  }, [openInChat, selectedSession]);
+  const continueContextInChat = useCallback(() => {
+    if (chatSession) openInChat(chatSession.id);
+  }, [chatSession, openInChat]);
   const backToSessions = useCallback(() => setView('sessions'), []);
   const askAboutRubric = useCallback(
     (rubricId: string) => {
-      const session = SESSIONS.find((s) => s.rubricId === rubricId);
+      const session = sessions.find((s) => s.rubricId === rubricId);
       if (session) openInChat(session.id);
       else setView('chat');
     },
-    [openInChat],
+    [openInChat, sessions],
   );
   const openExtension = useCallback(() => {
     /* placeholder - would deep link the extension */
+  }, []);
+  const changeCoachMode = useCallback((mode: CoachMode) => {
+    setCoachMode((prev) => {
+      if (prev === mode) return prev;
+      // Optimistic; revert if the profile PATCH is rejected or fails.
+      apiFetch('/users/me', {
+        method: 'PATCH',
+        body: JSON.stringify({ default_coach_mode: mode }),
+      })
+        .then((res) => {
+          if (!res.ok) setCoachMode(prev);
+        })
+        .catch(() => setCoachMode(prev));
+      return mode;
+    });
+  }, []);
+  const signOut = useCallback(() => {
+    clearAuth();
+    window.location.hash = '#auth';
   }, []);
 
   return (
@@ -502,8 +475,8 @@ export default function Dashboard() {
         view={view}
         setView={setView}
         openCount={openActionItems.length}
-        sessionsCount={SESSIONS.length}
-        rubricsCount={RUBRICS.length}
+        sessionsCount={sessions.length}
+        rubricsCount={rubrics.length}
       />
 
       <section className="ds-main">
@@ -511,87 +484,110 @@ export default function Dashboard() {
           view={view}
           theme={theme}
           contextOpen={contextOpen}
+          query={query}
+          onQueryChange={setQuery}
           onToggleSidebar={toggleSidebar}
           onToggleContext={toggleContext}
           onToggleTheme={toggleTheme}
         />
 
         <div className="ds-canvas">
-          {view === 'home' && (
-            <HomeView
-              student={student}
-              activeRubric={activeRubric}
-              latestSession={SESSIONS[0]}
-              latestSessionOpenCount={latestSessionOpenCount}
-              openActionItems={homeActionItems}
-              onContinueInChat={continueLatestInChat}
-              onOpenSession={openSessionDetail}
-              onToggleAction={toggleAction}
-              onGoTo={setView}
-            />
-          )}
+          {loading ? (
+            <div className="ds-state ds-state-loading">
+              <span className="ds-state-spinner" aria-hidden="true" />
+              <p>Loading your workspace…</p>
+            </div>
+          ) : loadError ? (
+            <div className="ds-state ds-state-error">
+              <p>We couldn't load your data. Check your connection and try again.</p>
+              <button type="button" className="ds-btn" onClick={() => window.location.reload()}>
+                Retry
+              </button>
+            </div>
+          ) : (
+            <>
+              {view === 'home' && (
+                <HomeView
+                  student={student}
+                  activeRubric={activeRubric}
+                  latestSession={latestSession}
+                  latestSessionOpenCount={latestSessionOpenCount}
+                  openActionItems={homeActionItems}
+                  sessionsById={sessionsById}
+                  recentActivity={recentActivity}
+                  onContinueInChat={continueLatestInChat}
+                  onOpenSession={openSessionDetail}
+                  onToggleAction={toggleAction}
+                  onGoTo={setView}
+                />
+              )}
 
-          {view === 'chat' && (
-            <ChatView
-              student={student}
-              activeRubric={activeRubric}
-              session={chatSession}
-              onOpenSession={openChatSessionDetail}
-            />
-          )}
+              {view === 'chat' && (
+                <ChatView
+                  student={student}
+                  activeRubric={activeRubric}
+                  session={chatSession}
+                  transcript={chatTranscript}
+                  transcriptLoading={transcriptLoading}
+                  onOpenSession={openChatSessionDetail}
+                />
+              )}
 
-          {view === 'sessions' && (
-            <SessionsView
-              rows={sessionRows}
-              onOpenSession={openSessionDetail}
-              onContinueInChat={openInChat}
-            />
-          )}
+              {view === 'sessions' && (
+                <SessionsView
+                  rows={sessionRows}
+                  query={query}
+                  onOpenSession={openSessionDetail}
+                  onContinueInChat={openInChat}
+                />
+              )}
 
-          {view === 'session-detail' && (
-            <SessionDetailView
-              session={selectedSession}
-              rubric={selectedSessionRubric}
-              actionItems={selectedSessionActionItems}
-              onToggleAction={toggleAction}
-              onBack={backToSessions}
-              onContinueInChat={continueSelectedInChat}
-            />
-          )}
+              {view === 'session-detail' && (
+                <SessionDetailView
+                  session={selectedSession}
+                  rubric={selectedSessionRubric}
+                  actionItems={selectedSessionActionItems}
+                  transcript={selectedTranscript}
+                  transcriptLoading={transcriptLoading}
+                  onToggleAction={toggleAction}
+                  onBack={backToSessions}
+                  onContinueInChat={continueSelectedInChat}
+                />
+              )}
 
-          {view === 'rubrics' && (
-            <RubricsView
-              rubrics={RUBRICS}
-              activeRubricId={activeRubricId}
-              onSetActive={setActiveRubricId}
-              onAskAbout={askAboutRubric}
-            />
-          )}
+              {view === 'rubrics' && (
+                <RubricsView
+                  rubrics={rubrics}
+                  activeRubricId={activeRubricId}
+                  query={query}
+                  onSetActive={setActiveRubricId}
+                  onAskAbout={askAboutRubric}
+                />
+              )}
 
-          {view === 'action-items' && (
-            <ActionItemsView
-              open={openActionItems}
-              done={doneActionItems}
-              sessionsById={sessionsById}
-              rubricsById={rubricsById}
-              onToggle={toggleAction}
-              onOpenSession={openSessionDetail}
-            />
-          )}
+              {view === 'action-items' && (
+                <ActionItemsView
+                  open={openActionItems}
+                  done={doneActionItems}
+                  sessionsById={sessionsById}
+                  rubricsById={rubricsById}
+                  query={query}
+                  onToggle={toggleAction}
+                  onOpenSession={openSessionDetail}
+                />
+              )}
 
-          {view === 'settings' && (
-            <SettingsView
-              student={student}
-              theme={theme}
-              onSetTheme={(nextTheme) => {
-                setTheme(nextTheme);
-                try {
-                  window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
-                } catch {
-                  /* localStorage unavailable */
-                }
-              }}
-            />
+              {view === 'settings' && (
+                <SettingsView
+                  student={student}
+                  theme={theme}
+                  coachMode={coachMode}
+                  onSetCoachMode={changeCoachMode}
+                  onSignOut={signOut}
+                  onSetTheme={applyTheme}
+                />
+              )}
+            </>
           )}
         </div>
       </section>
@@ -722,6 +718,8 @@ const TopBar = memo(function TopBar({
   view,
   theme,
   contextOpen,
+  query,
+  onQueryChange,
   onToggleSidebar,
   onToggleContext,
   onToggleTheme,
@@ -729,12 +727,27 @@ const TopBar = memo(function TopBar({
   view: View;
   theme: Theme;
   contextOpen: boolean;
+  query: string;
+  onQueryChange: (value: string) => void;
   onToggleSidebar: () => void;
   onToggleContext: () => void;
   onToggleTheme: () => void;
 }) {
   const t = VIEW_TITLES[view];
   const isLight = theme === 'light';
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // ⌘K / Ctrl-K focuses the search box from anywhere on the page.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   return (
     <header className="ds-topbar">
@@ -755,8 +768,25 @@ const TopBar = memo(function TopBar({
       <div className="ds-topbar-actions">
         <div className="ds-search">
           <Search size={13} strokeWidth={1.6} />
-          <input placeholder="Search sessions, rubrics, action items…" />
-          <kbd>⌘K</kbd>
+          <input
+            ref={searchRef}
+            value={query}
+            onChange={(e) => onQueryChange(e.target.value)}
+            placeholder="Search sessions, rubrics, action items…"
+            aria-label="Search"
+          />
+          {query ? (
+            <button
+              type="button"
+              className="ds-search-clear"
+              onClick={() => onQueryChange('')}
+              aria-label="Clear search"
+            >
+              ✕
+            </button>
+          ) : (
+            <kbd>⌘K</kbd>
+          )}
         </div>
         <button
           type="button"
@@ -794,16 +824,20 @@ const HomeView = memo(function HomeView({
   latestSession,
   latestSessionOpenCount,
   openActionItems,
+  sessionsById,
+  recentActivity,
   onContinueInChat,
   onOpenSession,
   onToggleAction,
   onGoTo,
 }: {
   student: typeof STUDENT;
-  activeRubric: Rubric;
-  latestSession: Session;
+  activeRubric: Rubric | undefined;
+  latestSession: Session | undefined;
   latestSessionOpenCount: number;
   openActionItems: ActionItem[];
+  sessionsById: Map<string, Session>;
+  recentActivity: { id: string; time: string; title: string }[];
   onContinueInChat: () => void;
   onOpenSession: (id: string) => void;
   onToggleAction: (id: string) => void;
@@ -826,72 +860,96 @@ const HomeView = memo(function HomeView({
           {greeting} <i>{student.name}</i>.
         </h2>
         <p className="ds-lede">
-          Three open action items from your last coaching session. The extension picked up where
-          your draft left off — pick up where it left off.
+          {openActionItems.length > 0
+            ? `${openActionItems.length} open action ${openActionItems.length === 1 ? 'item' : 'items'} waiting. Pick up where the extension left off.`
+            : 'Your coaching memory lives here. Import a session from the extension to get started.'}
         </p>
       </header>
 
       <section className="ds-row ds-row-2">
         {/* Latest imported session */}
-        <article className="ds-card ds-card-primary">
-          <div className="ds-card-eyebrow">
-            <span className="ds-dot ds-dot-cyan" aria-hidden="true" />
-            <span>Imported from Chrome extension · {latestSession.when}</span>
-          </div>
-          <h3 className="ds-card-title">{latestSession.title}</h3>
-          <p className="ds-card-summary">{latestSession.summary}</p>
+        {latestSession ? (
+          <article className="ds-card ds-card-primary">
+            <div className="ds-card-eyebrow">
+              <span className="ds-dot ds-dot-cyan" aria-hidden="true" />
+              <span>Imported from Chrome extension · {latestSession.when}</span>
+            </div>
+            <h3 className="ds-card-title">{latestSession.title}</h3>
+            <p className="ds-card-summary">{latestSession.summary}</p>
 
-          <dl className="ds-meta-row">
-            <div>
-              <dt>Mode</dt>
-              <dd>{latestSession.mode}</dd>
-            </div>
-            <div>
-              <dt>Duration</dt>
-              <dd>{latestSession.duration}</dd>
-            </div>
-            <div>
-              <dt>Rubric</dt>
-              <dd>{activeRubric.title.replace(' Rubric', '')}</dd>
-            </div>
-            <div>
-              <dt>Open items</dt>
-              <dd>{latestSessionOpenCount}</dd>
-            </div>
-          </dl>
+            <dl className="ds-meta-row">
+              <div>
+                <dt>Mode</dt>
+                <dd>{latestSession.mode}</dd>
+              </div>
+              <div>
+                <dt>Duration</dt>
+                <dd>{latestSession.duration}</dd>
+              </div>
+              <div>
+                <dt>Rubric</dt>
+                <dd>{activeRubric ? activeRubric.title.replace(' Rubric', '') : '—'}</dd>
+              </div>
+              <div>
+                <dt>Open items</dt>
+                <dd>{latestSessionOpenCount}</dd>
+              </div>
+            </dl>
 
-          <div className="ds-card-actions">
-            <DsButton variant="primary" onClick={onContinueInChat}>
-              Continue in chat <ArrowRight size={13} strokeWidth={1.7} />
-            </DsButton>
-            <DsButton variant="ghost" onClick={() => onOpenSession(latestSession.id)}>
-              View transcript
-            </DsButton>
-          </div>
-        </article>
+            <div className="ds-card-actions">
+              <DsButton variant="primary" onClick={onContinueInChat}>
+                Continue in chat <ArrowRight size={13} strokeWidth={1.7} />
+              </DsButton>
+              <DsButton variant="ghost" onClick={() => onOpenSession(latestSession.id)}>
+                View transcript
+              </DsButton>
+            </div>
+          </article>
+        ) : (
+          <article className="ds-card ds-card-primary">
+            <div className="ds-card-eyebrow">
+              <span className="ds-dot ds-dot-cyan" aria-hidden="true" />
+              <span>No sessions yet</span>
+            </div>
+            <h3 className="ds-card-title">Import your first session</h3>
+            <EmptyState
+              title="Nothing here yet."
+              body="Run a coaching session in the Chrome extension and it'll show up here with its transcript and action items."
+            />
+          </article>
+        )}
 
         {/* Active rubric */}
         <article className="ds-card">
           <div className="ds-card-eyebrow">
             <span>Active rubric</span>
           </div>
-          <h3 className="ds-card-title ds-card-title-sm">{activeRubric.title}</h3>
-          <p className="ds-card-sub">{activeRubric.course}</p>
+          {activeRubric ? (
+            <>
+              <h3 className="ds-card-title ds-card-title-sm">{activeRubric.title}</h3>
+              <p className="ds-card-sub">{activeRubric.course}</p>
 
-          <ul className="ds-criteria">
-            {activeRubric.criteria.map((c) => (
-              <li key={c.name}>
-                <span>{c.name}</span>
-                <ScoreDots score={c.score ?? 0} max={c.max ?? 4} />
-              </li>
-            ))}
-          </ul>
+              <ul className="ds-criteria">
+                {activeRubric.criteria.map((c) => (
+                  <li key={c.name}>
+                    <span>{c.name}</span>
+                    <ScoreDots score={c.score ?? 0} max={c.max ?? 4} />
+                  </li>
+                ))}
+              </ul>
 
-          <div className="ds-card-actions">
-            <DsButton variant="ghost" onClick={() => onGoTo('rubrics')}>
-              All rubrics <ChevronRight size={13} strokeWidth={1.7} />
-            </DsButton>
-          </div>
+              <div className="ds-card-actions">
+                <DsButton variant="ghost" onClick={() => onGoTo('rubrics')}>
+                  All rubrics <ChevronRight size={13} strokeWidth={1.7} />
+                </DsButton>
+              </div>
+            </>
+          ) : (
+            <EmptyState
+              title="No rubric yet."
+              body="Upload a rubric to anchor your coaching feedback."
+            />
+          )}
         </article>
       </section>
 
@@ -917,7 +975,7 @@ const HomeView = memo(function HomeView({
                   key={a.id}
                   item={a}
                   onToggle={() => onToggleAction(a.id)}
-                  sessionTitle={SESSIONS.find((s) => s.id === a.sessionId)?.title}
+                  sessionTitle={a.sessionId ? sessionsById.get(a.sessionId)?.title : undefined}
                 />
               ))}
             </ul>
@@ -929,32 +987,23 @@ const HomeView = memo(function HomeView({
           <div className="ds-card-eyebrow">
             <span>Recent activity</span>
           </div>
-          <ul className="ds-activity">
-            <li>
-              <span className="ds-activity-time">2:38 PM</span>
-              <span>
-                Session imported · <b>Research Essay Draft</b>
-              </span>
-            </li>
-            <li>
-              <span className="ds-activity-time">2:41 PM</span>
-              <span>
-                4 action items added from <b>Essay Coach</b>
-              </span>
-            </li>
-            <li>
-              <span className="ds-activity-time">Yesterday</span>
-              <span>
-                Marked <b>Cite the Atlantic article in MLA</b> as done
-              </span>
-            </li>
-            <li>
-              <span className="ds-activity-time">Apr 21</span>
-              <span>
-                Activated rubric <b>Argumentative Essay</b>
-              </span>
-            </li>
-          </ul>
+          {recentActivity.length === 0 ? (
+            <EmptyState
+              title="No activity yet."
+              body="Imported coaching sessions will show up here."
+            />
+          ) : (
+            <ul className="ds-activity">
+              {recentActivity.map((a) => (
+                <li key={a.id}>
+                  <span className="ds-activity-time">{a.time}</span>
+                  <span>
+                    Session imported · <b>{a.title}</b>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </article>
       </section>
     </div>
@@ -965,43 +1014,47 @@ const HomeView = memo(function HomeView({
    Chat view
    ============================================================================ */
 
-const SEED_MESSAGES: Message[] = [
-  createMessage({
-    id: 'm1',
-    role: 'ai',
-    text:
-      "I pulled up your last session — Research Essay Draft. Your thesis is clear, but the rubric asks for stronger evidence. Paragraph 2 summarizes the source instead of analyzing it. Want to start there?",
-    time: '2:47 PM',
-  }),
-  createMessage({
-    id: 'm2',
-    role: 'user',
-    text: 'Yes — what should I revise first?',
-    time: '2:47 PM',
-  }),
-  createMessage({
-    id: 'm3',
-    role: 'ai',
-    text:
-      "Start with the second body paragraph. The quote from Hochschild is strong, but you stop at restating it. Add one sentence linking it back to your thesis claim about working-class identity. I can’t write the introduction for you, but I can help you improve it. What is the main claim you want your reader to believe?",
-    time: '2:48 PM',
-  }),
-];
+// Until the Gemini API is wired up, the coach can't generate replies — be honest
+// about it rather than faking a canned response.
+const AI_OFFLINE_NOTICE =
+  "StudyPilot's AI coach isn't connected yet — replies turn on once the Gemini API is added. Your message is shown here but isn't saved or answered yet.";
+
+/** Map a session's stored transcript lines into chat message bubbles. */
+function transcriptToMessages(lines: TranscriptLine[]): Message[] {
+  return lines.map((l) =>
+    createMessage({
+      id: l.id,
+      role: l.who === 'You' ? 'user' : 'ai',
+      text: l.text,
+      time: l.t,
+    }),
+  );
+}
 
 const ChatView = memo(function ChatView({
   student,
   activeRubric,
   session,
+  transcript,
+  transcriptLoading,
   onOpenSession,
 }: {
   student: typeof STUDENT;
-  activeRubric: Rubric;
-  session: Session;
+  activeRubric: Rubric | undefined;
+  session: Session | undefined;
+  transcript: TranscriptLine[];
+  transcriptLoading: boolean;
   onOpenSession: () => void;
 }) {
-  const [messages, setMessages] = useState<Message[]>(SEED_MESSAGES);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [micOn, setMicOn] = useState(false);
+
+  // Seed the conversation from the session's real transcript. Re-runs when the
+  // chat switches sessions or the transcript finishes loading.
+  useEffect(() => {
+    setMessages(transcriptToMessages(transcript));
+  }, [session?.id, transcript]);
   const messagesRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollFrameRef = useRef<number | null>(null);
@@ -1052,13 +1105,21 @@ const ChatView = memo(function ChatView({
   const send = useCallback((text?: string) => {
     const value = (text ?? input).trim();
     if (!value) return;
+    const now = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
     const userMsg = createMessage({
-      id: String(Date.now()),
+      id: `local-${Date.now()}`,
       role: 'user',
       text: value,
-      time: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+      time: now,
     });
-    setMessages((m) => [...m, userMsg]);
+    const offlineMsg = createMessage({
+      id: `offline-${Date.now()}`,
+      role: 'ai',
+      text: AI_OFFLINE_NOTICE,
+      time: now,
+    });
+    // Keep a single trailing "AI offline" note rather than stacking copies.
+    setMessages((m) => [...m.filter((msg) => !msg.id.startsWith('offline-')), userMsg, offlineMsg]);
     setInput('');
   }, [input]);
 
@@ -1067,28 +1128,44 @@ const ChatView = memo(function ChatView({
   return (
     <div className="ds-view ds-view-chat">
       <div className="ds-context-strip">
-        <span className="ds-context-chip ds-chip-accent" onClick={onOpenSession} role="button" tabIndex={0}>
-          <ScrollText size={11} strokeWidth={1.8} />
-          <span>{session.title}</span>
-        </span>
-        <span className="ds-context-chip">
-          <BookOpen size={11} strokeWidth={1.8} />
-          <span>{activeRubric.title.replace(' Rubric', '')}</span>
-        </span>
+        {session && (
+          <span className="ds-context-chip ds-chip-accent" onClick={onOpenSession} role="button" tabIndex={0}>
+            <ScrollText size={11} strokeWidth={1.8} />
+            <span>{session.title}</span>
+          </span>
+        )}
+        {activeRubric && (
+          <span className="ds-context-chip">
+            <BookOpen size={11} strokeWidth={1.8} />
+            <span>{activeRubric.title.replace(' Rubric', '')}</span>
+          </span>
+        )}
         <span className="ds-context-chip">
           <Chrome size={11} strokeWidth={1.8} />
           <span>Imported from Chrome extension</span>
         </span>
-        <span className="ds-context-chip ds-chip-muted">
-          <Clock size={11} strokeWidth={1.8} />
-          <span>{session.duration} · {session.mode}</span>
-        </span>
+        {session && (
+          <span className="ds-context-chip ds-chip-muted">
+            <Clock size={11} strokeWidth={1.8} />
+            <span>{session.duration} · {session.mode}</span>
+          </span>
+        )}
       </div>
 
       <div className="ds-messages" ref={messagesRef}>
-        {messages.map((m) => (
-          <MessageBubble key={m.id} message={m} student={student} />
-        ))}
+        {transcriptLoading && messages.length === 0 ? (
+          <div className="ds-state ds-state-loading ds-state-inline">
+            <span className="ds-state-spinner" aria-hidden="true" />
+            <p>Loading conversation…</p>
+          </div>
+        ) : messages.length === 0 ? (
+          <EmptyState
+            title="Start the conversation."
+            body="Ask about your rubric, feedback, or what to revise next."
+          />
+        ) : (
+          messages.map((m) => <MessageBubble key={m.id} message={m} student={student} />)
+        )}
       </div>
 
       <div className="ds-composer-wrap">
@@ -1182,13 +1259,28 @@ const MessageBubble = memo(function MessageBubble({
 
 const SessionsView = memo(function SessionsView({
   rows,
+  query,
   onOpenSession,
   onContinueInChat,
 }: {
   rows: SessionRow[];
+  query: string;
   onOpenSession: (id: string) => void;
   onContinueInChat: (id: string) => void;
 }) {
+  const q = query.trim().toLowerCase();
+  const filtered = useMemo(
+    () =>
+      q
+        ? rows.filter(({ session: s, rubric }) =>
+            [s.title, s.summary, s.mode, s.source, rubric?.title ?? ''].some((f) =>
+              f.toLowerCase().includes(q),
+            ),
+          )
+        : rows,
+    [rows, q],
+  );
+
   return (
     <div className="ds-view ds-view-sessions">
       <header className="ds-view-head">
@@ -1205,8 +1297,16 @@ const SessionsView = memo(function SessionsView({
         </span>
       </header>
 
+      {rows.length === 0 ? (
+        <EmptyState
+          title="No sessions yet."
+          body="Run a coaching session in the Chrome extension and it'll be imported here automatically."
+        />
+      ) : filtered.length === 0 ? (
+        <EmptyState title="No matches." body={`No sessions match “${query.trim()}”.`} />
+      ) : (
       <ul className="ds-session-list">
-        {rows.map(({ session: s, rubric, openCount }) => {
+        {filtered.map(({ session: s, rubric, openCount }) => {
           return (
             <li key={s.id}>
               <article className="ds-session-card">
@@ -1253,6 +1353,7 @@ const SessionsView = memo(function SessionsView({
           );
         })}
       </ul>
+      )}
     </div>
   );
 });
@@ -1265,17 +1366,33 @@ const SessionDetailView = memo(function SessionDetailView({
   session,
   rubric,
   actionItems,
+  transcript,
+  transcriptLoading,
   onToggleAction,
   onBack,
   onContinueInChat,
 }: {
-  session: Session;
-  rubric: Rubric;
+  session: Session | undefined;
+  rubric: Rubric | undefined;
   actionItems: ActionItem[];
+  transcript: TranscriptLine[];
+  transcriptLoading: boolean;
   onToggleAction: (id: string) => void;
   onBack: () => void;
   onContinueInChat: () => void;
 }) {
+  if (!session) {
+    return (
+      <div className="ds-view ds-view-session">
+        <button type="button" className="ds-back" onClick={onBack}>
+          <ChevronRight size={13} strokeWidth={1.7} style={{ transform: 'rotate(180deg)' }} />
+          <span>Back to sessions</span>
+        </button>
+        <EmptyState title="Session not found." body="It may have been removed. Head back to your sessions." />
+      </div>
+    );
+  }
+
   return (
     <div className="ds-view ds-view-session">
       <button type="button" className="ds-back" onClick={onBack}>
@@ -1313,15 +1430,27 @@ const SessionDetailView = memo(function SessionDetailView({
                 Continue in chat <ChevronRight size={12} strokeWidth={1.7} />
               </button>
             </div>
-            <ul className="ds-transcript">
-              {session.transcript.map((t, i) => (
-                <li key={i} className={t.who === 'You' ? 'is-you' : 'is-ai'}>
-                  <span className="ds-transcript-who">{t.who}</span>
-                  <p>{t.text}</p>
-                  <time>{t.t}</time>
-                </li>
-              ))}
-            </ul>
+            {transcriptLoading ? (
+              <div className="ds-state ds-state-loading ds-state-inline">
+                <span className="ds-state-spinner" aria-hidden="true" />
+                <p>Loading transcript…</p>
+              </div>
+            ) : transcript.length === 0 ? (
+              <EmptyState
+                title="No transcript."
+                body="This session didn't capture any messages."
+              />
+            ) : (
+              <ul className="ds-transcript">
+                {transcript.map((t) => (
+                  <li key={t.id} className={t.who === 'You' ? 'is-you' : 'is-ai'}>
+                    <span className="ds-transcript-who">{t.who}</span>
+                    <p>{t.text}</p>
+                    <time>{t.t}</time>
+                  </li>
+                ))}
+              </ul>
+            )}
           </article>
 
           <article className="ds-card">
@@ -1345,16 +1474,22 @@ const SessionDetailView = memo(function SessionDetailView({
             <div className="ds-card-eyebrow">
               <span>Rubric used</span>
             </div>
-            <h4 className="ds-card-title ds-card-title-sm">{rubric.title}</h4>
-            <p className="ds-card-sub">{rubric.course}</p>
-            <ul className="ds-criteria">
-              {rubric.criteria.map((c) => (
-                <li key={c.name}>
-                  <span>{c.name}</span>
-                  <ScoreDots score={c.score ?? 0} max={c.max ?? 4} />
-                </li>
-              ))}
-            </ul>
+            {rubric ? (
+              <>
+                <h4 className="ds-card-title ds-card-title-sm">{rubric.title}</h4>
+                <p className="ds-card-sub">{rubric.course}</p>
+                <ul className="ds-criteria">
+                  {rubric.criteria.map((c) => (
+                    <li key={c.name}>
+                      <span>{c.name}</span>
+                      <ScoreDots score={c.score ?? 0} max={c.max ?? 4} />
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <EmptyState title="No rubric." body="This session wasn't linked to a rubric." />
+            )}
           </article>
 
           <article className="ds-card">
@@ -1390,14 +1525,29 @@ const SessionDetailView = memo(function SessionDetailView({
 const RubricsView = memo(function RubricsView({
   rubrics,
   activeRubricId,
+  query,
   onSetActive,
   onAskAbout,
 }: {
   rubrics: Rubric[];
   activeRubricId: string;
+  query: string;
   onSetActive: (id: string) => void;
   onAskAbout: (id: string) => void;
 }) {
+  const q = query.trim().toLowerCase();
+  const filtered = useMemo(
+    () =>
+      q
+        ? rubrics.filter((r) =>
+            [r.title, r.course, ...r.criteria.map((c) => c.name)].some((f) =>
+              f.toLowerCase().includes(q),
+            ),
+          )
+        : rubrics,
+    [rubrics, q],
+  );
+
   return (
     <div className="ds-view ds-view-rubrics">
       <header className="ds-view-head">
@@ -1413,8 +1563,16 @@ const RubricsView = memo(function RubricsView({
         </DsButton>
       </header>
 
+      {rubrics.length === 0 ? (
+        <EmptyState
+          title="No rubrics yet."
+          body="Upload a rubric to set the criteria your coach holds you to."
+        />
+      ) : filtered.length === 0 ? (
+        <EmptyState title="No matches." body={`No rubrics match “${query.trim()}”.`} />
+      ) : (
       <ul className="ds-rubric-list">
-        {rubrics.map((r) => {
+        {filtered.map((r) => {
           const isActive = r.id === activeRubricId;
           return (
             <li key={r.id}>
@@ -1465,6 +1623,7 @@ const RubricsView = memo(function RubricsView({
           );
         })}
       </ul>
+      )}
     </div>
   );
 });
@@ -1478,6 +1637,7 @@ const ActionItemsView = memo(function ActionItemsView({
   done,
   sessionsById,
   rubricsById,
+  query,
   onToggle,
   onOpenSession,
 }: {
@@ -1485,11 +1645,20 @@ const ActionItemsView = memo(function ActionItemsView({
   done: ActionItem[];
   sessionsById: ReadonlyMap<string, Session>;
   rubricsById: ReadonlyMap<string, Rubric>;
+  query: string;
   onToggle: (id: string) => void;
   onOpenSession: (id: string) => void;
 }) {
   const [tab, setTab] = useState<'open' | 'done'>('open');
-  const items = tab === 'open' ? open : done;
+  const q = query.trim().toLowerCase();
+  const items = useMemo(() => {
+    const base = tab === 'open' ? open : done;
+    if (!q) return base;
+    return base.filter((a) => {
+      const sessionTitle = a.sessionId ? sessionsById.get(a.sessionId)?.title ?? '' : '';
+      return [a.text, sessionTitle].some((f) => f.toLowerCase().includes(q));
+    });
+  }, [tab, open, done, q, sessionsById]);
 
   return (
     <div className="ds-view ds-view-todo">
@@ -1525,18 +1694,20 @@ const ActionItemsView = memo(function ActionItemsView({
 
       {items.length === 0 ? (
         <EmptyState
-          title={tab === 'open' ? 'All clear.' : 'Nothing completed yet.'}
+          title={q ? 'No matches.' : tab === 'open' ? 'All clear.' : 'Nothing completed yet.'}
           body={
-            tab === 'open'
-              ? 'New action items from your next coaching session will land here.'
-              : 'Check items off as you revise and they’ll show up here.'
+            q
+              ? `No ${tab} action items match “${query.trim()}”.`
+              : tab === 'open'
+                ? 'New action items from your next coaching session will land here.'
+                : 'Check items off as you revise and they’ll show up here.'
           }
         />
       ) : (
         <ul className="ds-todo ds-todo-detailed">
           {items.map((a) => {
-            const session = sessionsById.get(a.sessionId);
-            const rubric = rubricsById.get(a.rubricId);
+            const session = a.sessionId ? sessionsById.get(a.sessionId) : undefined;
+            const rubric = a.rubricId ? rubricsById.get(a.rubricId) : undefined;
             return (
               <li key={a.id} className={a.done ? 'is-done' : ''}>
                 <button
@@ -1585,14 +1756,18 @@ const ActionItemsView = memo(function ActionItemsView({
 const SettingsView = memo(function SettingsView({
   student,
   theme,
+  coachMode,
+  onSetCoachMode,
+  onSignOut,
   onSetTheme,
 }: {
   student: typeof STUDENT;
   theme: Theme;
+  coachMode: CoachMode;
+  onSetCoachMode: (mode: CoachMode) => void;
+  onSignOut: () => void;
   onSetTheme: (theme: Theme) => void;
 }) {
-  const [coachMode, setCoachMode] = useState<CoachMode>('essay');
-
   return (
     <div className="ds-view ds-view-settings">
       <header className="ds-view-head">
@@ -1615,7 +1790,7 @@ const SettingsView = memo(function SettingsView({
               <b>{student.name}</b>
               <em>{student.email}</em>
             </div>
-            <DsButton variant="ghost">Sign out</DsButton>
+            <DsButton variant="ghost" onClick={onSignOut}>Sign out</DsButton>
           </div>
         </article>
 
@@ -1634,7 +1809,7 @@ const SettingsView = memo(function SettingsView({
                 role="radio"
                 aria-checked={coachMode === m.id}
                 className={`ds-segment-btn ${coachMode === m.id ? 'is-active' : ''}`}
-                onClick={() => setCoachMode(m.id)}
+                onClick={() => onSetCoachMode(m.id)}
               >
                 {m.label}
               </button>
@@ -1714,16 +1889,19 @@ const ContextPanel = memo(function ContextPanel({
 }: {
   view: View;
   student: typeof STUDENT;
-  activeRubric: Rubric;
-  chatSession: Session;
-  selectedSession: Session;
+  activeRubric: Rubric | undefined;
+  chatSession: Session | undefined;
+  selectedSession: Session | undefined;
   openActionItemCount: number;
   onGoTo: (v: View) => void;
   onContinueInChat: () => void;
   onOpenExtension: () => void;
 }) {
   const contextSession = view === 'session-detail' ? selectedSession : chatSession;
-  const visibleCriteria = useMemo(() => activeRubric.criteria.slice(0, 5), [activeRubric]);
+  const visibleCriteria = useMemo(
+    () => activeRubric?.criteria.slice(0, 5) ?? [],
+    [activeRubric],
+  );
 
   return (
     <aside className="ds-context">
@@ -1731,43 +1909,47 @@ const ContextPanel = memo(function ContextPanel({
         <span className="ds-eyebrow">Current context</span>
       </div>
 
-      <section className="ds-context-section">
-        <span className="ds-context-label">Active rubric</span>
-        <button
-          type="button"
-          className="ds-context-block ds-context-block-button"
-          onClick={() => onGoTo('rubrics')}
-        >
-          <span className="ds-context-block-title">{activeRubric.title}</span>
-          <span className="ds-context-block-sub">{activeRubric.course}</span>
-          <ul className="ds-mini-criteria">
-            {visibleCriteria.map((c) => (
-              <li key={c.name}>
-                <span>{c.name}</span>
-                <ScoreDots score={c.score ?? 0} max={c.max ?? 4} />
-              </li>
-            ))}
-          </ul>
-        </button>
-      </section>
+      {activeRubric && (
+        <section className="ds-context-section">
+          <span className="ds-context-label">Active rubric</span>
+          <button
+            type="button"
+            className="ds-context-block ds-context-block-button"
+            onClick={() => onGoTo('rubrics')}
+          >
+            <span className="ds-context-block-title">{activeRubric.title}</span>
+            <span className="ds-context-block-sub">{activeRubric.course}</span>
+            <ul className="ds-mini-criteria">
+              {visibleCriteria.map((c) => (
+                <li key={c.name}>
+                  <span>{c.name}</span>
+                  <ScoreDots score={c.score ?? 0} max={c.max ?? 4} />
+                </li>
+              ))}
+            </ul>
+          </button>
+        </section>
+      )}
 
-      <section className="ds-context-section">
-        <span className="ds-context-label">From the extension</span>
-        <div className="ds-context-block">
-          <div className="ds-context-source">
-            <span className="ds-context-source-ico" aria-hidden="true">
-              <Chrome size={12} strokeWidth={1.7} />
-            </span>
-            <div>
-              <b>{contextSession.title}</b>
-              <em>
-                {contextSession.mode} · {contextSession.duration} · {contextSession.when}
-              </em>
+      {contextSession && (
+        <section className="ds-context-section">
+          <span className="ds-context-label">From the extension</span>
+          <div className="ds-context-block">
+            <div className="ds-context-source">
+              <span className="ds-context-source-ico" aria-hidden="true">
+                <Chrome size={12} strokeWidth={1.7} />
+              </span>
+              <div>
+                <b>{contextSession.title}</b>
+                <em>
+                  {contextSession.mode} · {contextSession.duration} · {contextSession.when}
+                </em>
+              </div>
             </div>
+            <p className="ds-context-quote">{contextSession.summary}</p>
           </div>
-          <p className="ds-context-quote">{contextSession.summary}</p>
-        </div>
-      </section>
+        </section>
+      )}
 
       <section className="ds-context-section">
         <span className="ds-context-label">Suggested next steps</span>
