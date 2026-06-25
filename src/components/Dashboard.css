@@ -552,6 +552,25 @@
   border-radius: 4px;
   background: var(--ds-surface);
 }
+.app-dashboard .ds-search-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ds-quiet);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+.app-dashboard .ds-search-clear:hover {
+  color: var(--ds-ink);
+  background: var(--ds-surface-2);
+}
 
 .app-dashboard .ds-canvas {
   flex: 1;
@@ -1373,6 +1392,57 @@
   font-size: 12.5px;
   color: var(--ds-quiet);
   max-width: 48ch;
+}
+
+/* ---------- Loading / error states ---------- */
+
+.app-dashboard .ds-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 60vh;
+  padding: 48px 28px;
+  text-align: center;
+}
+.app-dashboard .ds-state p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ds-muted);
+  max-width: 44ch;
+}
+.app-dashboard .ds-state-inline {
+  min-height: 0;
+  padding: 28px 0 10px;
+  align-items: flex-start;
+  flex-direction: row;
+  gap: 10px;
+  text-align: left;
+}
+.app-dashboard .ds-state-spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--ds-line-strong);
+  border-top-color: var(--ds-accent-cyan);
+  animation: ds-spin 0.7s linear infinite;
+  flex: none;
+}
+.app-dashboard .ds-state-error p {
+  color: var(--ds-muted);
+}
+
+@keyframes ds-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-dashboard .ds-state-spinner {
+    animation-duration: 1.6s;
+  }
 }
 
 /* ---------- Context panel ---------- */
