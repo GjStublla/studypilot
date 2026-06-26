@@ -2,8 +2,9 @@
 Action items router — /action-items
 
 Endpoints:
-    GET   /action-items        List all action items for the logged-in user
-    PATCH /action-items/{id}   Toggle an action item's done state
+    GET    /action-items        List all action items for the logged-in user
+    PATCH  /action-items/{id}   Toggle an action item's done state
+    DELETE /action-items/{id}   Permanently delete an action item
 
 RLS is enforced on every query via get_user_client().
 """
@@ -95,9 +96,8 @@ def toggle_action_item(
     Updates the done field on a single action item.
 
     The action item must belong to the authenticated user — RLS enforces this
-    at the DB level (auth.uid() = user_id).  An item that doesn't exist or
-    belongs to another user returns 404 rather than 403 to avoid leaking
-    whether the ID exists at all.
+    at the DB level (auth.uid() = user_id). An item that doesn't exist or
+    belongs to another user returns 404 to avoid leaking whether the ID exists.
     """
     client = get_user_client(token)
 
@@ -107,24 +107,28 @@ def toggle_action_item(
             .update({"done": body.done})
             .eq("id", item_id)
             .eq("user_id", user_id)   # belt-and-suspenders on top of RLS
+            # select() is required — without it PostgREST returns no data
+            # and we can't confirm the update succeeded or return the row.
+            .select("id, text, session_id, rubric_id, done")
+            .single()
             .execute()
         )
     except Exception as e:
+        error_str = str(e).lower()
+        # PGRST116 = .single() found no rows → item doesn't exist or belongs
+        # to another user. Return 404 in both cases (don't leak ownership).
+        if "pgrst116" in error_str or "no rows" in error_str:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Action item not found.",
+            )
         print(f"[action-items] toggle_action_item failed for item {item_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Could not update action item. Please try again.",
         )
 
-    # No matching row → item doesn't exist or belongs to another user. Return 404
-    # in both cases (don't leak whether the ID exists).
-    if not result.data:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Action item not found.",
-        )
-
-    row = result.data[0]
+    row = result.data
     return ActionItemResponse(
         id=row["id"],
         text=row["text"],
@@ -132,3 +136,64 @@ def toggle_action_item(
         rubric_id=row.get("rubric_id"),
         done=row["done"],
     )
+
+
+@router.delete(
+    "/{item_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Permanently delete an action item",
+)
+def delete_action_item(
+    item_id: str,
+    user_id: str = Depends(verify_token),
+    token: str = Depends(get_token),
+):
+    """
+    Permanently deletes an action item.
+
+    Returns 404 if the item doesn't exist or belongs to another user —
+    we never confirm whether an ID exists to a different user.
+
+    Use this when the student wants to remove an item entirely.
+    To just mark it complete, use PATCH instead.
+    """
+    client = get_user_client(token)
+
+    # Fetch first to distinguish a genuine 404 from a DB error.
+    try:
+        fetch_result = (
+            client.table("action_items")
+            .select("id")
+            .eq("id", item_id)
+            .eq("user_id", user_id)
+            .single()
+            .execute()
+        )
+    except Exception as e:
+        error_str = str(e).lower()
+        if "pgrst116" in error_str or "no rows" in error_str:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Action item not found.",
+            )
+        print(f"[action-items] delete_action_item fetch failed for item {item_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not delete action item. Please try again.",
+        )
+
+    if not fetch_result.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Action item not found.",
+        )
+
+    # Delete the item.
+    try:
+        client.table("action_items").delete().eq("id", item_id).eq("user_id", user_id).execute()
+    except Exception as e:
+        print(f"[action-items] delete_action_item failed for item {item_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not delete action item. Please try again.",
+        )
