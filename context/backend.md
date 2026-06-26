@@ -415,6 +415,7 @@ Returns the full updated rubric (same shape as GET).
 |--------|----------|-------------|
 | `GET` | `/action-items` | List all action items (open first, then done) |
 | `PATCH` | `/action-items/{id}` | Toggle done state |
+| `DELETE` | `/action-items/{id}` | Permanently delete an action item |
 
 #### GET /action-items — response
 ```json
@@ -435,6 +436,9 @@ Open items (`done: false`) come before completed ones.
 { "done": true }
 ```
 Returns the full updated action item (same shape as list item).
+
+#### DELETE /action-items/{id}
+Returns 204 No Content. Use PATCH to mark done instead of deleting.
 
 ---
 
