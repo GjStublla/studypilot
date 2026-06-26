@@ -156,6 +156,37 @@ function GoogleLogo() {
   );
 }
 
+// ─── Password strength helpers ───────────────────────────────────────────────
+
+type PasswordRule = { label: string; test: (p: string) => boolean };
+
+const PASSWORD_RULES: PasswordRule[] = [
+  { label: 'At least 8 characters',      test: (p) => p.length >= 8 },
+  { label: 'One uppercase letter (A–Z)', test: (p) => /[A-Z]/.test(p) },
+  { label: 'One number (0–9)',           test: (p) => /\d/.test(p) },
+];
+
+function passwordValid(p: string): boolean {
+  return PASSWORD_RULES.every((r) => r.test(p));
+}
+
+function PasswordStrength({ password }: { password: string }) {
+  if (!password) return null;
+  return (
+    <ul className="auth-pw-rules" aria-label="Password requirements">
+      {PASSWORD_RULES.map((rule) => {
+        const ok = rule.test(password);
+        return (
+          <li key={rule.label} className={`auth-pw-rule ${ok ? 'is-met' : 'is-unmet'}`}>
+            <span className="auth-pw-rule-icon" aria-hidden="true">{ok ? '✓' : '·'}</span>
+            {rule.label}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 // ─── Login form ───────────────────────────────────────────────────────────────
 
 function LoginForm() {
@@ -164,10 +195,12 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [suggestGoogle, setSuggestGoogle] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault();
     setError('');
+    setSuggestGoogle(false);
     setLoading(true);
 
     try {
@@ -175,14 +208,17 @@ function LoginForm() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.detail || 'Login failed. Please try again.');
+        const message = typeof data.detail === 'string' ? data.detail : 'Login failed.';
+        // Backend sends a specific message when the account is Google-only
+        if (message.toLowerCase().includes('google sign-in') || message.toLowerCase().includes('continue with google')) {
+          setSuggestGoogle(true);
+        } else {
+          setError(message);
+        }
         return;
       }
 
-      // Store the JWT (+ refresh token) so the rest of the app can use it.
       storeAuth(data as AuthTokens);
-
-      // Redirect to dashboard
       window.location.hash = '#dashboard';
     } catch {
       setError('Could not connect to the server. Is the backend running?');
@@ -232,6 +268,12 @@ function LoginForm() {
         </div>
       </div>
 
+      {suggestGoogle && (
+        <div className="auth-google-prompt" role="alert">
+          <p>This account was created with Google. Use the button below to sign in.</p>
+        </div>
+      )}
+
       {error && (
         <p className="auth-error" role="alert">
           {error}
@@ -267,41 +309,49 @@ function SignupForm({ onSuccess }: { onSuccess: () => void }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [needsConfirmation, setNeedsConfirmation] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault();
     setError('');
 
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters.');
-      return;
-    }
     if (!name.trim()) {
       setError('Please enter your full name.');
+      return;
+    }
+
+    if (!passwordValid(password)) {
+      setError('Password does not meet the requirements below.');
       return;
     }
 
     setLoading(true);
 
     try {
-      const res = await apiPost('/auth/signup', { name, email, password });
+      const res = await apiPost("/auth/signup", { name, email, password });
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.detail || 'Signup failed. Please try again.');
-        return;
+          const message =
+              typeof data.detail === "string"
+                  ? data.detail
+                  : typeof data.message === "string"
+                  ? data.message
+                  : "Could not create account. Please try again.";
+
+          setError(message);
+          return;
       }
 
-      // Email confirmation required — no token yet
       if (data.email_confirmation_required) {
-        setNeedsConfirmation(true);
+        setSuccessMessage(data.message);
         setSuccess(true);
-        setTimeout(() => onSuccess(), 3000);
+        setTimeout(() => onSuccess(), 4000);
         return;
       }
 
       // Email confirmation off — tokens returned immediately
+      setSuccessMessage('Account created. Taking you to sign in…');
       setSuccess(true);
       setTimeout(() => onSuccess(), 2000);
     } catch {
@@ -315,11 +365,7 @@ function SignupForm({ onSuccess }: { onSuccess: () => void }) {
     return (
       <div className="auth-success">
         <div className="auth-success-icon">✓</div>
-        <p>
-          {needsConfirmation
-            ? 'Account created. Check your email to confirm, then sign in.'
-            : 'Account created. Taking you to sign in…'}
-        </p>
+        <p>{successMessage}</p>
       </div>
     );
   }
@@ -357,7 +403,6 @@ function SignupForm({ onSuccess }: { onSuccess: () => void }) {
       <div className="auth-field">
         <label htmlFor="signup-password">
           Password
-          <span className="auth-field-hint">min. 8 characters</span>
         </label>
         <div className="auth-input-wrap">
           <input
@@ -380,6 +425,7 @@ function SignupForm({ onSuccess }: { onSuccess: () => void }) {
             {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
           </button>
         </div>
+        <PasswordStrength password={password} />
       </div>
 
       {error && (
