@@ -210,7 +210,7 @@ function App() {
     );
   }
 
-  if (isAuth && !isSupabaseCallback) {
+  if (isAuth) {
     // Already logged in — go straight to dashboard
     if (user) {
       window.location.hash = '#dashboard';

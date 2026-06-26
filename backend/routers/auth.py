@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Header, Request, status
-from pydantic import BaseModel, EmailStr, Field
-from typing import Union
+from pydantic import BaseModel, EmailStr, Field, field_validator
+import re
 
 from rate_limit import limiter
 from supabase_client import supabase, supabase_admin
@@ -8,20 +8,37 @@ from supabase_client import supabase, supabase_admin
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+# ---------- Password policy ----------
+# Kept in one place so backend and any future tooling stay in sync.
+# Min 8 chars, at least one uppercase letter, at least one digit.
+# The regex enforces all three — the Field min_length is a fast pre-check
+# that short-circuits before the regex runs.
+PASSWORD_POLICY_RE = re.compile(r'^(?=.*[A-Z])(?=.*\d).{8,}$')
+PASSWORD_POLICY_MSG = (
+    "Password must be at least 8 characters and contain "
+    "at least one uppercase letter and one number."
+)
+
+
 # ---------- Request / Response models ----------
 
 class SignUpRequest(BaseModel):
     email: EmailStr
-    # Enforced server-side so it can't be bypassed by calling the API directly
-    # (the client also checks). Keep in sync with the Supabase dashboard password
-    # policy (Auth → Policies) since there is no supabase/config.toml.
-    password: str = Field(min_length=8)
     name: str = Field(min_length=1, max_length=100, strip_whitespace=True)
+    password: str = Field(min_length=8)
+
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        if not PASSWORD_POLICY_RE.match(v):
+            raise ValueError(PASSWORD_POLICY_MSG)
+        return v
 
 
 class LoginRequest(BaseModel):
     email: EmailStr
-    password: str
+    # Max length prevents oversized payload attacks on the login endpoint.
+    password: str = Field(min_length=1, max_length=256)
 
 
 class RefreshRequest(BaseModel):
@@ -39,7 +56,7 @@ class AuthResponse(BaseModel):
 
 class SignupPendingResponse(BaseModel):
     message: str
-    email_confirmation_required: bool
+    email_confirmation_required: bool =True
 
 
 class MessageResponse(BaseModel):
@@ -50,59 +67,56 @@ class MessageResponse(BaseModel):
 
 @router.post(
     "/signup",
-    # Two possible responses: tokens (email confirm off) or pending message (email confirm on).
-    # Union lets FastAPI document both shapes in OpenAPI and validate whichever is returned.
-    response_model=Union[AuthResponse, SignupPendingResponse],
+    response_model=SignupPendingResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Register a new student account",
 )
 @limiter.limit("5/minute")
 def signup(request: Request, body: SignUpRequest):
     """
-    Creates a new Supabase Auth user.
-    The auth trigger in the database automatically creates a profiles row.
+    Register a new student account.
 
-    If email confirmation is enabled in Supabase, returns a pending message.
-    If email confirmation is disabled, returns a JWT immediately.
+    Password policy: min 8 characters, at least one uppercase letter, one number.
+    Enforced by the SignUpRequest validator above — invalid passwords get a 422
+    with a clear message before this function is even called.
+
+    Duplicate email handling: Supabase deliberately returns the same response
+    whether the email already exists or not (anti-enumeration). This means a
+    user with a duplicate email will see "check your email" but won't receive
+    one. This is the correct industry standard behavior — we do not leak
+    whether an email is registered.
+
+    Google OAuth + email/password: if a user previously signed up via Google
+    with the same email, Supabase will link the accounts when they set a
+    password through the "forgot password" flow. They cannot sign up again
+    from scratch — the duplicate email behavior above applies.
     """
     try:
-        response = supabase.auth.sign_up({
+        supabase.auth.sign_up({
             "email": body.email,
             "password": body.password,
             "options": {
                 "data": {
-                    # Stored in auth.users.raw_user_meta_data
-                    # The DB trigger reads this to populate profiles.name and profiles.initials
+                    # Stored in auth.users.raw_user_meta_data.
+                    # The DB trigger reads this to populate profiles.name and initials.
                     "name": body.name,
                 }
             },
         })
     except Exception as e:
-        # Log the real error server-side, but return a generic message so we don't
-        # leak SDK internals or whether the email is already registered.
-        print(f"[signup] sign_up failed: {e}")
+        print(f"[signup] {type(e).__name__}: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Could not create account. Please try again.",
+            detail="Could not create account. Please check your information and try again.",
         )
 
-    # Email confirmation OFF (or auto-confirm) — a session is returned, log in now.
-    if response.session is not None and response.user is not None:
-        return AuthResponse(
-            access_token=response.session.access_token,
-            refresh_token=response.session.refresh_token,
-            user_id=str(response.user.id),
-            email=response.user.email or body.email,
-        )
-
-    # Email confirmation ON (our configuration): Supabase returns no session and
-    # deliberately obfuscates whether the email already existed. Return the *same*
-    # response in every case so this endpoint can't be used to enumerate accounts.
+    # Always return the same message whether the email is new or already exists.
+    # The second sentence nudges duplicate-email users toward signing in
+    # without explicitly confirming whether the email is registered.
     return SignupPendingResponse(
-        message="Account created. Please check your email to confirm your account, then sign in.",
+        message="Check your email to confirm your account, then sign in. If you already have an account, sign in directly.",
         email_confirmation_required=True,
     )
-
 
 # ---------- Login ----------
 
@@ -116,8 +130,9 @@ def login(request: Request, body: LoginRequest):
     """
     Authenticates an existing user with email and password.
 
-    Returns a JWT access token. The frontend stores this and sends it
-    as Authorization: Bearer <token> on every subsequent request.
+    If the email belongs to a Google OAuth account (no password set), returns
+    a specific error code so the frontend can prompt the user to use Google
+    sign-in instead.
     """
     try:
         response = supabase.auth.sign_in_with_password({
@@ -125,7 +140,25 @@ def login(request: Request, body: LoginRequest):
             "password": body.password,
         })
     except Exception:
-        # Return a generic message — don't reveal whether the email exists
+        # Login failed — check whether this is a Google-only account so we
+        # can give a more helpful error than the generic "invalid credentials".
+        # Uses a targeted admin lookup by email — does NOT fetch all users.
+        try:
+            user_lookup = supabase_admin.auth.admin.get_user_by_email(body.email)
+            if user_lookup and user_lookup.user:
+                identities = user_lookup.user.identities or []
+                has_google = any(getattr(i, "provider", None) == "google" for i in identities)
+                has_email  = any(getattr(i, "provider", None) == "email"  for i in identities)
+                if has_google and not has_email:
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="This account uses Google sign-in. Please use the 'Continue with Google' button to log in.",
+                    )
+        except HTTPException:
+            raise
+        except Exception:
+            pass  # lookup failed — fall through to generic error
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password.",
