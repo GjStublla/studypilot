@@ -362,6 +362,9 @@ Returns: `{ "id": "uuid" }` — status 201.
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/rubrics` | List all rubrics with their criteria |
+| `POST` | `/rubrics` | Create a new rubric with criteria |
+| `DELETE` | `/rubrics/{id}` | Delete a rubric and all its criteria |
+| `PATCH` | `/rubrics/{id}/active` | Set a rubric as the active one |
 
 #### GET /rubrics — response
 ```json
@@ -373,15 +376,36 @@ Returns: `{ "id": "uuid" }` — status 201.
     "uploaded_at": "2026-04-12T10:00:00+00:00",
     "active": true,
     "sessions_count": 3,
-    "file_search_status": "indexed",
+    "file_search_status": "not_indexed",
     "criteria": [
-      { "id": "uuid", "name": "Thesis clarity", "score": 3, "max_score": 4 },
-      { "id": "uuid", "name": "Evidence quality", "score": 2, "max_score": 4 }
+      { "id": "uuid", "name": "Thesis clarity", "score": 0, "max_score": 4 }
     ]
   }
 ]
 ```
-Ordered by most recently uploaded first.
+
+#### POST /rubrics — request body
+```json
+{
+  "title": "Argumentative Essay Rubric",
+  "course": "ENG 102 · Composition II",
+  "criteria": [
+    { "name": "Thesis clarity", "max_score": 4 },
+    { "name": "Evidence quality", "max_score": 4 },
+    { "name": "Organization", "max_score": 4 }
+  ]
+}
+```
+`criteria` is optional — you can create a rubric with no criteria and add them later.
+Returns: `{ "id": "uuid", "title": "...", "course": "..." }` — status 201.
+
+#### DELETE /rubrics/{id}
+Returns 204 No Content. Criteria are deleted automatically by the DB cascade.
+Returns 409 if the rubric is currently active — set another rubric as active first.
+
+#### PATCH /rubrics/{id}/active
+No request body. Marks the rubric as active and deactivates all others.
+Returns the full updated rubric (same shape as GET).
 
 ---
 
