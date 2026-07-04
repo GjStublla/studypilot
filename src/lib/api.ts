@@ -8,7 +8,6 @@
 // See context/backend.md.
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-console.log(API_BASE);
 
 if (!import.meta.env.VITE_API_BASE_URL) {
   // Only warn in production builds — in dev the localhost fallback is intentional.

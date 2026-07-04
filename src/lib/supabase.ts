@@ -34,5 +34,8 @@ export const supabase = createClient(supabaseUrl ?? '', supabaseAnonKey ?? '', {
     // Required: tells the SDK to parse the #access_token fragment that
     // Supabase appends to the redirect URL after Google auth completes.
     detectSessionInUrl: true,
+    // Use a separate storage key so this OAuth-only client doesn't clash
+    // with the data client in supabaseClient.ts.
+    storageKey: 'sp-oauth-session',
   },
 });
