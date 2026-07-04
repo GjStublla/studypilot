@@ -282,10 +282,9 @@ serve(async (req) => {
     system_instruction: systemWithContext,
     input: interactionInput,
     stream: true,
-    store: false,
     generation_config: {
       temperature: 0.7,
-      max_output_tokens: 1024,
+      maxOutputTokens: 1024,
     },
   }
 
@@ -341,21 +340,23 @@ serve(async (req) => {
 
           try {
             const parsed = JSON.parse(raw)
-            if (parsed?.event_type === 'error') {
-              const message = parsed?.error?.message ?? 'AI service stream error.'
-              console.error('[socratic-coach] Gemini stream error:', message)
-              await writer.write(encoder.encode(sseError(message)))
-              continue
-            }
 
+            // Real Gemini streamGenerateContent SSE format:
+            // { "candidates": [{ "content": { "parts": [{ "text": "..." }] } }] }
             const text: string =
-              parsed?.event_type === 'step.delta' && parsed?.delta?.type === 'text'
-              ? parsed.delta.text
-              : ''
+              parsed?.candidates?.[0]?.content?.parts
+                ?.map((p: any) => p.text ?? '')
+                .join('') ?? ''
 
             if (text) {
               fullResponse += text
               await writer.write(encoder.encode(sseChunk(text)))
+            }
+
+            // Check for finish reason errors
+            const finishReason = parsed?.candidates?.[0]?.finishReason
+            if (finishReason && finishReason !== 'STOP' && finishReason !== 'MAX_TOKENS') {
+              console.error('[socratic-coach] Gemini finish reason:', finishReason)
             }
           } catch {
             // Partial JSON chunk — safe to skip
