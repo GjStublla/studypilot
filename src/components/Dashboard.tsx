@@ -1,18 +1,27 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentType, MouseEvent, ReactNode, SVGProps } from 'react';
-import { apiFetch, clearAuth } from '../lib/api';
+import { clearAuth, apiFetch } from '../lib/api';
+import { supabase } from '../lib/supabaseClient';
 import {
   fetchSessions,
   fetchRubrics,
   fetchActionItems,
   fetchSessionTranscript,
   setActionItemDone,
-  type Session,
-  type Rubric,
-  type ActionItem,
-  type TranscriptLine,
-} from '../lib/dashboardApi';
+} from '../lib/studypilot-api';
+import { sendCoachingMessage } from '../lib/socraticCoach';
+import { useStudyPilotRealtime } from '../lib/useRealtime';
 import './Dashboard.css';
+
+type Session = any;
+type Rubric = any;
+type ActionItem = any;
+type TranscriptLine = {
+  id: string;
+  who: string;
+  text: string;
+  t: number;
+};
 import {
   ArrowRight,
   ArrowUp,
@@ -189,6 +198,71 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
 
+  // ── Realtime subscriptions ─────────────────────────────────────────────────
+  const [userId, setUserId] = useState<string | null>(null);
+
+  // Resolve the Supabase UUID for realtime channel filtering.
+  // For email/password users the user ID is already in localStorage (sp_user_id).
+  // For OAuth users it comes from the Supabase session.
+  // We avoid calling supabase.auth.getUser() here because it makes a network
+  // request that can 403 if the token is expired or the client has no session yet.
+  useEffect(() => {
+    // Try localStorage first — populated immediately after any login
+    const storedId = localStorage.getItem('sp_user_id');
+    if (storedId) {
+      setUserId(storedId);
+      return;
+    }
+    // Fallback for OAuth users whose ID may only be in the Supabase session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user?.id) setUserId(session.user.id);
+    }).catch(() => { /* not fatal */ });
+  }, []);
+
+  useStudyPilotRealtime(userId, {
+    onNewSession: (newSession) => {
+      setSessions((prev) => [newSession, ...prev]);
+    },
+    onDocumentUpdated: (doc) => {
+      // Update rubric status if document is linked to a rubric
+      if (doc.rubric_id) {
+        setRubrics((prev) =>
+          prev.map((r) =>
+            r.id === doc.rubric_id
+              ? { ...r, file_search_status: doc.index_status }
+              : r
+          )
+        );
+      }
+    },
+    onActionItemChanged: (payload) => {
+      if (payload.event === 'INSERT') {
+        setActionItems((prev) => [payload.new as ActionItem, ...prev]);
+      } else if (payload.event === 'UPDATE') {
+        setActionItems((prev) =>
+          prev.map((item) =>
+            item.id === payload.new.id ? payload.new as ActionItem : item
+          )
+        );
+      } else if (payload.event === 'DELETE') {
+        setActionItems((prev) => prev.filter((item) => item.id !== payload.old.id));
+      }
+    },
+    onRubricChanged: (payload) => {
+      if (payload.event === 'INSERT') {
+        setRubrics((prev) => [payload.new as Rubric, ...prev]);
+      } else if (payload.event === 'UPDATE') {
+        setRubrics((prev) =>
+          prev.map((r) =>
+            r.id === payload.new.id ? payload.new as Rubric : r
+          )
+        );
+      } else if (payload.event === 'DELETE') {
+        setRubrics((prev) => prev.filter((r) => r.id !== payload.old.id));
+      }
+    },
+  });
+
   const [activeRubricId, setActiveRubricId] = useState<string>('');
   const [selectedSessionId, setSelectedSessionId] = useState<string>('');
   const [chatContextSessionId, setChatContextSessionId] = useState<string>('');
@@ -364,16 +438,22 @@ export default function Dashboard() {
   );
 
   // Fetch a session's transcript the first time it's needed, then cache it.
+  // Using a ref for the transcripts lookup so this callback is stable and
+  // doesn't re-create (and cascade to openInChat / openSessionDetail) every
+  // time a transcript is fetched.
+  const transcriptsRef = useRef(transcripts);
+  useEffect(() => { transcriptsRef.current = transcripts; });
+
   const ensureTranscript = useCallback(
     (sessionId: string) => {
-      if (transcripts[sessionId] !== undefined) return;
+      if (transcriptsRef.current[sessionId] !== undefined) return;
       setTranscriptLoading(true);
       fetchSessionTranscript(sessionId)
         .then((lines) => setTranscripts((prev) => ({ ...prev, [sessionId]: lines })))
         .catch(() => setTranscripts((prev) => ({ ...prev, [sessionId]: [] })))
         .finally(() => setTranscriptLoading(false));
     },
-    [transcripts],
+    [], // stable — reads transcripts via ref, not closure
   );
 
   const openInChat = useCallback(
@@ -930,12 +1010,12 @@ const HomeView = memo(function HomeView({
               <p className="ds-card-sub">{activeRubric.course}</p>
 
               <ul className="ds-criteria">
-                {activeRubric.criteria.map((c) => (
+                {activeRubric.criteria?.map((c: any) => (
                   <li key={c.name}>
                     <span>{c.name}</span>
                     <ScoreDots score={c.score ?? 0} max={c.max ?? 4} />
                   </li>
-                ))}
+                )) || []}
               </ul>
 
               <div className="ds-card-actions">
@@ -1014,19 +1094,14 @@ const HomeView = memo(function HomeView({
    Chat view
    ============================================================================ */
 
-// Until the Gemini API is wired up, the coach can't generate replies — be honest
-// about it rather than faking a canned response.
-const AI_OFFLINE_NOTICE =
-  "StudyPilot's AI coach isn't connected yet — replies turn on once the Gemini API is added. Your message is shown here but isn't saved or answered yet.";
-
 /** Map a session's stored transcript lines into chat message bubbles. */
 function transcriptToMessages(lines: TranscriptLine[]): Message[] {
   return lines.map((l) =>
     createMessage({
       id: l.id,
-      role: l.who === 'You' ? 'user' : 'ai',
+      role: l.who === 'Student' ? 'user' : 'ai',
       text: l.text,
-      time: l.t,
+      time: String(l.t),
     }),
   );
 }
@@ -1102,7 +1177,7 @@ const ChatView = memo(function ChatView({
     };
   }, [input]);
 
-  const send = useCallback((text?: string) => {
+  const send = useCallback(async (text?: string) => {
     const value = (text ?? input).trim();
     if (!value) return;
     const now = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -1112,16 +1187,60 @@ const ChatView = memo(function ChatView({
       text: value,
       time: now,
     });
-    const offlineMsg = createMessage({
-      id: `offline-${Date.now()}`,
+    
+    setMessages((m) => [...m.filter((msg) => !msg.id.startsWith('ai-')), userMsg]);
+    setInput('');
+    
+    // Create a placeholder AI message for streaming
+    const aiMsgId = `ai-${Date.now()}`;
+    const aiMsg = createMessage({
+      id: aiMsgId,
       role: 'ai',
-      text: AI_OFFLINE_NOTICE,
+      text: '',
       time: now,
     });
-    // Keep a single trailing "AI offline" note rather than stacking copies.
-    setMessages((m) => [...m.filter((msg) => !msg.id.startsWith('offline-')), userMsg, offlineMsg]);
-    setInput('');
-  }, [input]);
+    setMessages((m) => [...m, aiMsg]);
+    
+    // Stream the AI response
+    let accumulatedText = '';
+    await sendCoachingMessage(
+      session?.id,
+      value,
+      {
+        onTokenReceived: (token) => {
+          accumulatedText += token;
+          setMessages((m) =>
+            m.map((msg) =>
+              msg.id === aiMsgId
+                ? { ...msg, text: accumulatedText, lines: accumulatedText.split('\n') }
+                : msg
+            )
+          );
+        },
+        onStreamComplete: () => {
+          setMessages((m) =>
+            m.map((msg) =>
+              msg.id === aiMsgId
+                ? { ...msg, text: accumulatedText, lines: accumulatedText.split('\n') }
+                : msg
+            )
+          );
+        },
+        onStreamError: (error) => {
+          console.error('Chat stream error:', error);
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          console.error('Error message:', errorMessage);
+          setMessages((m) =>
+            m.map((msg) =>
+              msg.id === aiMsgId
+                ? { ...msg, text: `Error: ${errorMessage}`, lines: [`Error: ${errorMessage}`] }
+                : msg
+            )
+          );
+        },
+      }
+    );
+  }, [input, session?.id]);
 
   const toggleMic = useCallback(() => setMicOn((v) => !v), []);
 
@@ -1479,7 +1598,7 @@ const SessionDetailView = memo(function SessionDetailView({
                 <h4 className="ds-card-title ds-card-title-sm">{rubric.title}</h4>
                 <p className="ds-card-sub">{rubric.course}</p>
                 <ul className="ds-criteria">
-                  {rubric.criteria.map((c) => (
+                  {rubric.criteria?.map((c: any) => (
                     <li key={c.name}>
                       <span>{c.name}</span>
                       <ScoreDots score={c.score ?? 0} max={c.max ?? 4} />
@@ -1540,7 +1659,7 @@ const RubricsView = memo(function RubricsView({
     () =>
       q
         ? rubrics.filter((r) =>
-            [r.title, r.course, ...r.criteria.map((c) => c.name)].some((f) =>
+            [r.title, r.course, ...(r.criteria?.map((c: any) => c.name) || [])].some((f) =>
               f.toLowerCase().includes(q),
             ),
           )
@@ -1594,7 +1713,7 @@ const RubricsView = memo(function RubricsView({
                 <h3 className="ds-card-title">{r.title}</h3>
 
                 <div className="ds-criteria-grid">
-                  {r.criteria.map((c) => (
+                  {r.criteria?.map((c: any) => (
                     <div key={c.name} className="ds-criteria-pill">
                       <span>{c.name}</span>
                     </div>
@@ -1920,7 +2039,7 @@ const ContextPanel = memo(function ContextPanel({
             <span className="ds-context-block-title">{activeRubric.title}</span>
             <span className="ds-context-block-sub">{activeRubric.course}</span>
             <ul className="ds-mini-criteria">
-              {visibleCriteria.map((c) => (
+              {visibleCriteria.map((c: any) => (
                 <li key={c.name}>
                   <span>{c.name}</span>
                   <ScoreDots score={c.score ?? 0} max={c.max ?? 4} />

@@ -163,33 +163,38 @@ function App() {
   const isSupabaseCallback = hash.startsWith('#access_token=') && hash.includes('type=');
 
   // ── Google OAuth callback ──────────────────────────────────────────────────
-  // After the user approves on Google's consent screen, Supabase redirects
-  // back here with the session tokens in the URL fragment. We read the
-  // session, store the tokens via storeAuth(), then forward to #dashboard.
-  // This runs in a useEffect so it only fires once per mount, not on every
-  // render cycle.
   useEffect(() => {
     if (!isSupabaseCallback) return;
 
+    let cancelled = false;
+
     supabase.auth.getSession().then(({ data, error }) => {
+      if (cancelled) return;
+
       if (error || !data.session) {
-        // Session exchange failed — could be an expired link, a denied
-        // consent, or a misconfigured redirect URI. Send the user back to
-        // the auth page; the #oauth-error flag lets AuthPage show a message.
         console.error('[OAuth] getSession failed:', error?.message ?? 'no session returned');
         window.location.hash = '#auth?error=oauth';
         return;
       }
 
-      // Session is valid — persist tokens and go to the dashboard.
       storeAuth({
         access_token: data.session.access_token,
         refresh_token: data.session.refresh_token,
         user_id: data.session.user.id,
         email: data.session.user.email ?? '',
       } satisfies AuthTokens);
+
+      supabase.auth.setSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      }).catch((e) => console.warn('[OAuth] supabase.auth.setSession failed:', e));
+
       window.location.hash = '#dashboard';
     });
+
+    return () => {
+      cancelled = true;
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // intentionally empty — only run on the initial mount of this route
 
