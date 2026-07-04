@@ -111,7 +111,7 @@ Rules:
       store: false,
       generation_config: {
         temperature: 0.1,
-        max_output_tokens: 2048,
+        maxOutputTokens: 2048,
       },
     })
 
