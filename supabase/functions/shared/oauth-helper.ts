@@ -17,6 +17,17 @@ interface ServiceAccountCredentials {
   client_x509_cert_url: string;
 }
 
+// The subset of a service account actually needed to mint tokens. Sourced
+// from the split GOOGLE_* secrets when present (that pair is verified to
+// work with Vertex AI in this project), else from the full
+// GEMINI_SERVICE_ACCOUNT_CREDENTIALS JSON blob.
+interface SigningIdentity {
+  client_email: string;
+  private_key: string;
+  private_key_id?: string;
+  token_uri: string;
+}
+
 interface CachedToken {
   accessToken: string;
   expiresAt: number;
@@ -24,18 +35,53 @@ interface CachedToken {
 
 let cachedToken: CachedToken | null = null;
 
-function getServiceAccountCredentials(): ServiceAccountCredentials {
+function getSigningIdentity(): SigningIdentity {
+  const clientEmail = Deno.env.get('GOOGLE_CLIENT_EMAIL');
+  const privateKey = Deno.env.get('GOOGLE_PRIVATE_KEY');
+  if (clientEmail && privateKey) {
+    return {
+      client_email: clientEmail,
+      private_key: privateKey,
+      token_uri: 'https://oauth2.googleapis.com/token',
+    };
+  }
+
   const credentialsJson = Deno.env.get('GEMINI_SERVICE_ACCOUNT_CREDENTIALS');
   if (!credentialsJson) {
     throw new Error(
-      'GEMINI_SERVICE_ACCOUNT_CREDENTIALS secret is not set. ' +
-      'Add it in Supabase Dashboard → Edge Functions → Secrets.'
+      'No Google credentials configured. Set GOOGLE_CLIENT_EMAIL + GOOGLE_PRIVATE_KEY ' +
+      'or GEMINI_SERVICE_ACCOUNT_CREDENTIALS in Supabase Dashboard → Edge Functions → Secrets.'
     );
   }
   try {
-    return JSON.parse(credentialsJson) as ServiceAccountCredentials;
+    const creds = JSON.parse(credentialsJson) as ServiceAccountCredentials;
+    return {
+      client_email: creds.client_email,
+      private_key: creds.private_key,
+      private_key_id: creds.private_key_id,
+      token_uri: creds.token_uri || 'https://oauth2.googleapis.com/token',
+    };
   } catch (e) {
     throw new Error(`Failed to parse service account credentials: ${(e as Error).message}`);
+  }
+}
+
+/**
+ * Resolve the GCP project id used for API routing (Vertex AI URLs, quota
+ * project header). Explicit env vars win over the credentials JSON.
+ */
+export function getGoogleProjectId(): string | undefined {
+  const explicit = Deno.env.get('GOOGLE_PROJECT_ID')
+    || Deno.env.get('GOOGLE_CLOUD_PROJECT')
+    || Deno.env.get('GCP_PROJECT_ID');
+  if (explicit) return explicit;
+
+  const credentialsJson = Deno.env.get('GEMINI_SERVICE_ACCOUNT_CREDENTIALS');
+  if (!credentialsJson) return undefined;
+  try {
+    return (JSON.parse(credentialsJson) as { project_id?: string }).project_id;
+  } catch {
+    return undefined;
   }
 }
 
@@ -82,10 +128,14 @@ async function importPrivateKey(pem: string): Promise<CryptoKey> {
 /**
  * Create a signed RS256 JWT for Google Cloud service account auth.
  */
-async function createServiceAccountJWT(creds: ServiceAccountCredentials): Promise<string> {
+async function createServiceAccountJWT(creds: SigningIdentity): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
 
-  const header = base64urlJson({ alg: 'RS256', typ: 'JWT', kid: creds.private_key_id });
+  const header = base64urlJson({
+    alg: 'RS256',
+    typ: 'JWT',
+    ...(creds.private_key_id ? { kid: creds.private_key_id } : {}),
+  });
   const payload = base64urlJson({
     iss: creds.client_email,
     sub: creds.client_email,
@@ -143,7 +193,7 @@ export async function getAccessToken(): Promise<string> {
     return cachedToken.accessToken;
   }
 
-  const creds = getServiceAccountCredentials();
+  const creds = getSigningIdentity();
   const jwt = await createServiceAccountJWT(creds);
   const tokenData = await exchangeJWTForToken(jwt, creds.token_uri);
 

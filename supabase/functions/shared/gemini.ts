@@ -1,33 +1,16 @@
-import { getAccessToken } from "./oauth-helper.ts"
+import { getAccessToken, getGoogleProjectId, invalidateToken } from "./oauth-helper.ts"
 
-const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models'
-
-function getGoogleCloudProjectId(): string | undefined {
-  const explicitProjectId = Deno.env.get('GOOGLE_CLOUD_PROJECT') || Deno.env.get('GCP_PROJECT_ID')
-  if (explicitProjectId) return explicitProjectId
-
-  const credentialsJson = Deno.env.get('GEMINI_SERVICE_ACCOUNT_CREDENTIALS')
-  if (!credentialsJson) return undefined
-
-  try {
-    const credentials = JSON.parse(credentialsJson) as { project_id?: string }
-    return credentials.project_id
-  } catch {
-    return undefined
-  }
-}
+const GENERATIVE_LANGUAGE_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models'
 
 export function getGeminiTextModel(): string {
   return Deno.env.get('GEMINI_TEXT_MODEL') || 'gemini-2.0-flash'
 }
 
 export async function createGeminiInteraction(body: Record<string, unknown>): Promise<Response> {
-  const accessToken = await getAccessToken()
-  const projectId = getGoogleCloudProjectId()
-  const model = body.model as string || getGeminiTextModel()
   const stream = body.stream === true
 
-  // Build the standard generateContent request body
+  // Build the standard generateContent request body (identical shape for
+  // Vertex AI and the Generative Language API)
   const systemInstruction = body.system_instruction
   const input = body.input as string
   const generationConfig = body.generation_config
@@ -38,18 +21,83 @@ export async function createGeminiInteraction(body: Record<string, unknown>): Pr
     ...(systemInstruction ? { systemInstruction: { parts: [{ text: systemInstruction }] } } : {}),
   }
 
-  const action = stream ? 'streamGenerateContent?alt=sse' : 'generateContent'
-  const url = `${GEMINI_BASE_URL}/${model}:${action}`
+  // Vertex AI (aiplatform.googleapis.com) is the primary endpoint: it is
+  // enabled in the GCP project, while generativelanguage.googleapis.com is
+  // not (403 SERVICE_DISABLED). Vertex URLs embed a project id, so fall back
+  // to the Generative Language API when none is configured.
+  const projectId = getGoogleProjectId()
+  const useVertex = Boolean(projectId)
 
-  return fetch(url, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-      ...(projectId ? { 'x-goog-user-project': projectId } : {}),
-    },
-    body: JSON.stringify(requestBody),
-  })
+  // On Vertex, VERTEX_MODEL (when set) wins over the caller's model: it names
+  // a model verified to serve in this project/region.
+  const model =
+    (useVertex ? Deno.env.get('VERTEX_MODEL') : undefined) ||
+    (body.model as string) ||
+    getGeminiTextModel()
+
+  const action = stream ? 'streamGenerateContent?alt=sse' : 'generateContent'
+
+  let url: string
+  if (useVertex) {
+    const location = Deno.env.get('VERTEX_LOCATION') || 'us-central1'
+    const host = location === 'global'
+      ? 'aiplatform.googleapis.com'
+      : `${location}-aiplatform.googleapis.com`
+    url = `https://${host}/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:${action}`
+  } else {
+    url = `${GENERATIVE_LANGUAGE_BASE_URL}/${model}:${action}`
+  }
+
+  // Vertex reads the project from the URL; the x-goog-user-project quota
+  // header only applies to the Generative Language API.
+  const doFetch = async (includeQuotaProject: boolean) =>
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${await getAccessToken()}`,
+        'Content-Type': 'application/json',
+        ...(includeQuotaProject && projectId ? { 'x-goog-user-project': projectId } : {}),
+      },
+      body: JSON.stringify(requestBody),
+    })
+
+  let response = await doFetch(!useVertex)
+
+  // The cached service-account token can outlive its validity in a warm
+  // isolate; on 401 mint a fresh token and retry once.
+  if (response.status === 401) {
+    invalidateToken()
+    response = await doFetch(!useVertex)
+  }
+
+  // Google rejects x-goog-user-project unless the caller holds
+  // serviceusage.services.use on that project. A service account already
+  // bills its own project by default, so retry without the header.
+  if (!useVertex && response.status === 403 && projectId) {
+    const errText = await response.clone().text()
+    if (errText.includes('USER_PROJECT_DENIED') || errText.includes('serviceusage.services.use')) {
+      console.warn('[gemini] x-goog-user-project rejected; retrying without quota project header')
+      response = await doFetch(false)
+    }
+  }
+
+  return response
+}
+
+// Pull the machine-readable status/reason out of a Gemini error body so
+// callers can show "403 PERMISSION_DENIED/SERVICE_DISABLED" instead of a
+// bare status code.
+export function describeGeminiError(errText: string): string {
+  try {
+    const parsed = JSON.parse(errText) as {
+      error?: { status?: string; details?: Array<{ reason?: string }> }
+    }
+    const status = parsed.error?.status ?? ''
+    const reason = parsed.error?.details?.find(d => typeof d?.reason === 'string')?.reason ?? ''
+    return [status, reason].filter(Boolean).join('/')
+  } catch {
+    return ''
+  }
 }
 
 function collectText(value: unknown): string {

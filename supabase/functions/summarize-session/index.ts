@@ -15,7 +15,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4"
-import { createGeminiInteraction, extractInteractionText, getGeminiTextModel } from "../shared/gemini.ts"
+import { createGeminiInteraction, describeGeminiError, extractInteractionText, getGeminiTextModel } from "../shared/gemini.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -123,7 +123,8 @@ Rules:
     if (!geminiRes.ok) {
       const errText = await geminiRes.text()
       console.error('[summarize-session] Gemini API error:', geminiRes.status, errText)
-      return jsonResponse({ error: 'Failed to generate summary' }, 502)
+      const detail = describeGeminiError(errText)
+      return jsonResponse({ error: `Failed to generate summary (Gemini ${geminiRes.status}${detail ? ` ${detail}` : ''})` }, 502)
     }
 
     const geminiData = await geminiRes.json()

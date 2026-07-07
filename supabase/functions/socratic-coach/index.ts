@@ -18,7 +18,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4"
-import { createGeminiInteraction, getGeminiTextModel } from "../shared/gemini.ts"
+import { createGeminiInteraction, describeGeminiError, getGeminiTextModel } from "../shared/gemini.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -303,8 +303,9 @@ serve(async (req) => {
   if (!geminiResponse.ok) {
     const errText = await geminiResponse.text()
     console.error('[socratic-coach] Gemini API error:', geminiResponse.status, errText)
+    const detail = describeGeminiError(errText)
     return new Response(
-      JSON.stringify({ error: 'AI service returned an error. Please try again.' }),
+      JSON.stringify({ error: `AI service returned an error (Gemini ${geminiResponse.status}${detail ? ` ${detail}` : ''}). Please try again.` }),
       { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
