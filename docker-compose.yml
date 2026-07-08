@@ -1,0 +1,29 @@
+# Development stack: hot-reloading backend + Vite dev server.
+# Uses hosted Supabase — fill backend/.env and .env from their .env.example files first.
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      context: .
+      target: dev
+    ports:
+      - "5173:5173"
+    env_file:
+      - .env
+    environment:
+      # Reliable HMR over bind mounts (needed on Windows/WSL where fs events don't propagate).
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      - backend

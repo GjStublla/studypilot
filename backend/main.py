@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -14,7 +16,10 @@ app = FastAPI(title="StudyPilot API", version="1.0.0")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# Allow the React frontend and Chrome extension to call this API
+# Allow the React frontend and Chrome extension to call this API.
+# Extra origins (e.g. the Dockerized nginx frontend) can be added via the
+# comma-separated CORS_ORIGINS env var without touching this list.
+_extra_origins = [o.strip() for o in os.getenv("CORS_ORIGINS", "").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -22,7 +27,7 @@ app.add_middleware(
         "http://127.0.0.1:5173",
         "http://localhost:4173",   # Vite preview
         "https://studypilot.app",  # production domain — update when known
-    ],
+    ] + _extra_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
