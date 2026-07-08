@@ -7,6 +7,7 @@ import {
   fetchRubrics,
   fetchActionItems,
   fetchSessionTranscript,
+  createSessionCaptureSignedUrl,
   setActionItemDone,
 } from '../lib/studypilot-api';
 import { sendCoachingMessage } from '../lib/socraticCoach';
@@ -1500,6 +1501,31 @@ const SessionDetailView = memo(function SessionDetailView({
   onBack: () => void;
   onContinueInChat: () => void;
 }) {
+  const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
+  const [screenshotError, setScreenshotError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setScreenshotUrl(null);
+    setScreenshotError(false);
+
+    if (!session?.screenshotPath) return () => {
+      cancelled = true;
+    };
+
+    createSessionCaptureSignedUrl(session.screenshotPath)
+      .then((url) => {
+        if (!cancelled) setScreenshotUrl(url);
+      })
+      .catch(() => {
+        if (!cancelled) setScreenshotError(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.id, session?.screenshotPath]);
+
   if (!session) {
     return (
       <div className="ds-view ds-view-session">
@@ -1535,6 +1561,31 @@ const SessionDetailView = memo(function SessionDetailView({
 
       <div className="ds-row ds-row-2-1">
         <div className="ds-stack">
+          {session.screenshotPath ? (
+            <article className="ds-card ds-screenshot-card">
+              <div className="ds-card-eyebrow">
+                <span>Screenshot</span>
+              </div>
+              {screenshotUrl ? (
+                <img
+                  className="ds-session-screenshot"
+                  src={screenshotUrl}
+                  alt={`Screenshot captured during ${session.title}`}
+                />
+              ) : screenshotError ? (
+                <EmptyState
+                  title="Screenshot unavailable."
+                  body="StudyPilot could not create a signed preview for this capture."
+                />
+              ) : (
+                <div className="ds-state ds-state-loading ds-state-inline">
+                  <span className="ds-state-spinner" aria-hidden="true" />
+                  <p>Loading screenshot...</p>
+                </div>
+              )}
+            </article>
+          ) : null}
+
           <article className="ds-card">
             <div className="ds-card-eyebrow">
               <span>Summary</span>

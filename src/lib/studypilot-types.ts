@@ -82,6 +82,7 @@ export interface Session {
   duration_seconds: number;
   page_title?: string | null;
   page_url?: string | null;
+  screenshot_path?: string | null;
   summary?: string | null;
   when_timestamp: string;
   session_messages?: TranscriptMessage[];
@@ -156,6 +157,8 @@ export interface IndexKnowledgeDocumentResponse {
 export interface SocraticCoachRequest {
   sessionId?: string;
   userMessage: string;
+  history?: Array<{ role: 'user' | 'ai' | 'system'; text: string }>;
+  images?: Array<{ mimeType: string; data: string }>;
 }
 
 export interface SocraticCoachStreamChunk {
