@@ -29,6 +29,33 @@ function jsonResponse(body: unknown, status = 200) {
   })
 }
 
+function parseSummaryJson(rawText: string): { summary?: string; actionItems?: string[]; followUpPrompts?: string[] } | null {
+  const clean = rawText
+    .replace(/^```(?:json)?\n?/i, '')
+    .replace(/\n?```$/i, '')
+    .trim()
+
+  const candidates = [clean]
+  const firstBrace = clean.indexOf('{')
+  const lastBrace = clean.lastIndexOf('}')
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    candidates.push(clean.slice(firstBrace, lastBrace + 1))
+  }
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate)
+      if (parsed && typeof parsed === 'object') {
+        return parsed
+      }
+    } catch {
+      // Try the next candidate.
+    }
+  }
+
+  return null
+}
+
 const MODE_INSTRUCTIONS: Record<string, string> = {
   'Essay Coach': 'Focus on thesis clarity, argument structure, evidence quality, and areas for revision.',
   'Presentation Coach': 'Focus on structure, delivery feedback, key talking points, and rehearsal suggestions.',
@@ -117,6 +144,7 @@ Rules:
       generation_config: {
         temperature: 0.3,
         maxOutputTokens: 1024,
+        responseMimeType: 'application/json',
       },
     })
 
@@ -131,12 +159,8 @@ Rules:
     const rawText = extractInteractionText(geminiData)
 
     // ── Parse the JSON response ──────────────────────────────────────────────
-    let parsed: { summary?: string; actionItems?: string[]; followUpPrompts?: string[] }
-    try {
-      // Strip any accidental markdown fences in case the model ignores responseMimeType
-      const clean = rawText.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim()
-      parsed = JSON.parse(clean)
-    } catch {
+    let parsed = parseSummaryJson(rawText)
+    if (!parsed) {
       console.error('[summarize-session] Failed to parse Gemini response:', rawText)
       // Fallback so the function still returns something useful
       parsed = {

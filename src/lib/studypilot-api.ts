@@ -127,16 +127,12 @@ export async function createSessionCaptureSignedUrl(path: string): Promise<strin
   const { data, error } = await supabase
     .storage
     .from('session-captures')
-    .createSignedUrl(path, 60 * 60, {
-      transform: {
-        width: 560,
-        height: 320,
-        resize: 'contain',
-      },
-    });
+    .createSignedUrl(path, 60 * 60);
 
   if (error) throw error;
-  return data.signedUrl;
+  return data.signedUrl.startsWith('/')
+    ? `${import.meta.env.VITE_SUPABASE_URL}${data.signedUrl}`
+    : data.signedUrl;
 }
 
 // ─── Dashboard-compatible wrappers ─────────────────────────────────────────────────
