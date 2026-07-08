@@ -1,0 +1,32 @@
+# Node / build output
+node_modules
+dist
+.vite
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+!.env.docker.example
+backend/.env
+
+# Python caches (backend has its own .dockerignore, this covers the root context)
+**/__pycache__
+**/*.pyc
+.venv
+
+# Supabase local state
+supabase/.temp
+
+# Docker files themselves
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# VCS / editor / misc
+.git
+.gitignore
+.claude
+.cursor
+loop
+*.log
