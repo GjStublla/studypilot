@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Header, Request, status
+from gotrue.errors import AuthApiError
 from pydantic import BaseModel, EmailStr, Field, field_validator
 import re
 
@@ -54,9 +55,35 @@ class AuthResponse(BaseModel):
     email: str | None = None
 
 
-class SignupPendingResponse(BaseModel):
+class SignupResponse(BaseModel):
     message: str
-    email_confirmation_required: bool =True
+    email_confirmation_required: bool
+    access_token: str | None = None
+    refresh_token: str | None = None
+    user_id: str | None = None
+    email: str | None = None
+
+
+def _raise_signup_auth_error(e: AuthApiError) -> None:
+    if e.code == "email_address_invalid":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "That email address was rejected as undeliverable. "
+                "Use a real, reachable email address."
+            ),
+        )
+    if e.code in ("over_email_send_rate_limit", "over_request_rate_limit") or e.status == 429:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many confirmation emails sent. Please wait an hour and try again.",
+        )
+    if e.code in ("user_already_exists", "email_exists"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An account with this email already exists — sign in instead.",
+        )
+    raise HTTPException(status_code=e.status or status.HTTP_400_BAD_REQUEST, detail=e.message)
 
 
 class MessageResponse(BaseModel):
@@ -67,7 +94,7 @@ class MessageResponse(BaseModel):
 
 @router.post(
     "/signup",
-    response_model=SignupPendingResponse,
+    response_model=SignupResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Register a new student account",
 )
@@ -80,42 +107,66 @@ def signup(request: Request, body: SignUpRequest):
     Enforced by the SignUpRequest validator above — invalid passwords get a 422
     with a clear message before this function is even called.
 
-    Duplicate email handling: Supabase deliberately returns the same response
-    whether the email already exists or not (anti-enumeration). This means a
-    user with a duplicate email will see "check your email" but won't receive
-    one. This is the correct industry standard behavior — we do not leak
-    whether an email is registered.
+    Accounts are created pre-confirmed via the admin API rather than
+    supabase.auth.sign_up(): the project uses Supabase's built-in email
+    service, which validates recipient deliverability and caps confirmation
+    emails at 2/hour — both of which made normal signups fail. The admin path
+    sends no email, so neither restriction applies. A session is minted right
+    after so the client can log the user in. Duplicate emails return a clear
+    409 error.
 
     Google OAuth + email/password: if a user previously signed up via Google
     with the same email, Supabase will link the accounts when they set a
     password through the "forgot password" flow. They cannot sign up again
-    from scratch — the duplicate email behavior above applies.
+    from scratch — duplicate signup returns an explicit error.
     """
     try:
-        supabase.auth.sign_up({
+        created = supabase_admin.auth.admin.create_user({
             "email": body.email,
             "password": body.password,
-            "options": {
-                "data": {
-                    # Stored in auth.users.raw_user_meta_data.
-                    # The DB trigger reads this to populate profiles.name and initials.
-                    "name": body.name,
-                }
+            "email_confirm": True,
+            "user_metadata": {
+                # Stored in auth.users.raw_user_meta_data.
+                # The DB trigger reads this to populate profiles.name and initials.
+                "name": body.name,
             },
         })
+    except AuthApiError as e:
+        _raise_signup_auth_error(e)
     except Exception as e:
         print(f"[signup] {type(e).__name__}: {e}")
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Could not create account. Please check your information and try again.",
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not reach authentication service. Please try again shortly.",
         )
 
-    # Always return the same message whether the email is new or already exists.
-    # The second sentence nudges duplicate-email users toward signing in
-    # without explicitly confirming whether the email is registered.
-    return SignupPendingResponse(
-        message="Check your email to confirm your account, then sign in. If you already have an account, sign in directly.",
-        email_confirmation_required=True,
+    # Mint a session so the client can take the user straight to the dashboard.
+    try:
+        res = supabase.auth.sign_in_with_password({
+            "email": body.email,
+            "password": body.password,
+        })
+    except Exception as e:
+        # Account exists at this point — don't fail the signup over a login
+        # hiccup; the client falls back to the sign-in form.
+        print(f"[signup] post-create sign-in failed: {type(e).__name__}: {e}")
+        res = None
+
+    if res is not None and res.session is not None and res.user is not None:
+        return SignupResponse(
+            message="Account created successfully.",
+            email_confirmation_required=False,
+            access_token=res.session.access_token,
+            refresh_token=res.session.refresh_token,
+            user_id=str(res.user.id),
+            email=res.user.email or body.email,
+        )
+
+    return SignupResponse(
+        message="Account created. You can sign in now.",
+        email_confirmation_required=False,
+        user_id=str(created.user.id) if created.user else None,
+        email=body.email,
     )
 
 # ---------- Login ----------
@@ -139,26 +190,39 @@ def login(request: Request, body: LoginRequest):
             "email": body.email,
             "password": body.password,
         })
+    except AuthApiError as e:
+        if e.code == "email_not_confirmed":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=(
+                    "Please confirm your email before signing in. "
+                    "Check your inbox for the confirmation link."
+                ),
+            )
+        if e.code == "invalid_credentials":
+            # Check whether this is a Google-only account so we can give a more
+            # helpful error than the generic "invalid credentials".
+            try:
+                user_lookup = supabase_admin.auth.admin.get_user_by_email(body.email)
+                if user_lookup and user_lookup.user:
+                    identities = user_lookup.user.identities or []
+                    has_google = any(getattr(i, "provider", None) == "google" for i in identities)
+                    has_email = any(getattr(i, "provider", None) == "email" for i in identities)
+                    if has_google and not has_email:
+                        raise HTTPException(
+                            status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="This account uses Google sign-in. Please use the 'Continue with Google' button to log in.",
+                        )
+            except HTTPException:
+                raise
+            except Exception:
+                pass
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password.",
+            )
+        raise HTTPException(status_code=e.status or status.HTTP_401_UNAUTHORIZED, detail=e.message)
     except Exception:
-        # Login failed — check whether this is a Google-only account so we
-        # can give a more helpful error than the generic "invalid credentials".
-        # Uses a targeted admin lookup by email — does NOT fetch all users.
-        try:
-            user_lookup = supabase_admin.auth.admin.get_user_by_email(body.email)
-            if user_lookup and user_lookup.user:
-                identities = user_lookup.user.identities or []
-                has_google = any(getattr(i, "provider", None) == "google" for i in identities)
-                has_email  = any(getattr(i, "provider", None) == "email"  for i in identities)
-                if has_google and not has_email:
-                    raise HTTPException(
-                        status_code=status.HTTP_401_UNAUTHORIZED,
-                        detail="This account uses Google sign-in. Please use the 'Continue with Google' button to log in.",
-                    )
-        except HTTPException:
-            raise
-        except Exception:
-            pass  # lookup failed — fall through to generic error
-
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password.",

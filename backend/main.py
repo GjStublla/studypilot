@@ -25,6 +25,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",   # Vite dev server
         "http://127.0.0.1:5173",
+        "http://localhost:5180",   # Vite dev server (Claude preview, .claude/launch.json)
+        "http://127.0.0.1:5180",
         "http://localhost:4173",   # Vite preview
         "https://studypilot.app",  # production domain — update when known
     ] + _extra_origins,

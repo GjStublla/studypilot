@@ -1407,6 +1407,25 @@
   max-width: 48ch;
 }
 
+/* Chat empty state: center it within the message viewport instead of the
+   default top-left inline treatment used by list views. Scoped to
+   .ds-messages, which only exists in the chat view. */
+.app-dashboard .ds-messages .ds-empty {
+  min-height: 100%;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 10px;
+  padding: 24px;
+  border-top: none;
+}
+.app-dashboard .ds-messages .ds-empty-title {
+  font-size: 20px;
+}
+.app-dashboard .ds-messages .ds-empty-body {
+  max-width: 38ch;
+}
+
 /* ---------- Loading / error states ---------- */
 
 .app-dashboard .ds-state {
