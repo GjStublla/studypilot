@@ -332,15 +332,25 @@ function SignupForm({ onSuccess }: { onSuccess: () => void }) {
       const data = await res.json();
 
       if (!res.ok) {
-          const message =
-              typeof data.detail === "string"
-                  ? data.detail
-                  : typeof data.message === "string"
-                  ? data.message
-                  : "Could not create account. Please try again.";
+        const message =
+          typeof data.detail === 'string'
+            ? data.detail
+            : typeof data.message === 'string'
+              ? data.message
+              : typeof data.error === 'string'
+                ? data.error
+                : 'Could not create account. Please try again.';
 
-          setError(message);
-          return;
+        setError(message);
+        return;
+      }
+
+      if (data.email_confirmation_required === false && data.access_token) {
+        storeAuth(data as AuthTokens);
+        setSuccessMessage('Account created! Taking you to your dashboard…');
+        setSuccess(true);
+        window.location.hash = '#dashboard';
+        return;
       }
 
       if (data.email_confirmation_required) {
@@ -350,8 +360,8 @@ function SignupForm({ onSuccess }: { onSuccess: () => void }) {
         return;
       }
 
-      // Email confirmation off — tokens returned immediately
-      setSuccessMessage('Account created. Taking you to sign in…');
+      // Account created but no session returned — send them to the sign-in tab.
+      setSuccessMessage(data.message || 'Account created. You can sign in now.');
       setSuccess(true);
       setTimeout(() => onSuccess(), 2000);
     } catch {

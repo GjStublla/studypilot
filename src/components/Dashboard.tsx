@@ -1189,7 +1189,7 @@ const ChatView = memo(function ChatView({
       time: now,
     });
     
-    setMessages((m) => [...m.filter((msg) => !msg.id.startsWith('ai-')), userMsg]);
+    setMessages((m) => [...m, userMsg]);
     setInput('');
     
     // Create a placeholder AI message for streaming
