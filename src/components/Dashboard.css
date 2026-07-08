@@ -722,6 +722,19 @@
 .app-dashboard .ds-prose-quiet { color: var(--ds-quiet); }
 .app-dashboard .ds-prose + .ds-prose { margin-top: 8px; }
 
+.app-dashboard .ds-screenshot-card {
+  gap: 14px;
+}
+.app-dashboard .ds-session-screenshot {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border: 1px solid var(--ds-line-soft);
+  border-radius: 8px;
+  background: var(--ds-surface-2);
+}
+
 .app-dashboard .ds-meta-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));

@@ -20,6 +20,11 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4"
 import { createGeminiInteraction, describeGeminiError, getGeminiTextModel } from "../shared/gemini.ts"
 
+const MAX_HISTORY_TURNS = 20
+const MAX_IMAGES = 2
+const MAX_IMAGE_BASE64_CHARS = 1_500_000
+const ALLOWED_IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -63,6 +68,72 @@ function sseDone(): string {
 
 function sseError(message: string): string {
   return `data: ${JSON.stringify({ error: message })}\n\n`
+}
+
+type RequestHistoryTurn = {
+  role: 'user' | 'ai' | 'system'
+  text: string
+}
+
+type RequestImage = {
+  mimeType: string
+  data: string
+}
+
+function normalizeHistory(value: unknown): RequestHistoryTurn[] {
+  if (!Array.isArray(value)) return []
+
+  return value
+    .map((turn): RequestHistoryTurn | null => {
+      if (!turn || typeof turn !== 'object') return null
+
+      const record = turn as Record<string, unknown>
+      const role = record.role
+      const text = typeof record.text === 'string' ? record.text.trim() : ''
+
+      if ((role !== 'user' && role !== 'ai' && role !== 'system') || !text) {
+        return null
+      }
+
+      return { role, text: text.slice(0, 4_000) }
+    })
+    .filter((turn): turn is RequestHistoryTurn => Boolean(turn))
+    .slice(-MAX_HISTORY_TURNS)
+}
+
+function labelHistoryRole(role: RequestHistoryTurn['role']): string {
+  if (role === 'user') return 'Student'
+  if (role === 'ai') return 'StudyPilot'
+  return 'System'
+}
+
+function normalizeImages(value: unknown): { images: RequestImage[]; error?: string } {
+  if (value === undefined || value === null) return { images: [] }
+  if (!Array.isArray(value)) return { images: [], error: 'images must be an array.' }
+  if (value.length > MAX_IMAGES) return { images: [], error: `images can include at most ${MAX_IMAGES} items.` }
+
+  const images: RequestImage[] = []
+  for (const image of value) {
+    if (!image || typeof image !== 'object') {
+      return { images: [], error: 'Each image must include mimeType and data.' }
+    }
+
+    const record = image as Record<string, unknown>
+    const mimeType = typeof record.mimeType === 'string' ? record.mimeType.trim().toLowerCase() : ''
+    const data = typeof record.data === 'string' ? record.data.trim() : ''
+
+    if (!ALLOWED_IMAGE_MIME_TYPES.has(mimeType)) {
+      return { images: [], error: 'images must be JPEG, PNG, or WebP.' }
+    }
+
+    if (!data || data.length > MAX_IMAGE_BASE64_CHARS) {
+      return { images: [], error: 'Each image must be a non-empty base64 payload under 1.5 MB.' }
+    }
+
+    images.push({ mimeType, data })
+  }
+
+  return { images }
 }
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
@@ -118,11 +189,23 @@ serve(async (req) => {
   // ── Parse body ────────────────────────────────────────────────────────────
   let sessionId: string | undefined
   let userMessage: string
+  let requestHistory: RequestHistoryTurn[] = []
+  let requestImages: RequestImage[] = []
 
   try {
     const body = await req.json()
     sessionId = body.sessionId
     userMessage = body.userMessage
+    requestHistory = normalizeHistory(body.history)
+
+    const imageResult = normalizeImages(body.images)
+    if (imageResult.error) {
+      return new Response(
+        JSON.stringify({ error: imageResult.error }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    requestImages = imageResult.images
 
     if (!userMessage || typeof userMessage !== 'string' || userMessage.trim().length === 0) {
       return new Response(
@@ -268,6 +351,11 @@ serve(async (req) => {
     : SYSTEM_PROMPT
 
   const historyText = chatHistory
+    .concat(requestHistory.map((m) => ({
+      role: labelHistoryRole(m.role),
+      text: m.text,
+    })))
+    .slice(-MAX_HISTORY_TURNS)
     .map((m) => `${m.role}: ${m.text}`)
     .join('\n')
 
@@ -275,12 +363,23 @@ serve(async (req) => {
     ? `Recent chat history:\n${historyText}\n\nStudent: ${userMessage}`
     : userMessage
 
+  const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [
+    { text: interactionInput },
+    ...requestImages.map((image) => ({
+      inlineData: {
+        mimeType: image.mimeType,
+        data: image.data,
+      },
+    })),
+  ]
+
   const geminiModel = getGeminiTextModel()
 
   const geminiPayload = {
     model: geminiModel,
     system_instruction: systemWithContext,
     input: interactionInput,
+    parts,
     stream: true,
     generation_config: {
       temperature: 0.7,

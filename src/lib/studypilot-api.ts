@@ -36,6 +36,7 @@ export function adaptSession(session: Session): any {
   return {
     ...session,
     rubricId: session.rubric_id,
+    screenshotPath: session.screenshot_path,
     when: formatWhen(session.when_timestamp),
     duration: formatDuration(session.duration_seconds),
   };
@@ -119,6 +120,23 @@ export async function fetchSessionTranscript(sessionId: string): Promise<Transcr
     text: m.message_text,
     t: m.time_offset_seconds,
   }));
+}
+
+export async function createSessionCaptureSignedUrl(path: string): Promise<string> {
+  await injectStoredToken();
+  const { data, error } = await supabase
+    .storage
+    .from('session-captures')
+    .createSignedUrl(path, 60 * 60, {
+      transform: {
+        width: 560,
+        height: 320,
+        resize: 'contain',
+      },
+    });
+
+  if (error) throw error;
+  return data.signedUrl;
 }
 
 // ─── Dashboard-compatible wrappers ─────────────────────────────────────────────────
@@ -342,7 +360,7 @@ export async function getSessions(): Promise<Session[]> {
   const { data, error } = await supabase
     .from('sessions')
     .select(`
-      id, title, source, mode, duration_seconds, summary, when_timestamp, rubric_id,
+      id, title, source, mode, duration_seconds, summary, when_timestamp, rubric_id, screenshot_path,
       action_items(id, done)
     `)
     .order('when_timestamp', { ascending: false });

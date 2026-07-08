@@ -2,8 +2,41 @@ import { getAccessToken, getGoogleProjectId, invalidateToken } from "./oauth-hel
 
 const GENERATIVE_LANGUAGE_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models'
 
+type GeminiTextPart = { text: string }
+type GeminiInlineDataPart = { inlineData: { mimeType: string; data: string } }
+type GeminiPart = GeminiTextPart | GeminiInlineDataPart
+
 export function getGeminiTextModel(): string {
   return Deno.env.get('GEMINI_TEXT_MODEL') || 'gemini-2.0-flash'
+}
+
+function isGeminiPart(value: unknown): value is GeminiPart {
+  if (!value || typeof value !== 'object') return false
+
+  const record = value as Record<string, unknown>
+  if (typeof record.text === 'string' && record.text.trim().length > 0) {
+    return true
+  }
+
+  const inlineData = record.inlineData
+  if (!inlineData || typeof inlineData !== 'object') return false
+
+  const data = inlineData as Record<string, unknown>
+  return typeof data.mimeType === 'string'
+    && data.mimeType.trim().length > 0
+    && typeof data.data === 'string'
+    && data.data.trim().length > 0
+}
+
+function buildUserParts(body: Record<string, unknown>): GeminiPart[] {
+  const parts = Array.isArray(body.parts)
+    ? body.parts.filter(isGeminiPart)
+    : []
+
+  if (parts.length > 0) return parts
+
+  const input = typeof body.input === 'string' ? body.input : ''
+  return [{ text: input }]
 }
 
 export async function createGeminiInteraction(body: Record<string, unknown>): Promise<Response> {
@@ -12,11 +45,11 @@ export async function createGeminiInteraction(body: Record<string, unknown>): Pr
   // Build the standard generateContent request body (identical shape for
   // Vertex AI and the Generative Language API)
   const systemInstruction = body.system_instruction
-  const input = body.input as string
   const generationConfig = body.generation_config
+  const parts = buildUserParts(body)
 
   const requestBody: Record<string, unknown> = {
-    contents: [{ role: 'user', parts: [{ text: input }] }],
+    contents: [{ role: 'user', parts }],
     ...(generationConfig ? { generationConfig } : {}),
     ...(systemInstruction ? { systemInstruction: { parts: [{ text: systemInstruction }] } } : {}),
   }
