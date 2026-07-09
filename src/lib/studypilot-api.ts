@@ -7,6 +7,7 @@
 import { supabase, injectStoredToken } from './supabaseClient';
 import type {
   Profile,
+  AiUsage,
   Rubric,
   KnowledgeDocument,
   Session,
@@ -21,6 +22,7 @@ import type {
 // Re-export types for convenience
 export type {
   Profile,
+  AiUsage,
   Rubric,
   KnowledgeDocument,
   Session,
@@ -188,6 +190,17 @@ export async function updateProfile(updates: Partial<Profile>): Promise<Profile>
 
   if (error) throw error;
   return data;
+}
+
+// ─── AI Usage Operations ─────────────────────────────────────────────────────────
+
+export async function getAiUsage(): Promise<AiUsage> {
+  await injectStoredToken();
+
+  const { data, error } = await supabase.rpc('get_ai_usage');
+  if (error) throw error;
+
+  return data as AiUsage;
 }
 
 // ─── Rubric Operations ────────────────────────────────────────────────────────────
@@ -561,7 +574,13 @@ export async function summarizeSession(sessionId: string): Promise<SummarizeSess
   );
 
   if (!response.ok) {
-    throw new Error(`Summarization failed: ${response.statusText}`);
+    const errorBody = await response.json().catch(() => ({}));
+    const message = (errorBody as { error?: unknown }).error;
+    throw new Error(
+      typeof message === 'string' && message.trim()
+        ? message
+        : `Summarization failed: ${response.statusText}`,
+    );
   }
 
   return response.json();
@@ -587,7 +606,13 @@ export async function extractRubric(rubricId: string, filePath?: string): Promis
   );
 
   if (!response.ok) {
-    throw new Error(`Rubric extraction failed: ${response.statusText}`);
+    const errorBody = await response.json().catch(() => ({}));
+    const message = (errorBody as { error?: unknown }).error;
+    throw new Error(
+      typeof message === 'string' && message.trim()
+        ? message
+        : `Rubric extraction failed: ${response.statusText}`,
+    );
   }
 
   return response.json();

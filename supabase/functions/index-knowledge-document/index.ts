@@ -107,7 +107,9 @@ serve(async (req) => {
       .update({ index_status: 'indexing' })
       .eq('id', knowledgeDocumentId)
 
-    // TODO: Replace the stub below with the real Gemini File Search import:
+    // TODO: Call consumeAiRequest(db, user.id) before the real Gemini request
+    // below so document indexing shares the daily AI request pool.
+    // Replace the stub below with the real Gemini File Search import:
     //
     // const { getAccessToken } = await import('../shared/oauth-helper.ts')
     // const accessToken = await getAccessToken()

@@ -70,7 +70,9 @@ serve(async (req) => {
     const userIdShort = user.id.slice(0, 8)
     const displayName = `studypilot-user-${userIdShort}`
 
-    // TODO: Replace the stub below with the real Gemini File Search Stores
+    // TODO: Call consumeAiRequest(supabaseClient, user.id) before the real
+    // Gemini request below so File Search setup shares the daily AI request pool.
+    // Replace the stub below with the real Gemini File Search Stores
     // create API once available:
     //
     // const accessToken = await getAccessToken()

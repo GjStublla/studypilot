@@ -68,7 +68,9 @@ serve(async (req) => {
 
     // ── Delete from Gemini File Search (if indexed) ─────────────────────────
     if (doc.gemini_file_search_document_name) {
-      // TODO: Replace with real Gemini File Search delete call:
+      // TODO: Call consumeAiRequest(db, user.id) before the real Gemini request
+      // below so File Search deletion shares the daily AI request pool.
+      // Replace with real Gemini File Search delete call:
       //
       // const { getAccessToken } = await import('../shared/oauth-helper.ts')
       // const accessToken = await getAccessToken()

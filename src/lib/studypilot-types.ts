@@ -10,10 +10,16 @@ export interface Profile {
   email: string;
   theme: 'dark' | 'light';
   default_coach_mode: 'essay' | 'lecture' | 'reader';
+  ai_daily_limit?: number;
   gemini_file_search_store_name?: string | null;
   gemini_file_search_store_display_name?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface AiUsage {
+  used: number;
+  limit: number;
 }
 
 export interface Criterion {
