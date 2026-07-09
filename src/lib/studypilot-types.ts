@@ -100,9 +100,19 @@ export interface ActionItem {
   updated_at: string;
 }
 
+export interface DashboardChat {
+  id: string;
+  user_id: string;
+  session_id?: string | null;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface DashboardChatMessage {
   id: string;
   user_id: string;
+  chat_id?: string | null;
   session_id?: string | null;
   role: 'user' | 'ai' | 'system';
   text: string;
@@ -155,6 +165,7 @@ export interface IndexKnowledgeDocumentResponse {
 }
 
 export interface SocraticCoachRequest {
+  chatId?: string;
   sessionId?: string;
   userMessage: string;
   history?: Array<{ role: 'user' | 'ai' | 'system'; text: string }>;
