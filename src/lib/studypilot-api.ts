@@ -12,6 +12,7 @@ import type {
   KnowledgeDocument,
   Session,
   ActionItem,
+  DashboardChat,
   DashboardChatMessage,
   ActivityLog,
   IndexKnowledgeDocumentResponse,
@@ -27,6 +28,7 @@ export type {
   KnowledgeDocument,
   Session,
   ActionItem,
+  DashboardChat,
   DashboardChatMessage,
   ActivityLog,
 };
@@ -500,32 +502,79 @@ export async function deleteActionItem(id: string): Promise<void> {
 
 // ─── Dashboard Chat Operations ────────────────────────────────────────────────────
 
-export async function getDashboardChatMessages(sessionId?: string): Promise<DashboardChatMessage[]> {
-  let query = supabase
-    .from('dashboard_chat_messages')
+async function getDashboardChatUserId(): Promise<string> {
+  const storedUserId = localStorage.getItem('sp_user_id');
+  if (storedUserId) return storedUserId;
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.user.id) return session.user.id;
+
+  throw new Error('Not authenticated');
+}
+
+export async function getDashboardChats(): Promise<DashboardChat[]> {
+  await injectStoredToken();
+  const { data, error } = await supabase
+    .from('dashboard_chats')
     .select('*')
-    .order('created_at', { ascending: true });
+    .order('updated_at', { ascending: false });
 
-  if (sessionId) {
-    query = query.eq('session_id', sessionId);
-  }
-
-  const { data, error } = await query;
   if (error) throw error;
   return data || [];
 }
 
-export async function createDashboardChatMessage(
-  message: Omit<DashboardChatMessage, 'id' | 'created_at'>
-): Promise<DashboardChatMessage> {
+export async function createDashboardChat(
+  title: string,
+  sessionId?: string | null,
+): Promise<DashboardChat> {
+  await injectStoredToken();
+  const userId = await getDashboardChatUserId();
   const { data, error } = await supabase
-    .from('dashboard_chat_messages')
-    .insert(message)
+    .from('dashboard_chats')
+    .insert({ user_id: userId, title, session_id: sessionId ?? null })
     .select()
     .single();
 
   if (error) throw error;
   return data;
+}
+
+export async function updateDashboardChat(
+  chatId: string,
+  updates: Pick<DashboardChat, 'title'>,
+): Promise<DashboardChat> {
+  await injectStoredToken();
+  const { data, error } = await supabase
+    .from('dashboard_chats')
+    .update(updates)
+    .eq('id', chatId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteDashboardChat(chatId: string): Promise<void> {
+  await injectStoredToken();
+  const { error } = await supabase
+    .from('dashboard_chats')
+    .delete()
+    .eq('id', chatId);
+
+  if (error) throw error;
+}
+
+export async function getDashboardChatMessages(chatId: string): Promise<DashboardChatMessage[]> {
+  await injectStoredToken();
+  const { data, error } = await supabase
+    .from('dashboard_chat_messages')
+    .select('*')
+    .eq('chat_id', chatId)
+    .order('created_at', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
 }
 
 // ─── Activity Log Operations ─────────────────────────────────────────────────────
