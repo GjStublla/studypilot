@@ -304,6 +304,7 @@ CREATE TABLE public.profiles (
     initials VARCHAR(10) NOT NULL,
     theme TEXT DEFAULT 'dark' CHECK (theme IN ('dark', 'light')),
     default_coach_mode TEXT DEFAULT 'essay' CHECK (default_coach_mode IN ('essay', 'lecture', 'reader')),
+    ai_daily_limit INTEGER NOT NULL DEFAULT 50,
     gemini_file_search_store_name TEXT,
     gemini_file_search_store_display_name TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -314,6 +315,15 @@ CREATE TRIGGER set_timestamp_profiles
 BEFORE UPDATE ON public.profiles
 FOR EACH ROW
 EXECUTE FUNCTION trigger_set_timestamp();
+
+-- Shared daily AI request usage. One row per user per UTC day.
+CREATE TABLE public.ai_usage (
+    user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    usage_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    request_count INTEGER NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, usage_date)
+);
 
 -- Rubrics
 -- Note: knowledge_document_id FK is added later via ALTER TABLE
@@ -485,6 +495,107 @@ CREATE INDEX idx_knowledge_documents_user ON public.knowledge_documents(user_id)
 CREATE INDEX idx_knowledge_documents_rubric ON public.knowledge_documents(rubric_id);
 CREATE INDEX idx_knowledge_documents_status ON public.knowledge_documents(index_status);
 CREATE INDEX idx_knowledge_documents_store ON public.knowledge_documents(gemini_file_search_store_name);
+
+-- AI usage RPCs
+-- consume_ai_request atomically reserves one request from a user's shared
+-- daily AI pool. The conditional conflict update prevents concurrent callers
+-- from exceeding profiles.ai_daily_limit.
+CREATE OR REPLACE FUNCTION public.consume_ai_request(p_user_id UUID)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_limit INTEGER;
+  v_used INTEGER;
+  v_count INTEGER;
+BEGIN
+  SELECT COALESCE(
+    (
+      SELECT profiles.ai_daily_limit
+      FROM public.profiles
+      WHERE profiles.id = p_user_id
+    ),
+    50
+  ) INTO v_limit;
+
+  SELECT COALESCE(
+    (
+      SELECT ai_usage.request_count
+      FROM public.ai_usage
+      WHERE ai_usage.user_id = p_user_id
+        AND ai_usage.usage_date = CURRENT_DATE
+    ),
+    0
+  ) INTO v_used;
+
+  IF v_limit <= 0 THEN
+    RETURN jsonb_build_object('allowed', false, 'used', v_used, 'limit', v_limit);
+  END IF;
+
+  INSERT INTO public.ai_usage (user_id, usage_date, request_count)
+  VALUES (p_user_id, CURRENT_DATE, 1)
+  ON CONFLICT (user_id, usage_date) DO UPDATE
+    SET request_count = ai_usage.request_count + 1,
+        updated_at = NOW()
+    WHERE ai_usage.request_count < v_limit
+  RETURNING request_count INTO v_count;
+
+  IF v_count IS NULL THEN
+    SELECT COALESCE(
+      (
+        SELECT ai_usage.request_count
+        FROM public.ai_usage
+        WHERE ai_usage.user_id = p_user_id
+          AND ai_usage.usage_date = CURRENT_DATE
+      ),
+      0
+    ) INTO v_used;
+
+    RETURN jsonb_build_object('allowed', false, 'used', v_used, 'limit', v_limit);
+  END IF;
+
+  RETURN jsonb_build_object('allowed', true, 'used', v_count, 'limit', v_limit);
+END;
+$$;
+
+-- get_ai_usage is callable by the signed-in browser and uses auth.uid() to
+-- return only the current user's count and configured limit.
+CREATE OR REPLACE FUNCTION public.get_ai_usage()
+RETURNS JSONB
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id UUID := auth.uid();
+  v_limit INTEGER;
+  v_used INTEGER;
+BEGIN
+  SELECT COALESCE(
+    (
+      SELECT profiles.ai_daily_limit
+      FROM public.profiles
+      WHERE profiles.id = v_user_id
+    ),
+    50
+  ) INTO v_limit;
+
+  SELECT COALESCE(
+    (
+      SELECT ai_usage.request_count
+      FROM public.ai_usage
+      WHERE ai_usage.user_id = v_user_id
+        AND ai_usage.usage_date = CURRENT_DATE
+    ),
+    0
+  ) INTO v_used;
+
+  RETURN jsonb_build_object('used', v_used, 'limit', v_limit);
+END;
+$$;
 ```
 
 ---
@@ -564,6 +675,7 @@ Enable RLS on all tables.
 
 ```sql
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ai_usage ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.rubrics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.rubric_criteria ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.knowledge_documents ENABLE ROW LEVEL SECURITY;
@@ -583,6 +695,14 @@ ON public.profiles FOR SELECT USING (auth.uid() = id);
 
 CREATE POLICY "Students can modify their own profile preferences"
 ON public.profiles FOR UPDATE USING (auth.uid() = id);
+
+-- AI usage
+CREATE POLICY "Users read own ai usage"
+ON public.ai_usage FOR SELECT
+TO authenticated
+USING ((select auth.uid()) = user_id);
+
+GRANT SELECT ON TABLE public.ai_usage TO authenticated;
 
 -- Rubrics
 CREATE POLICY "Students can read their own rubrics"
@@ -687,6 +807,13 @@ ON public.activity_logs FOR SELECT USING (auth.uid() = user_id);
 
 CREATE POLICY "Students can insert their own activity logs"
 ON public.activity_logs FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Database function access
+REVOKE EXECUTE ON FUNCTION public.consume_ai_request(UUID) FROM public, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.consume_ai_request(UUID) TO service_role;
+
+REVOKE EXECUTE ON FUNCTION public.get_ai_usage() FROM public, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_ai_usage() TO authenticated;
 ```
 
 ---

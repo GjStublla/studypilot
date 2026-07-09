@@ -55,6 +55,8 @@ serve(async (req) => {
     const sessionId: string | undefined = body.sessionId
 
     // ── TODO: Issue a real Gemini Live ephemeral token ───────────────────────
+    // Create the service-role DB client and call consumeAiRequest(db, user.id)
+    // after validation so the real Gemini request shares the daily AI pool.
     // Replace the stub below once the Gemini Live ephemeral token API is ready:
     //
     // const { getAccessToken } = await import('../shared/oauth-helper.ts')

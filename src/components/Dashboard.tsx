@@ -8,7 +8,9 @@ import {
   fetchActionItems,
   fetchSessionTranscript,
   createSessionCaptureSignedUrl,
+  getAiUsage,
   setActionItemDone,
+  type AiUsage,
 } from '../lib/studypilot-api';
 import { sendCoachingMessage } from '../lib/socraticCoach';
 import { useStudyPilotRealtime } from '../lib/useRealtime';
@@ -198,6 +200,13 @@ export default function Dashboard() {
   const [transcriptLoading, setTranscriptLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [aiUsage, setAiUsage] = useState<AiUsage | null>(null);
+
+  const refreshAiUsage = useCallback(() => {
+    getAiUsage().then(setAiUsage).catch(() => {
+      // The migration may not be deployed yet; usage UI is optional in that case.
+    });
+  }, []);
 
   // ── Realtime subscriptions ─────────────────────────────────────────────────
   const [userId, setUserId] = useState<string | null>(null);
@@ -336,6 +345,10 @@ export default function Dashboard() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    refreshAiUsage();
+  }, [refreshAiUsage]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -610,7 +623,9 @@ export default function Dashboard() {
                   session={chatSession}
                   transcript={chatTranscript}
                   transcriptLoading={transcriptLoading}
+                  aiUsage={aiUsage}
                   onOpenSession={openChatSessionDetail}
+                  onAiRequestSettled={refreshAiUsage}
                 />
               )}
 
@@ -663,6 +678,7 @@ export default function Dashboard() {
                   student={student}
                   theme={theme}
                   coachMode={coachMode}
+                  aiUsage={aiUsage}
                   onSetCoachMode={changeCoachMode}
                   onSignOut={signOut}
                   onSetTheme={applyTheme}
@@ -680,6 +696,7 @@ export default function Dashboard() {
         chatSession={chatSession}
         selectedSession={selectedSession}
         openActionItemCount={openActionItems.length}
+        aiUsage={aiUsage}
         onGoTo={setView}
         onContinueInChat={continueContextInChat}
         onOpenExtension={openExtension}
@@ -1113,18 +1130,27 @@ const ChatView = memo(function ChatView({
   session,
   transcript,
   transcriptLoading,
+  aiUsage,
   onOpenSession,
+  onAiRequestSettled,
 }: {
   student: typeof STUDENT;
   activeRubric: Rubric | undefined;
   session: Session | undefined;
   transcript: TranscriptLine[];
   transcriptLoading: boolean;
+  aiUsage: AiUsage | null;
   onOpenSession: () => void;
+  onAiRequestSettled: () => void;
 }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [micOn, setMicOn] = useState(false);
+  // Id of the AI placeholder message that is still waiting for its first
+  // streamed token — that bubble renders a "thinking" indicator.
+  const [thinkingId, setThinkingId] = useState<string | null>(null);
+  const limitReached = aiUsage !== null && aiUsage.used >= aiUsage.limit;
+  const remainingRequests = aiUsage === null ? null : Math.max(aiUsage.limit - aiUsage.used, 0);
 
   // Seed the conversation from the session's real transcript. Re-runs when the
   // chat switches sessions or the transcript finishes loading.
@@ -1179,6 +1205,8 @@ const ChatView = memo(function ChatView({
   }, [input]);
 
   const send = useCallback(async (text?: string) => {
+    if (limitReached) return;
+
     const value = (text ?? input).trim();
     if (!value) return;
     const now = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -1201,7 +1229,8 @@ const ChatView = memo(function ChatView({
       time: now,
     });
     setMessages((m) => [...m, aiMsg]);
-    
+    setThinkingId(aiMsgId);
+
     // Stream the AI response
     let accumulatedText = '';
     await sendCoachingMessage(
@@ -1210,6 +1239,7 @@ const ChatView = memo(function ChatView({
       {
         onTokenReceived: (token) => {
           accumulatedText += token;
+          setThinkingId((id) => (id === aiMsgId ? null : id));
           setMessages((m) =>
             m.map((msg) =>
               msg.id === aiMsgId
@@ -1219,6 +1249,7 @@ const ChatView = memo(function ChatView({
           );
         },
         onStreamComplete: () => {
+          setThinkingId((id) => (id === aiMsgId ? null : id));
           setMessages((m) =>
             m.map((msg) =>
               msg.id === aiMsgId
@@ -1226,11 +1257,13 @@ const ChatView = memo(function ChatView({
                 : msg
             )
           );
+          onAiRequestSettled();
         },
         onStreamError: (error) => {
           console.error('Chat stream error:', error);
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           console.error('Error message:', errorMessage);
+          setThinkingId((id) => (id === aiMsgId ? null : id));
           setMessages((m) =>
             m.map((msg) =>
               msg.id === aiMsgId
@@ -1238,10 +1271,11 @@ const ChatView = memo(function ChatView({
                 : msg
             )
           );
+          onAiRequestSettled();
         },
       }
     );
-  }, [input, session?.id]);
+  }, [input, limitReached, onAiRequestSettled, session?.id]);
 
   const toggleMic = useCallback(() => setMicOn((v) => !v), []);
 
@@ -1284,14 +1318,22 @@ const ChatView = memo(function ChatView({
             body="Ask about your rubric, feedback, or what to revise next."
           />
         ) : (
-          messages.map((m) => <MessageBubble key={m.id} message={m} student={student} />)
+          messages.map((m) => (
+            <MessageBubble key={m.id} message={m} student={student} thinking={m.id === thinkingId} />
+          ))
         )}
       </div>
 
       <div className="ds-composer-wrap">
         <div className="ds-quick-prompts" role="group" aria-label="Quick prompts">
           {QUICK_PROMPTS.map((p) => (
-            <button key={p} type="button" className="ds-quick-prompt" onClick={() => send(p)}>
+            <button
+              key={p}
+              type="button"
+              className="ds-quick-prompt"
+              onClick={() => send(p)}
+              disabled={limitReached}
+            >
               <Sparkles size={11} strokeWidth={1.7} />
               <span>{p}</span>
             </button>
@@ -1332,16 +1374,24 @@ const ChatView = memo(function ChatView({
           <button
             type="submit"
             className="ds-send"
-            disabled={!input.trim()}
+            disabled={limitReached || !input.trim()}
             aria-label="Send"
           >
             <ArrowUp size={14} strokeWidth={2} />
           </button>
         </form>
 
-        <p className="ds-composer-hint">
-          <ShieldCheck size={11} strokeWidth={1.7} /> StudyPilot will not write your work — it
-          helps you revise it.
+        <p className={`ds-composer-hint ${limitReached ? 'is-limit' : ''}`}>
+          {limitReached ? (
+            <>Daily AI limit reached ({aiUsage.used} of {aiUsage.limit}). Resets at midnight UTC.</>
+          ) : remainingRequests !== null && remainingRequests <= 5 ? (
+            <>{remainingRequests} AI requests left today.</>
+          ) : (
+            <>
+              <ShieldCheck size={11} strokeWidth={1.7} /> StudyPilot will not write your work — it
+              helps you revise it.
+            </>
+          )}
         </p>
       </div>
     </div>
@@ -1351,9 +1401,11 @@ const ChatView = memo(function ChatView({
 const MessageBubble = memo(function MessageBubble({
   message,
   student,
+  thinking = false,
 }: {
   message: Message;
   student: typeof STUDENT;
+  thinking?: boolean;
 }) {
   return (
     <article className={`ds-msg ds-msg-${message.role}`}>
@@ -1365,9 +1417,17 @@ const MessageBubble = memo(function MessageBubble({
           <b>{message.role === 'ai' ? 'StudyPilot' : student.name}</b>
           <time>{message.time}</time>
         </div>
-        {message.lines.map((line, i) => (
-          <p key={i}>{line || ' '}</p>
-        ))}
+        {thinking ? (
+          <div className="ds-typing" role="status" aria-label="StudyPilot is thinking">
+            <span className="ds-typing-dot" />
+            <span className="ds-typing-dot" />
+            <span className="ds-typing-dot" />
+          </div>
+        ) : (
+          message.lines.map((line, i) => (
+            <p key={i}>{line || ' '}</p>
+          ))
+        )}
       </div>
     </article>
   );
@@ -1927,6 +1987,7 @@ const SettingsView = memo(function SettingsView({
   student,
   theme,
   coachMode,
+  aiUsage,
   onSetCoachMode,
   onSignOut,
   onSetTheme,
@@ -1934,6 +1995,7 @@ const SettingsView = memo(function SettingsView({
   student: typeof STUDENT;
   theme: Theme;
   coachMode: CoachMode;
+  aiUsage: AiUsage | null;
   onSetCoachMode: (mode: CoachMode) => void;
   onSignOut: () => void;
   onSetTheme: (theme: Theme) => void;
@@ -1959,6 +2021,9 @@ const SettingsView = memo(function SettingsView({
             <div className="ds-account-body">
               <b>{student.name}</b>
               <em>{student.email}</em>
+              {aiUsage && (
+                <em>AI usage today: {aiUsage.used} of {aiUsage.limit} requests · resets midnight UTC</em>
+              )}
             </div>
             <DsButton variant="ghost" onClick={onSignOut}>Sign out</DsButton>
           </div>
@@ -2053,6 +2118,7 @@ const ContextPanel = memo(function ContextPanel({
   chatSession,
   selectedSession,
   openActionItemCount,
+  aiUsage,
   onGoTo,
   onContinueInChat,
   onOpenExtension,
@@ -2063,6 +2129,7 @@ const ContextPanel = memo(function ContextPanel({
   chatSession: Session | undefined;
   selectedSession: Session | undefined;
   openActionItemCount: number;
+  aiUsage: AiUsage | null;
   onGoTo: (v: View) => void;
   onContinueInChat: () => void;
   onOpenExtension: () => void;
@@ -2141,6 +2208,13 @@ const ContextPanel = memo(function ContextPanel({
           <b>{openActionItemCount}</b>
           <em>action items</em>
         </div>
+        {aiUsage && (
+          <div className="ds-context-stat">
+            <span className="ds-eyebrow">AI today</span>
+            <b>{aiUsage.used}</b>
+            <em>of {aiUsage.limit} requests</em>
+          </div>
+        )}
         <DsButton variant="secondary" onClick={onOpenExtension}>
           <Chrome size={13} strokeWidth={1.7} />
           Open extension

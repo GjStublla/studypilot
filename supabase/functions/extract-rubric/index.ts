@@ -11,6 +11,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4"
+import { consumeAiRequest, limitReachedMessage } from "../shared/ai-usage.ts"
 import { createGeminiInteraction, describeGeminiError, extractInteractionText, getGeminiTextModel } from "../shared/gemini.ts"
 
 const corsHeaders = {
@@ -79,6 +80,11 @@ serve(async (req) => {
 
     if (!sourceText.trim()) {
       return jsonResponse({ error: 'No text content available for extraction' }, 400)
+    }
+
+    const aiUsage = await consumeAiRequest(db, user.id)
+    if (!aiUsage.allowed) {
+      return jsonResponse({ error: limitReachedMessage(aiUsage) }, 429)
     }
 
     // ── Call Gemini Flash for structured extraction ──────────────────────────

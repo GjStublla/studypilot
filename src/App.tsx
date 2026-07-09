@@ -387,7 +387,7 @@ function Hero({ user, onLogout }: { user: ReturnType<typeof getStoredUser>; onLo
             >
               <img
                 src={productSvg}
-                width="430"
+                width="448"
                 height="820"
                 alt="StudyPilot study panel showing voice listening, quick actions, and a summary card"
               />
