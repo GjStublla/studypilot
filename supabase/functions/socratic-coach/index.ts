@@ -2,10 +2,11 @@
  * socratic-coach — Supabase Edge Function
  *
  * Streams a Socratic coaching response from Gemini Flash using the student's
- * session context, active rubric, and recent chat history.
+ * session context, active rubric, and chat-scoped recent history.
  *
  * Input (POST body):
- *   { sessionId?: string, userMessage: string }
+ *   { chatId?: string, sessionId?: string, userMessage: string }
+ *   `chatId` is verified as owned by the caller and its session is authoritative.
  *
  * Output:
  *   SSE stream: data: {"text":"..."} ... data: [DONE]
@@ -188,6 +189,7 @@ serve(async (req) => {
   const db = createClient(supabaseUrl, supabaseServiceKey)
 
   // ── Parse body ────────────────────────────────────────────────────────────
+  let chatId: string | undefined
   let sessionId: string | undefined
   let userMessage: string
   let requestHistory: RequestHistoryTurn[] = []
@@ -208,6 +210,16 @@ serve(async (req) => {
     }
     requestImages = imageResult.images
 
+    if (body.chatId !== undefined) {
+      if (typeof body.chatId !== 'string' || !body.chatId.trim()) {
+        return new Response(
+          JSON.stringify({ error: 'chatId must be a non-empty string when provided' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      chatId = body.chatId.trim()
+    }
+
     if (!userMessage || typeof userMessage !== 'string' || userMessage.trim().length === 0) {
       return new Response(
         JSON.stringify({ error: 'userMessage is required and must be a non-empty string' }),
@@ -221,6 +233,24 @@ serve(async (req) => {
       JSON.stringify({ error: 'Invalid request body' }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
+  }
+
+  if (chatId) {
+    const { data: chat } = await db
+      .from('dashboard_chats')
+      .select('id, session_id')
+      .eq('id', chatId)
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (!chat) {
+      return new Response(
+        JSON.stringify({ error: 'Chat not found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    sessionId = chat.session_id ?? undefined
   }
 
   const aiUsage = await consumeAiRequest(db, userId)
@@ -313,10 +343,10 @@ serve(async (req) => {
     }
   }
 
-  // 5. Recent chat history for this session (last 10 exchanges = 20 messages)
+  // 5. Recent chat history (last 10 exchanges = 20 messages)
   // NOTE: Supabase query builders are immutable — each chained method returns a
   // NEW builder. We must build the full chain in one expression so the
-  // optional sessionId filter is never silently dropped.
+  // chatId is strict. Legacy requests only see legacy rows where chat_id is null.
   let chatHistory: Array<{ role: string; text: string }> = []
   {
     const baseQuery = db
@@ -326,9 +356,13 @@ serve(async (req) => {
       .order('created_at', { ascending: false })
       .limit(20)
 
-    const { data: history } = await (
-      sessionId ? baseQuery.eq('session_id', sessionId) : baseQuery
-    )
+    const historyQuery = chatId
+      ? baseQuery.eq('chat_id', chatId)
+      : sessionId
+        ? baseQuery.eq('session_id', sessionId).is('chat_id', null)
+        : baseQuery.is('chat_id', null)
+
+    const { data: history } = await historyQuery
 
     if (history && history.length > 0) {
       // Reverse to get chronological order.
@@ -344,6 +378,7 @@ serve(async (req) => {
   // ── Save the user's message to the DB (fire-and-forget) ───────────────────
   db.from('dashboard_chat_messages').insert({
     user_id: userId,
+    chat_id: chatId ?? null,
     session_id: sessionId ?? null,
     role: 'user',
     text: userMessage,
@@ -486,6 +521,7 @@ serve(async (req) => {
       if (fullResponse.trim()) {
         db.from('dashboard_chat_messages').insert({
           user_id: userId,
+          chat_id: chatId ?? null,
           session_id: sessionId ?? null,
           role: 'ai',
           text: fullResponse.trim(),

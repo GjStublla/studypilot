@@ -10,10 +10,16 @@ import {
   createSessionCaptureSignedUrl,
   getAiUsage,
   setActionItemDone,
+  createDashboardChat,
+  deleteDashboardChat,
+  getDashboardChatMessages,
+  getDashboardChats,
+  updateDashboardChat,
   type AiUsage,
 } from '../lib/studypilot-api';
 import { sendCoachingMessage } from '../lib/socraticCoach';
 import { useStudyPilotRealtime } from '../lib/useRealtime';
+import type { DashboardChat, DashboardChatMessage } from '../lib/studypilot-types';
 import './Dashboard.css';
 
 type Session = any;
@@ -196,6 +202,8 @@ export default function Dashboard() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [rubrics, setRubrics] = useState<Rubric[]>([]);
   const [actionItems, setActionItems] = useState<ActionItem[]>([]);
+  const [chats, setChats] = useState<DashboardChat[]>([]);
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [transcripts, setTranscripts] = useState<Record<string, TranscriptLine[]>>({});
   const [transcriptLoading, setTranscriptLoading] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -275,7 +283,6 @@ export default function Dashboard() {
 
   const [activeRubricId, setActiveRubricId] = useState<string>('');
   const [selectedSessionId, setSelectedSessionId] = useState<string>('');
-  const [chatContextSessionId, setChatContextSessionId] = useState<string>('');
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
   // Real profile from the backend; starts as the email-derived guess so first
   // paint isn't blank, then gets replaced with the actual name/initials/email.
@@ -319,13 +326,13 @@ export default function Dashboard() {
     };
   }, []);
 
-  // Load sessions, rubrics, and action items in parallel. allSettled means one
+  // Load sessions, rubrics, action items, and chats in parallel. allSettled means one
   // failing endpoint doesn't blank the whole dashboard — we render whatever loaded.
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    Promise.allSettled([fetchSessions(), fetchRubrics(), fetchActionItems()])
-      .then(([s, r, a]) => {
+    Promise.allSettled([fetchSessions(), fetchRubrics(), fetchActionItems(), getDashboardChats()])
+      .then(([s, r, a, c]) => {
         if (cancelled) return;
         if (s.status === 'fulfilled') setSessions(s.value);
         if (r.status === 'fulfilled') {
@@ -334,6 +341,10 @@ export default function Dashboard() {
           if (active) setActiveRubricId((prev) => prev || active.id);
         }
         if (a.status === 'fulfilled') setActionItems(a.value);
+        if (c.status === 'fulfilled') {
+          setChats(c.value);
+          setActiveChatId(c.value[0]?.id ?? null);
+        }
         if (s.status === 'rejected' && r.status === 'rejected' && a.status === 'rejected') {
           setLoadError(true);
         }
@@ -390,9 +401,13 @@ export default function Dashboard() {
     () => sessionsById.get(selectedSessionId) ?? sessions[0],
     [selectedSessionId, sessionsById, sessions],
   );
+  const activeChat = useMemo<DashboardChat | undefined>(
+    () => chats.find((chat) => chat.id === activeChatId),
+    [activeChatId, chats],
+  );
   const chatSession = useMemo<Session | undefined>(
-    () => sessionsById.get(chatContextSessionId) ?? sessions[0],
-    [chatContextSessionId, sessionsById, sessions],
+    () => (activeChat?.session_id ? sessionsById.get(activeChat.session_id) : undefined),
+    [activeChat, sessionsById],
   );
 
   const openActionItems = useMemo(() => actionItems.filter((a) => !a.done), [actionItems]);
@@ -425,10 +440,6 @@ export default function Dashboard() {
   const selectedTranscript = selectedSession ? transcripts[selectedSession.id] ?? [] : [];
   // Memoized so the reference is stable between unrelated renders — the ChatView
   // effect that seeds messages from it depends on this not changing every render.
-  const chatTranscript = useMemo(
-    () => (chatSession ? transcripts[chatSession.id] ?? [] : []),
-    [chatSession, transcripts],
-  );
   // "Recent activity" derived from the user's real sessions (most recent first).
   const recentActivity = useMemo(
     () => sessions.slice(0, 5).map((s) => ({ id: s.id, time: s.when, title: s.title })),
@@ -457,6 +468,12 @@ export default function Dashboard() {
   // time a transcript is fetched.
   const transcriptsRef = useRef(transcripts);
   useEffect(() => { transcriptsRef.current = transcripts; });
+  const chatsRef = useRef(chats);
+  const sessionsRef = useRef(sessions);
+  const activeChatIdRef = useRef(activeChatId);
+  useEffect(() => { chatsRef.current = chats; }, [chats]);
+  useEffect(() => { sessionsRef.current = sessions; }, [sessions]);
+  useEffect(() => { activeChatIdRef.current = activeChatId; }, [activeChatId]);
 
   const ensureTranscript = useCallback(
     (sessionId: string) => {
@@ -470,14 +487,87 @@ export default function Dashboard() {
     [], // stable — reads transcripts via ref, not closure
   );
 
-  const openInChat = useCallback(
-    (sessionId: string) => {
-      setChatContextSessionId(sessionId);
-      setView('chat');
-      ensureTranscript(sessionId); // so the chat opens on the real conversation
-    },
-    [ensureTranscript],
-  );
+  const selectChat = useCallback((chatId: string) => {
+    setActiveChatId(chatId);
+    setView('chat');
+  }, []);
+
+  const startNewChat = useCallback(() => {
+    setActiveChatId(null);
+    setView('chat');
+  }, []);
+
+  const createChat = useCallback(async (title: string, sessionId?: string | null) => {
+    const chat = await createDashboardChat(title, sessionId);
+    setChats((current) => [chat, ...current.filter((item) => item.id !== chat.id)]);
+    setActiveChatId(chat.id);
+    return chat;
+  }, []);
+
+  const renameChat = useCallback((chatId: string, title: string) => {
+    const previous = chatsRef.current.find((chat) => chat.id === chatId);
+    if (!previous) return;
+
+    const nextTitle = title.trim() || previous.title;
+    setChats((current) =>
+      current.map((chat) => (chat.id === chatId ? { ...chat, title: nextTitle } : chat)),
+    );
+    updateDashboardChat(chatId, { title: nextTitle })
+      .then((updated) => {
+        setChats((current) =>
+          current.map((chat) => (chat.id === chatId ? updated : chat)),
+        );
+      })
+      .catch(() => {
+        setChats((current) =>
+          current.map((chat) => (chat.id === chatId ? previous : chat)),
+        );
+      });
+  }, []);
+
+  const deleteChat = useCallback((chatId: string) => {
+    const previousChats = chatsRef.current;
+    const nextChats = previousChats.filter((chat) => chat.id !== chatId);
+    if (nextChats.length === previousChats.length) return;
+
+    const previousActiveChatId = activeChatIdRef.current;
+    const nextActiveChatId = previousActiveChatId === chatId ? nextChats[0]?.id ?? null : previousActiveChatId;
+    setChats(nextChats);
+    if (previousActiveChatId === chatId) setActiveChatId(nextActiveChatId);
+
+    deleteDashboardChat(chatId).catch(() => {
+      setChats(previousChats);
+      if (activeChatIdRef.current === nextActiveChatId) {
+        setActiveChatId(previousActiveChatId);
+      }
+    });
+  }, []);
+
+  const touchChat = useCallback((chatId: string) => {
+    setChats((current) => {
+      const chat = current.find((item) => item.id === chatId);
+      if (!chat) return current;
+      return [
+        { ...chat, updated_at: new Date().toISOString() },
+        ...current.filter((item) => item.id !== chatId),
+      ];
+    });
+  }, []);
+
+  const openInChat = useCallback((sessionId: string) => {
+    const existing = chatsRef.current.find((chat) => chat.session_id === sessionId);
+    setView('chat');
+    if (existing) {
+      setActiveChatId(existing.id);
+      return;
+    }
+
+    setActiveChatId(null);
+    const session = sessionsRef.current.find((item) => item.id === sessionId);
+    void createChat(session?.title ?? 'Session chat', sessionId).catch(() => {
+      /* Leave the user in a fresh rubric-only draft if the chat could not be created. */
+    });
+  }, [createChat]);
 
   const openSessionDetail = useCallback(
     (sessionId: string) => {
@@ -526,9 +616,9 @@ export default function Dashboard() {
     (rubricId: string) => {
       const session = sessions.find((s) => s.rubricId === rubricId);
       if (session) openInChat(session.id);
-      else setView('chat');
+      else startNewChat();
     },
-    [openInChat, sessions],
+    [openInChat, sessions, startNewChat],
   );
   const openExtension = useCallback(() => {
     /* placeholder - would deep link the extension */
@@ -621,10 +711,16 @@ export default function Dashboard() {
                   student={student}
                   activeRubric={activeRubric}
                   session={chatSession}
-                  transcript={chatTranscript}
-                  transcriptLoading={transcriptLoading}
+                  chats={chats}
+                  activeChatId={activeChatId}
                   aiUsage={aiUsage}
                   onOpenSession={openChatSessionDetail}
+                  onSelectChat={selectChat}
+                  onStartNewChat={startNewChat}
+                  onCreateChat={createChat}
+                  onRenameChat={renameChat}
+                  onDeleteChat={deleteChat}
+                  onChatActivity={touchChat}
                   onAiRequestSettled={refreshAiUsage}
                 />
               )}
@@ -1112,35 +1208,56 @@ const HomeView = memo(function HomeView({
    Chat view
    ============================================================================ */
 
-/** Map a session's stored transcript lines into chat message bubbles. */
-function transcriptToMessages(lines: TranscriptLine[]): Message[] {
-  return lines.map((l) =>
-    createMessage({
-      id: l.id,
-      role: l.who === 'Student' ? 'user' : 'ai',
-      text: l.text,
-      time: String(l.t),
-    }),
-  );
+/** Map a persisted dashboard chat message into a visible bubble. */
+function dbMessageToMessage(row: DashboardChatMessage): Message | null {
+  if (row.role === 'system') return null;
+
+  const createdAt = new Date(row.created_at);
+  const time = Number.isNaN(createdAt.getTime())
+    ? ''
+    : createdAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+  return createMessage({
+    id: row.id,
+    role: row.role === 'user' ? 'user' : 'ai',
+    text: row.text,
+    time,
+  });
+}
+
+function titleFromFirstMessage(text: string): string {
+  return text.replace(/\s+/g, ' ').trim().slice(0, 40) || 'New chat';
 }
 
 const ChatView = memo(function ChatView({
   student,
   activeRubric,
   session,
-  transcript,
-  transcriptLoading,
+  chats,
+  activeChatId,
   aiUsage,
   onOpenSession,
+  onSelectChat,
+  onStartNewChat,
+  onCreateChat,
+  onRenameChat,
+  onDeleteChat,
+  onChatActivity,
   onAiRequestSettled,
 }: {
   student: typeof STUDENT;
   activeRubric: Rubric | undefined;
   session: Session | undefined;
-  transcript: TranscriptLine[];
-  transcriptLoading: boolean;
+  chats: DashboardChat[];
+  activeChatId: string | null;
   aiUsage: AiUsage | null;
   onOpenSession: () => void;
+  onSelectChat: (chatId: string) => void;
+  onStartNewChat: () => void;
+  onCreateChat: (title: string, sessionId?: string | null) => Promise<DashboardChat>;
+  onRenameChat: (chatId: string, title: string) => void;
+  onDeleteChat: (chatId: string) => void;
+  onChatActivity: (chatId: string) => void;
   onAiRequestSettled: () => void;
 }) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -1151,12 +1268,52 @@ const ChatView = memo(function ChatView({
   const [thinkingId, setThinkingId] = useState<string | null>(null);
   const limitReached = aiUsage !== null && aiUsage.used >= aiUsage.limit;
   const remainingRequests = aiUsage === null ? null : Math.max(aiUsage.limit - aiUsage.used, 0);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const activeChatIdRef = useRef<string | null>(activeChatId);
+  const suppressNextHistoryLoadRef = useRef<string | null>(null);
+  const historyLoadVersionRef = useRef(0);
 
-  // Seed the conversation from the session's real transcript. Re-runs when the
-  // chat switches sessions or the transcript finishes loading.
   useEffect(() => {
-    setMessages(transcriptToMessages(transcript));
-  }, [session?.id, transcript]);
+    activeChatIdRef.current = activeChatId;
+  }, [activeChatId]);
+
+  useEffect(() => {
+    const loadVersion = ++historyLoadVersionRef.current;
+    if (!activeChatId) {
+      setMessages([]);
+      setHistoryLoading(false);
+      return;
+    }
+
+    if (suppressNextHistoryLoadRef.current === activeChatId) {
+      suppressNextHistoryLoadRef.current = null;
+      setHistoryLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setMessages([]);
+    setHistoryLoading(true);
+    getDashboardChatMessages(activeChatId)
+      .then((rows) => {
+        if (cancelled || loadVersion !== historyLoadVersionRef.current) return;
+        setMessages(
+          rows
+            .map(dbMessageToMessage)
+            .filter((message): message is Message => message !== null),
+        );
+      })
+      .catch(() => {
+        if (!cancelled && loadVersion === historyLoadVersionRef.current) setMessages([]);
+      })
+      .finally(() => {
+        if (!cancelled && loadVersion === historyLoadVersionRef.current) setHistoryLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeChatId]);
   const messagesRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollFrameRef = useRef<number | null>(null);
@@ -1209,6 +1366,24 @@ const ChatView = memo(function ChatView({
 
     const value = (text ?? input).trim();
     if (!value) return;
+
+    let chatIdForSend = activeChatIdRef.current;
+    if (!chatIdForSend) {
+      try {
+        const chat = await onCreateChat(titleFromFirstMessage(value), session?.id ?? null);
+        chatIdForSend = chat.id;
+        suppressNextHistoryLoadRef.current = chat.id;
+        activeChatIdRef.current = chat.id;
+      } catch (error) {
+        console.error('Failed to create chat:', error);
+        return;
+      }
+    }
+
+    if (activeChatIdRef.current !== chatIdForSend) return;
+
+    historyLoadVersionRef.current += 1;
+
     const now = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
     const userMsg = createMessage({
       id: `local-${Date.now()}`,
@@ -1216,11 +1391,6 @@ const ChatView = memo(function ChatView({
       text: value,
       time: now,
     });
-    
-    setMessages((m) => [...m, userMsg]);
-    setInput('');
-    
-    // Create a placeholder AI message for streaming
     const aiMsgId = `ai-${Date.now()}`;
     const aiMsg = createMessage({
       id: aiMsgId,
@@ -1228,59 +1398,89 @@ const ChatView = memo(function ChatView({
       text: '',
       time: now,
     });
-    setMessages((m) => [...m, aiMsg]);
+    setMessages((current) => [...current, userMsg, aiMsg]);
     setThinkingId(aiMsgId);
+    setInput('');
 
-    // Stream the AI response
     let accumulatedText = '';
-    await sendCoachingMessage(
-      session?.id,
-      value,
-      {
-        onTokenReceived: (token) => {
-          accumulatedText += token;
+    await sendCoachingMessage(chatIdForSend, value, {
+      onTokenReceived: (token) => {
+        accumulatedText += token;
+        if (activeChatIdRef.current !== chatIdForSend) return;
+        setThinkingId((id) => (id === aiMsgId ? null : id));
+        setMessages((current) =>
+          current.map((message) =>
+            message.id === aiMsgId
+              ? { ...message, text: accumulatedText, lines: accumulatedText.split('\n') }
+              : message,
+          ),
+        );
+      },
+      onStreamComplete: () => {
+        if (activeChatIdRef.current === chatIdForSend) {
           setThinkingId((id) => (id === aiMsgId ? null : id));
-          setMessages((m) =>
-            m.map((msg) =>
-              msg.id === aiMsgId
-                ? { ...msg, text: accumulatedText, lines: accumulatedText.split('\n') }
-                : msg
-            )
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === aiMsgId
+                ? { ...message, text: accumulatedText, lines: accumulatedText.split('\n') }
+                : message,
+            ),
           );
-        },
-        onStreamComplete: () => {
-          setThinkingId((id) => (id === aiMsgId ? null : id));
-          setMessages((m) =>
-            m.map((msg) =>
-              msg.id === aiMsgId
-                ? { ...msg, text: accumulatedText, lines: accumulatedText.split('\n') }
-                : msg
-            )
-          );
+        }
+        onChatActivity(chatIdForSend);
+        onAiRequestSettled();
+      },
+      onStreamError: (error) => {
+        console.error('Chat stream error:', error);
+        if (activeChatIdRef.current !== chatIdForSend) {
           onAiRequestSettled();
-        },
-        onStreamError: (error) => {
-          console.error('Chat stream error:', error);
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          console.error('Error message:', errorMessage);
-          setThinkingId((id) => (id === aiMsgId ? null : id));
-          setMessages((m) =>
-            m.map((msg) =>
-              msg.id === aiMsgId
-                ? { ...msg, text: `Error: ${errorMessage}`, lines: [`Error: ${errorMessage}`] }
-                : msg
-            )
-          );
-          onAiRequestSettled();
-        },
-      }
-    );
-  }, [input, limitReached, onAiRequestSettled, session?.id]);
+          return;
+        }
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        setThinkingId((id) => (id === aiMsgId ? null : id));
+        setMessages((current) =>
+          current.map((message) =>
+            message.id === aiMsgId
+              ? { ...message, text: `Error: ${errorMessage}`, lines: [`Error: ${errorMessage}`] }
+              : message,
+          ),
+        );
+        onAiRequestSettled();
+      },
+    });
+  }, [input, limitReached, onAiRequestSettled, onChatActivity, onCreateChat, session?.id]);
 
   const toggleMic = useCallback(() => setMicOn((v) => !v), []);
 
   return (
     <div className="ds-view ds-view-chat">
+      <div className="ds-chat-layout">
+        <aside className="ds-chat-rail" aria-label="Chats">
+          <button type="button" className="ds-chat-new" onClick={onStartNewChat}>
+            <Plus size={14} strokeWidth={1.8} />
+            <span>New chat</span>
+          </button>
+          <div className="ds-chat-list">
+            {activeChatId === null && (
+              <div className="ds-chat-row is-active is-draft">
+                <Plus size={13} strokeWidth={1.8} />
+                <span>New chat</span>
+              </div>
+            )}
+            {chats.map((chat) => (
+              <ChatListRow
+                key={chat.id}
+                chat={chat}
+                active={chat.id === activeChatId}
+                onSelect={onSelectChat}
+                onRename={onRenameChat}
+                onDelete={onDeleteChat}
+              />
+            ))}
+          </div>
+        </aside>
+
+        <section className="ds-chat-main">
       <div className="ds-context-strip">
         {session && (
           <span className="ds-context-chip ds-chip-accent" onClick={onOpenSession} role="button" tabIndex={0}>
@@ -1307,7 +1507,7 @@ const ChatView = memo(function ChatView({
       </div>
 
       <div className="ds-messages" ref={messagesRef}>
-        {transcriptLoading && messages.length === 0 ? (
+        {historyLoading && messages.length === 0 ? (
           <div className="ds-state ds-state-loading ds-state-inline">
             <span className="ds-state-spinner" aria-hidden="true" />
             <p>Loading conversation…</p>
@@ -1394,6 +1594,108 @@ const ChatView = memo(function ChatView({
           )}
         </p>
       </div>
+        </section>
+      </div>
+    </div>
+  );
+});
+
+const ChatListRow = memo(function ChatListRow({
+  chat,
+  active,
+  onSelect,
+  onRename,
+  onDelete,
+}: {
+  chat: DashboardChat;
+  active: boolean;
+  onSelect: (chatId: string) => void;
+  onRename: (chatId: string, title: string) => void;
+  onDelete: (chatId: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState(chat.title);
+
+  useEffect(() => {
+    if (!editing) setTitle(chat.title);
+  }, [chat.title, editing]);
+
+  const commitRename = useCallback(() => {
+    const nextTitle = title.trim() || chat.title;
+    setEditing(false);
+    if (nextTitle !== chat.title) onRename(chat.id, nextTitle);
+  }, [chat.id, chat.title, onRename, title]);
+
+  const cancelRename = useCallback(() => {
+    setTitle(chat.title);
+    setEditing(false);
+  }, [chat.title]);
+
+  return (
+    <div
+      className={`ds-chat-row ${active ? 'is-active' : ''}`}
+      role="button"
+      tabIndex={0}
+      onClick={() => onSelect(chat.id)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onSelect(chat.id);
+        }
+      }}
+    >
+      {chat.session_id && <ScrollText className="ds-chat-session-glyph" size={13} strokeWidth={1.8} />}
+      {editing ? (
+        <input
+          className="ds-chat-rename-input"
+          value={title}
+          autoFocus
+          aria-label="Chat title"
+          onChange={(event) => setTitle(event.target.value)}
+          onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => {
+            event.stopPropagation();
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              commitRename();
+            } else if (event.key === 'Escape') {
+              event.preventDefault();
+              cancelRename();
+            }
+          }}
+          onBlur={commitRename}
+        />
+      ) : (
+        <span className="ds-chat-title">{chat.title}</span>
+      )}
+      {!editing && (
+        <span className="ds-chat-actions">
+          <button
+            type="button"
+            className="ds-chat-action"
+            aria-label={`Rename ${chat.title}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              setEditing(true);
+            }}
+            onKeyDown={(event) => event.stopPropagation()}
+          >
+            <MoreHorizontal size={14} strokeWidth={1.8} />
+          </button>
+          <button
+            type="button"
+            className="ds-chat-action"
+            aria-label={`Delete ${chat.title}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              if (window.confirm(`Delete “${chat.title}”? This cannot be undone.`)) onDelete(chat.id);
+            }}
+            onKeyDown={(event) => event.stopPropagation()}
+          >
+            <span aria-hidden="true">×</span>
+          </button>
+        </span>
+      )}
     </div>
   );
 });
