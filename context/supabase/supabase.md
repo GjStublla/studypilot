@@ -77,6 +77,7 @@ Chrome/Edge Extension
     │   ├── sessions
     │   ├── session_messages
     │   ├── action_items
+    │   ├── dashboard_chats
     │   ├── dashboard_chat_messages
     │   └── activity_logs
     │
@@ -441,10 +442,26 @@ BEFORE UPDATE ON public.action_items
 FOR EACH ROW
 EXECUTE FUNCTION trigger_set_timestamp();
 
--- Dashboard follow-up chat
+-- Dashboard chat conversations
+CREATE TABLE public.dashboard_chats (
+    id UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    session_id UUID REFERENCES public.sessions(id) ON DELETE SET NULL,
+    title TEXT NOT NULL DEFAULT 'New chat',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TRIGGER set_timestamp_dashboard_chats
+BEFORE UPDATE ON public.dashboard_chats
+FOR EACH ROW
+EXECUTE FUNCTION trigger_set_timestamp();
+
+-- Dashboard chat messages. `chat_id` is nullable only for legacy rows.
 CREATE TABLE public.dashboard_chat_messages (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    chat_id UUID REFERENCES public.dashboard_chats(id) ON DELETE CASCADE,
     session_id UUID REFERENCES public.sessions(id) ON DELETE CASCADE,
     role TEXT NOT NULL CHECK (role IN ('user', 'ai', 'system')),
     text TEXT NOT NULL,
@@ -479,12 +496,30 @@ CREATE INDEX idx_sessions_user ON public.sessions(user_id);
 CREATE INDEX idx_action_items_user ON public.action_items(user_id);
 CREATE INDEX idx_session_messages_session ON public.session_messages(session_id);
 CREATE INDEX idx_activity_logs_user ON public.activity_logs(user_id);
+CREATE INDEX idx_dashboard_chats_user_updated ON public.dashboard_chats(user_id, updated_at DESC);
 CREATE INDEX idx_chat_messages_session ON public.dashboard_chat_messages(session_id);
+CREATE INDEX idx_chat_messages_chat ON public.dashboard_chat_messages(chat_id);
 CREATE INDEX idx_rubric_criteria_rubric ON public.rubric_criteria(rubric_id);
 CREATE INDEX idx_knowledge_documents_user ON public.knowledge_documents(user_id);
 CREATE INDEX idx_knowledge_documents_rubric ON public.knowledge_documents(rubric_id);
 CREATE INDEX idx_knowledge_documents_status ON public.knowledge_documents(index_status);
 CREATE INDEX idx_knowledge_documents_store ON public.knowledge_documents(gemini_file_search_store_name);
+
+-- Keep conversations ordered by message activity.
+CREATE OR REPLACE FUNCTION public.touch_dashboard_chat()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE public.dashboard_chats SET updated_at = NOW() WHERE id = NEW.chat_id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog;
+
+REVOKE EXECUTE ON FUNCTION public.touch_dashboard_chat() FROM PUBLIC, anon, authenticated;
+
+CREATE TRIGGER touch_dashboard_chat_on_message
+AFTER INSERT ON public.dashboard_chat_messages
+FOR EACH ROW WHEN (NEW.chat_id IS NOT NULL)
+EXECUTE FUNCTION public.touch_dashboard_chat();
 ```
 
 ---
@@ -570,6 +605,7 @@ ALTER TABLE public.knowledge_documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.session_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.action_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.dashboard_chats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.dashboard_chat_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
 ```
@@ -674,12 +710,30 @@ ON public.action_items FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "Students can delete their checklist tasks"
 ON public.action_items FOR DELETE USING (auth.uid() = user_id);
 
--- Dashboard chat
+-- Dashboard chats
+CREATE POLICY "Students can view their own dashboard chats"
+ON public.dashboard_chats FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Students can create their own dashboard chats"
+ON public.dashboard_chats FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Students can update their own dashboard chats"
+ON public.dashboard_chats FOR UPDATE
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Students can delete their own dashboard chats"
+ON public.dashboard_chats FOR DELETE USING (auth.uid() = user_id);
+
+-- Dashboard chat messages
 CREATE POLICY "Students can view dashboard follow-up chat histories"
 ON public.dashboard_chat_messages FOR SELECT USING (auth.uid() = user_id);
 
 CREATE POLICY "Students can post messages to dashboard follow-up chats"
 ON public.dashboard_chat_messages FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Students can delete their own dashboard follow-up chat messages"
+ON public.dashboard_chat_messages FOR DELETE USING (auth.uid() = user_id);
 
 -- Activity logs
 CREATE POLICY "Students can view their recent action logs feed"
@@ -1023,10 +1077,16 @@ Input:
 
 ```json
 {
-  "sessionId": "uuid",
+  "chatId": "uuid",
   "userMessage": "What should I revise first?"
 }
 ```
+
+`chatId` is optional for backward compatibility. When present, the function
+loads `dashboard_chats.id = chatId` for the authenticated user, returns 404 if
+it does not exist, and uses that row's `session_id` instead of any body
+`sessionId`. New dashboard clients send `chatId` only. Old clients may continue
+to send `sessionId` without `chatId`.
 
 Output:
 
@@ -1049,6 +1109,15 @@ Context loaded from Supabase:
 - recent dashboard_chat_messages
 - profiles.gemini_file_search_store_name
 - indexed knowledge_documents
+```
+
+Chat-memory scoping rules:
+
+```text
+- With chatId: query only dashboard_chat_messages.chat_id = chatId.
+- Without chatId and with sessionId: query session_id = sessionId and chat_id IS NULL.
+- Without either: query only chat_id IS NULL.
+- Existing nullable chat_id rows are legacy history. They are never included in a chat-scoped request.
 ```
 
 Gemini call should use:

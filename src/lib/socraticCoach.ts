@@ -59,7 +59,7 @@ async function getAuthToken(): Promise<string> {
  * Calls onStreamError if anything goes wrong.
  */
 export async function sendCoachingMessage(
-  sessionId: string | undefined,
+  chatId: string,
   userMessageText: string,
   callbacks: SocraticCoachCallbacks,
 ): Promise<void> {
@@ -78,7 +78,7 @@ export async function sendCoachingMessage(
           apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({
-          sessionId,
+          chatId,
           userMessage: userMessageText,
         }),
       },
@@ -144,14 +144,14 @@ export async function sendCoachingMessage(
  * Useful for non-streaming contexts that still want the complete text.
  */
 export async function streamCoachingResponse(
-  sessionId: string | undefined,
+  chatId: string,
   userMessageText: string,
   onToken: (token: string) => void,
 ): Promise<string> {
   let fullResponse = '';
 
   await new Promise<void>((resolve, reject) => {
-    sendCoachingMessage(sessionId, userMessageText, {
+    sendCoachingMessage(chatId, userMessageText, {
       onTokenReceived: (token) => {
         fullResponse += token;
         onToken(token);
