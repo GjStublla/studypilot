@@ -19,7 +19,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4"
-import { consumeAiRequest, limitReachedMessage } from "../shared/ai-usage.ts"
+import { consumeAiRequest, limitReachedMessage, QUOTA_UNAVAILABLE_MESSAGE } from "../shared/ai-usage.ts"
 import { createGeminiInteraction, describeGeminiError, getGeminiTextModel } from "../shared/gemini.ts"
 
 const MAX_HISTORY_TURNS = 20
@@ -254,9 +254,15 @@ serve(async (req) => {
   }
 
   const aiUsage = await consumeAiRequest(db, userId)
-  if (!aiUsage.allowed) {
+  if (aiUsage.status === "unavailable") {
     return new Response(
-      JSON.stringify({ error: limitReachedMessage(aiUsage) }),
+      JSON.stringify({ error: QUOTA_UNAVAILABLE_MESSAGE }),
+      { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    )
+  }
+  if (!aiUsage.usage.allowed) {
+    return new Response(
+      JSON.stringify({ error: limitReachedMessage(aiUsage.usage) }),
       { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   }

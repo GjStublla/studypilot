@@ -1,0 +1,42 @@
+# StudyPilot Supabase local/project config.
+# Keep verify_jwt enabled for every deployed Edge Function.
+
+project_id = "rqszloxxegvxaedptcqj"
+
+[api]
+enabled = true
+
+[db]
+port = 54322
+major_version = 17
+
+[studio]
+enabled = true
+
+[auth]
+enabled = true
+
+[functions.live-token]
+verify_jwt = true
+
+[functions.ensure-file-search-store]
+verify_jwt = true
+
+[functions.extract-rubric]
+verify_jwt = true
+
+[functions.index-knowledge-document]
+verify_jwt = true
+
+[functions.socratic-coach]
+verify_jwt = true
+
+[functions.summarize-session]
+verify_jwt = true
+
+[functions.delete-knowledge-document]
+verify_jwt = true
+
+[analytics]
+enabled = false
+

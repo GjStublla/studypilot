@@ -1229,7 +1229,7 @@ function titleFromFirstMessage(text: string): string {
   return text.replace(/\s+/g, ' ').trim().slice(0, 40) || 'New chat';
 }
 
-const ChatView = memo(function ChatView({
+export const ChatView = memo(function ChatView({
   student,
   activeRubric,
   session,
@@ -1263,15 +1263,39 @@ const ChatView = memo(function ChatView({
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [micOn, setMicOn] = useState(false);
-  // Id of the AI placeholder message that is still waiting for its first
-  // streamed token — that bubble renders a "thinking" indicator.
-  const [thinkingId, setThinkingId] = useState<string | null>(null);
+  // Per-chat id of the AI placeholder still waiting for its first streamed token.
+  const [thinkingByChatId, setThinkingByChatId] = useState<Record<string, string | null>>({});
+  const [inFlightChatIds, setInFlightChatIds] = useState<Set<string>>(() => new Set());
+  const inFlightChatIdsRef = useRef<Set<string>>(new Set());
+  const [draftCreating, setDraftCreating] = useState(false);
+  const draftCreatingRef = useRef(false);
   const limitReached = aiUsage !== null && aiUsage.used >= aiUsage.limit;
   const remainingRequests = aiUsage === null ? null : Math.max(aiUsage.limit - aiUsage.used, 0);
+  const activeChatBusy = activeChatId
+    ? inFlightChatIds.has(activeChatId)
+    : draftCreating;
+  const composerDisabled = limitReached || activeChatBusy;
+  const activeThinkingId = activeChatId ? thinkingByChatId[activeChatId] ?? null : null;
   const [historyLoading, setHistoryLoading] = useState(false);
   const activeChatIdRef = useRef<string | null>(activeChatId);
   const suppressNextHistoryLoadRef = useRef<string | null>(null);
   const historyLoadVersionRef = useRef(0);
+
+  const markChatInFlight = useCallback((chatId: string) => {
+    inFlightChatIdsRef.current.add(chatId);
+    setInFlightChatIds(new Set(inFlightChatIdsRef.current));
+  }, []);
+
+  const clearChatInFlight = useCallback((chatId: string) => {
+    inFlightChatIdsRef.current.delete(chatId);
+    setInFlightChatIds(new Set(inFlightChatIdsRef.current));
+    setThinkingByChatId((current) => {
+      if (!(chatId in current)) return current;
+      const next = { ...current };
+      delete next[chatId];
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     activeChatIdRef.current = activeChatId;
@@ -1368,19 +1392,30 @@ const ChatView = memo(function ChatView({
     if (!value) return;
 
     let chatIdForSend = activeChatIdRef.current;
+
     if (!chatIdForSend) {
+      if (draftCreatingRef.current) return;
+      draftCreatingRef.current = true;
+      setDraftCreating(true);
       try {
         const chat = await onCreateChat(titleFromFirstMessage(value), session?.id ?? null);
         chatIdForSend = chat.id;
         suppressNextHistoryLoadRef.current = chat.id;
         activeChatIdRef.current = chat.id;
+        markChatInFlight(chatIdForSend);
       } catch (error) {
         console.error('Failed to create chat:', error);
         return;
+      } finally {
+        draftCreatingRef.current = false;
+        setDraftCreating(false);
       }
+    } else {
+      if (inFlightChatIdsRef.current.has(chatIdForSend)) return;
+      markChatInFlight(chatIdForSend);
     }
 
-    if (activeChatIdRef.current !== chatIdForSend) return;
+    if (!chatIdForSend) return;
 
     historyLoadVersionRef.current += 1;
 
@@ -1398,27 +1433,26 @@ const ChatView = memo(function ChatView({
       text: '',
       time: now,
     });
-    setMessages((current) => [...current, userMsg, aiMsg]);
-    setThinkingId(aiMsgId);
-    setInput('');
+
+    if (activeChatIdRef.current === chatIdForSend) {
+      setMessages((current) => [...current, userMsg, aiMsg]);
+      setInput('');
+    } else {
+      setInput('');
+    }
+    setThinkingByChatId((current) => ({ ...current, [chatIdForSend]: aiMsgId }));
 
     let accumulatedText = '';
-    await sendCoachingMessage(chatIdForSend, value, {
-      onTokenReceived: (token) => {
-        accumulatedText += token;
-        if (activeChatIdRef.current !== chatIdForSend) return;
-        setThinkingId((id) => (id === aiMsgId ? null : id));
-        setMessages((current) =>
-          current.map((message) =>
-            message.id === aiMsgId
-              ? { ...message, text: accumulatedText, lines: accumulatedText.split('\n') }
-              : message,
-          ),
-        );
-      },
-      onStreamComplete: () => {
-        if (activeChatIdRef.current === chatIdForSend) {
-          setThinkingId((id) => (id === aiMsgId ? null : id));
+    try {
+      await sendCoachingMessage(chatIdForSend, value, {
+        onTokenReceived: (token) => {
+          accumulatedText += token;
+          if (activeChatIdRef.current !== chatIdForSend) return;
+          setThinkingByChatId((current) =>
+            current[chatIdForSend] === aiMsgId
+              ? { ...current, [chatIdForSend]: null }
+              : current,
+          );
           setMessages((current) =>
             current.map((message) =>
               message.id === aiMsgId
@@ -1426,18 +1460,51 @@ const ChatView = memo(function ChatView({
                 : message,
             ),
           );
-        }
-        onChatActivity(chatIdForSend);
-        onAiRequestSettled();
-      },
-      onStreamError: (error) => {
-        console.error('Chat stream error:', error);
-        if (activeChatIdRef.current !== chatIdForSend) {
-          onAiRequestSettled();
-          return;
-        }
+        },
+        onStreamComplete: () => {
+          if (activeChatIdRef.current === chatIdForSend) {
+            setThinkingByChatId((current) =>
+              current[chatIdForSend] === aiMsgId
+                ? { ...current, [chatIdForSend]: null }
+                : current,
+            );
+            setMessages((current) =>
+              current.map((message) =>
+                message.id === aiMsgId
+                  ? { ...message, text: accumulatedText, lines: accumulatedText.split('\n') }
+                  : message,
+              ),
+            );
+          }
+          onChatActivity(chatIdForSend);
+        },
+        onStreamError: (error) => {
+          console.error('Chat stream error:', error);
+          if (activeChatIdRef.current !== chatIdForSend) return;
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          setThinkingByChatId((current) =>
+            current[chatIdForSend] === aiMsgId
+              ? { ...current, [chatIdForSend]: null }
+              : current,
+          );
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === aiMsgId
+                ? { ...message, text: `Error: ${errorMessage}`, lines: [`Error: ${errorMessage}`] }
+                : message,
+            ),
+          );
+        },
+      });
+    } catch (error) {
+      console.error('Unexpected chat send failure:', error);
+      if (activeChatIdRef.current === chatIdForSend) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        setThinkingId((id) => (id === aiMsgId ? null : id));
+        setThinkingByChatId((current) =>
+          current[chatIdForSend] === aiMsgId
+            ? { ...current, [chatIdForSend]: null }
+            : current,
+        );
         setMessages((current) =>
           current.map((message) =>
             message.id === aiMsgId
@@ -1445,10 +1512,21 @@ const ChatView = memo(function ChatView({
               : message,
           ),
         );
-        onAiRequestSettled();
-      },
-    });
-  }, [input, limitReached, onAiRequestSettled, onChatActivity, onCreateChat, session?.id]);
+      }
+    } finally {
+      clearChatInFlight(chatIdForSend);
+      onAiRequestSettled();
+    }
+  }, [
+    clearChatInFlight,
+    input,
+    limitReached,
+    markChatInFlight,
+    onAiRequestSettled,
+    onChatActivity,
+    onCreateChat,
+    session?.id,
+  ]);
 
   const toggleMic = useCallback(() => setMicOn((v) => !v), []);
 
@@ -1519,7 +1597,7 @@ const ChatView = memo(function ChatView({
           />
         ) : (
           messages.map((m) => (
-            <MessageBubble key={m.id} message={m} student={student} thinking={m.id === thinkingId} />
+            <MessageBubble key={m.id} message={m} student={student} thinking={m.id === activeThinkingId} />
           ))
         )}
       </div>
@@ -1532,7 +1610,7 @@ const ChatView = memo(function ChatView({
               type="button"
               className="ds-quick-prompt"
               onClick={() => send(p)}
-              disabled={limitReached}
+              disabled={composerDisabled}
             >
               <Sparkles size={11} strokeWidth={1.7} />
               <span>{p}</span>
@@ -1542,6 +1620,8 @@ const ChatView = memo(function ChatView({
 
         <form
           className="ds-composer"
+          role="form"
+          aria-busy={activeChatBusy}
           onSubmit={(e) => {
             e.preventDefault();
             send();
@@ -1574,7 +1654,7 @@ const ChatView = memo(function ChatView({
           <button
             type="submit"
             className="ds-send"
-            disabled={limitReached || !input.trim()}
+            disabled={composerDisabled || !input.trim()}
             aria-label="Send"
           >
             <ArrowUp size={14} strokeWidth={2} />
