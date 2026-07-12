@@ -87,3 +87,9 @@ pip-wheel-metadata/
 # Supabase CLI local state (project ref, org id, pooler URL — not for version control)
 supabase/.temp/
 supabase/.branches/
+
+deno.lock
+
+
+tmp/
+

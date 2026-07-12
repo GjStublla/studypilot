@@ -318,9 +318,11 @@ FOR EACH ROW
 EXECUTE FUNCTION trigger_set_timestamp();
 
 -- Shared daily AI request usage. One row per user per UTC day.
+-- user_id references auth.users so usage can be recorded even if a profile
+-- row is missing. Day boundaries use UTC via (now() at time zone 'utc')::date.
 CREATE TABLE public.ai_usage (
-    user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-    usage_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    usage_date DATE NOT NULL DEFAULT ((now() at time zone 'utc')::date),
     request_count INTEGER NOT NULL DEFAULT 0,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     PRIMARY KEY (user_id, usage_date)
@@ -534,7 +536,7 @@ EXECUTE FUNCTION public.touch_dashboard_chat();
 -- AI usage RPCs
 -- consume_ai_request atomically reserves one request from a user's shared
 -- daily AI pool. The conditional conflict update prevents concurrent callers
--- from exceeding profiles.ai_daily_limit.
+-- from exceeding profiles.ai_daily_limit. Day keys use UTC.
 CREATE OR REPLACE FUNCTION public.consume_ai_request(p_user_id UUID)
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -545,6 +547,7 @@ DECLARE
   v_limit INTEGER;
   v_used INTEGER;
   v_count INTEGER;
+  v_today DATE := (now() at time zone 'utc')::date;
 BEGIN
   SELECT COALESCE(
     (
@@ -560,7 +563,7 @@ BEGIN
       SELECT ai_usage.request_count
       FROM public.ai_usage
       WHERE ai_usage.user_id = p_user_id
-        AND ai_usage.usage_date = CURRENT_DATE
+        AND ai_usage.usage_date = v_today
     ),
     0
   ) INTO v_used;
@@ -570,7 +573,7 @@ BEGIN
   END IF;
 
   INSERT INTO public.ai_usage (user_id, usage_date, request_count)
-  VALUES (p_user_id, CURRENT_DATE, 1)
+  VALUES (p_user_id, v_today, 1)
   ON CONFLICT (user_id, usage_date) DO UPDATE
     SET request_count = ai_usage.request_count + 1,
         updated_at = NOW()
@@ -583,7 +586,7 @@ BEGIN
         SELECT ai_usage.request_count
         FROM public.ai_usage
         WHERE ai_usage.user_id = p_user_id
-          AND ai_usage.usage_date = CURRENT_DATE
+          AND ai_usage.usage_date = v_today
       ),
       0
     ) INTO v_used;
@@ -595,20 +598,25 @@ BEGIN
 END;
 $$;
 
--- get_ai_usage is callable by the signed-in browser and uses auth.uid() to
--- return only the current user's count and configured limit.
+-- get_ai_usage is SECURITY INVOKER so reads honor caller RLS. It uses
+-- auth.uid() to return only the current user's count and configured limit.
 CREATE OR REPLACE FUNCTION public.get_ai_usage()
 RETURNS JSONB
 LANGUAGE plpgsql
 STABLE
-SECURITY DEFINER
+SECURITY INVOKER
 SET search_path = public
 AS $$
 DECLARE
   v_user_id UUID := auth.uid();
   v_limit INTEGER;
   v_used INTEGER;
+  v_today DATE := (now() at time zone 'utc')::date;
 BEGIN
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated' USING ERRCODE = '42501';
+  END IF;
+
   SELECT COALESCE(
     (
       SELECT profiles.ai_daily_limit
@@ -623,7 +631,7 @@ BEGIN
       SELECT ai_usage.request_count
       FROM public.ai_usage
       WHERE ai_usage.user_id = v_user_id
-        AND ai_usage.usage_date = CURRENT_DATE
+        AND ai_usage.usage_date = v_today
     ),
     0
   ) INTO v_used;
@@ -866,7 +874,7 @@ ON public.activity_logs FOR INSERT WITH CHECK (auth.uid() = user_id);
 REVOKE EXECUTE ON FUNCTION public.consume_ai_request(UUID) FROM public, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.consume_ai_request(UUID) TO service_role;
 
-REVOKE EXECUTE ON FUNCTION public.get_ai_usage() FROM public, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.get_ai_usage() FROM public, anon;
 GRANT EXECUTE ON FUNCTION public.get_ai_usage() TO authenticated;
 ```
 
