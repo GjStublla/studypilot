@@ -23,6 +23,7 @@ import { Button } from './components/ui/button';
 import GradientBlinds from './components/GradientBlinds';
 import AuthPage from './components/AuthPage';
 import { clearAuth, storeAuth, apiFetch, type AuthTokens } from './lib/api';
+import { AUTH_REQUIRED } from './lib/authConfig';
 import { supabase } from './lib/supabase';
 import './components/AuthPage.css';
 
@@ -201,10 +202,9 @@ function App() {
   // Render nothing while the async session exchange completes
   if (isSupabaseCallback) return null;
 
-  // Block dashboard access if not logged in
+  // Block dashboard access if not logged in (skipped while AUTH_REQUIRED is false in dev)
   if (isDashboard) {
-    if (!user) {
-      // Redirect to auth
+    if (AUTH_REQUIRED && !user) {
       window.location.hash = '#auth';
       return null;
     }

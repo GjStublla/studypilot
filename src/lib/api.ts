@@ -7,6 +7,8 @@
 // but need backend cookie + CSRF work; that's a deliberate post-beta follow-up.
 // See context/backend.md.
 
+import { AUTH_REQUIRED } from './authConfig';
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 if (!import.meta.env.VITE_API_BASE_URL) {
@@ -72,6 +74,10 @@ export function clearAuth(): void {
 }
 
 function redirectToAuth(): void {
+  // During local/dev with AUTH_REQUIRED=false, keep the dashboard usable
+  // even when API calls return 401 (no session yet).
+  if (!AUTH_REQUIRED) return;
+
   clearAuth();
   if (typeof window !== 'undefined') {
     window.location.hash = '#auth';

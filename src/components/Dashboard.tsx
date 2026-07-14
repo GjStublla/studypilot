@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentType, MouseEvent, ReactNode, SVGProps } from 'react';
 import { clearAuth, apiFetch } from '../lib/api';
+import { AUTH_REQUIRED } from '../lib/authConfig';
 import { supabase } from '../lib/supabaseClient';
 import {
   fetchSessions,
@@ -345,7 +346,12 @@ export default function Dashboard() {
           setChats(c.value);
           setActiveChatId(c.value[0]?.id ?? null);
         }
-        if (s.status === 'rejected' && r.status === 'rejected' && a.status === 'rejected') {
+        if (
+          AUTH_REQUIRED &&
+          s.status === 'rejected' &&
+          r.status === 'rejected' &&
+          a.status === 'rejected'
+        ) {
           setLoadError(true);
         }
       })
@@ -640,7 +646,7 @@ export default function Dashboard() {
   }, []);
   const signOut = useCallback(() => {
     clearAuth();
-    window.location.hash = '#auth';
+    window.location.hash = AUTH_REQUIRED ? '#auth' : '#dashboard';
   }, []);
 
   return (
