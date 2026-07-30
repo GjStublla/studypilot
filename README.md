@@ -2,6 +2,55 @@
 
 An elegant, modern study assistant designed to elevate your learning experience. Built with React, TypeScript, and Vite.
 
+## Local full-stack development
+
+The explicit local mode uses the Supabase CLI stack, creates a disposable
+`dev@studypilot.local` user automatically, and bypasses AI request counting
+inside local Edge Functions. Production builds still require login and enforce
+the hosted daily limit.
+
+### Prerequisites
+
+- Node.js 22 or later
+- Docker Desktop
+- Gemini service-account credentials for real local AI responses
+
+Install dependencies and start local Supabase:
+
+```bash
+npm install
+npm run local:start
+npm run local:status
+```
+
+The repository tracks `.env.studypilot-local` with the standard public local
+Supabase URL and anon key, so no frontend secret setup is required. Use
+`npm run local:status` when you need to inspect the running service URLs.
+
+For real Gemini calls, copy
+[`supabase/functions/.env.local.example`](supabase/functions/.env.local.example)
+to `supabase/functions/.env.local` and fill in the service-account values. The
+tracked example enables the AI-usage bypass, but the server also verifies that
+it is running against a local Supabase hostname before honoring it.
+
+Run the functions and dashboard in separate terminals:
+
+```bash
+npm run local:functions
+npm run dev:local
+```
+
+Open `http://127.0.0.1:5173/#dashboard`. No login form is required: the
+dashboard signs in or creates the deterministic local developer account before
+rendering data. The normal `npm run dev` and `npm run build` commands do not
+enable this behavior.
+
+Stop the local services with:
+
+```bash
+npm run local:stop
+```
+
 ## Running with Docker
 
 The whole stack (React frontend + FastAPI backend) runs in Docker and talks to hosted Supabase. Node and Python run inside the containers, so the only tool you need locally is Docker.

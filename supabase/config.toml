@@ -15,6 +15,12 @@ enabled = true
 
 [auth]
 enabled = true
+site_url = "http://127.0.0.1:5173"
+additional_redirect_urls = ["http://127.0.0.1:5173/**", "http://localhost:5173/**"]
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false
 
 [functions.live-token]
 verify_jwt = true

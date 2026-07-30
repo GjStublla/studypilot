@@ -5,11 +5,16 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "dev:local": "vite --host 127.0.0.1 --mode studypilot-local",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:deno": "npx --yes deno@2.1.4 test supabase/functions/shared/ai-usage_test.ts",
+    "local:start": "supabase start",
+    "local:stop": "supabase stop",
+    "local:status": "supabase status -o env",
+    "local:functions": "supabase functions serve --env-file supabase/functions/.env.local",
     "backend": "cd backend && python -m uvicorn main:app --reload",
     "docker:dev": "docker compose up --build",
     "docker:prod": "docker compose -f docker-compose.prod.yml up --build -d",
@@ -24,7 +29,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "typescript": "^5.9.3",
-    "vite": "^7.2.6"
+    "vite": "7.3.6"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
@@ -33,6 +38,7 @@
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
     "jsdom": "^29.1.1",
+    "supabase": "2.110.0",
     "vitest": "^4.1.10"
   }
 }

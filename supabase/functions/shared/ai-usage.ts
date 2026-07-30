@@ -18,6 +18,42 @@ export interface AiUsageDbClient {
 export const QUOTA_UNAVAILABLE_MESSAGE =
   "AI usage tracking is temporarily unavailable. Please try again in a moment."
 
+interface AiUsageEnvironment {
+  disabled?: string
+  supabaseUrl?: string
+}
+
+const LOCAL_SUPABASE_HOSTS = new Set([
+  "127.0.0.1",
+  "localhost",
+  "::1",
+  "[::1]",
+  "kong",
+  "host.docker.internal",
+])
+
+export function shouldBypassAiUsageLimits(environment: AiUsageEnvironment): boolean {
+  if (environment.disabled !== "true" || !environment.supabaseUrl) return false
+
+  try {
+    const url = new URL(environment.supabaseUrl)
+    return url.protocol === "http:" && LOCAL_SUPABASE_HOSTS.has(url.hostname)
+  } catch {
+    return false
+  }
+}
+
+function localAiUsageLimitsDisabled(): boolean {
+  try {
+    return shouldBypassAiUsageLimits({
+      disabled: Deno.env.get("AI_USAGE_LIMITS_DISABLED"),
+      supabaseUrl: Deno.env.get("SUPABASE_URL"),
+    })
+  } catch {
+    return false
+  }
+}
+
 function isAiUsageResult(value: unknown): value is AiUsageResult {
   if (!value || typeof value !== "object") return false
 
@@ -36,6 +72,13 @@ export async function consumeAiRequest(
   db: AiUsageDbClient,
   userId: string,
 ): Promise<ConsumeAiRequestResult> {
+  if (localAiUsageLimitsDisabled()) {
+    return {
+      status: "available",
+      usage: { allowed: true, used: 0, limit: 50 },
+    }
+  }
+
   try {
     const { data, error } = await db.rpc("consume_ai_request", { p_user_id: userId })
 
