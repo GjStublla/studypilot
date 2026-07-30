@@ -6,6 +6,7 @@ import {
   consumeAiRequest,
   limitReachedMessage,
   QUOTA_UNAVAILABLE_MESSAGE,
+  shouldBypassAiUsageLimits,
   type AiUsageDbClient,
   type AiUsageResult,
 } from "./ai-usage.ts"
@@ -22,6 +23,37 @@ function fakeDb(result: RpcResult | (() => RpcResult) | (() => never)): AiUsageD
     },
   }
 }
+
+Deno.test("local AI usage bypass requires an explicit flag and a local runtime", () => {
+  assertEquals(
+    shouldBypassAiUsageLimits({
+      disabled: "true",
+      supabaseUrl: "http://127.0.0.1:54321",
+    }),
+    true,
+  )
+  assertEquals(
+    shouldBypassAiUsageLimits({
+      disabled: "true",
+      supabaseUrl: "http://kong:8000",
+    }),
+    true,
+  )
+  assertEquals(
+    shouldBypassAiUsageLimits({
+      disabled: "true",
+      supabaseUrl: "https://project.supabase.co",
+    }),
+    false,
+  )
+  assertEquals(
+    shouldBypassAiUsageLimits({
+      disabled: "false",
+      supabaseUrl: "http://127.0.0.1:54321",
+    }),
+    false,
+  )
+})
 
 Deno.test("consumeAiRequest returns available when allowed", async () => {
   const usage: AiUsageResult = { allowed: true, used: 3, limit: 50 }

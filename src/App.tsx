@@ -24,6 +24,8 @@ import GradientBlinds from './components/GradientBlinds';
 import AuthPage from './components/AuthPage';
 import { clearAuth, storeAuth, apiFetch, type AuthTokens } from './lib/api';
 import { AUTH_REQUIRED } from './lib/authConfig';
+import { LOCAL_DEV_MODE } from './lib/localDev';
+import { ensureLocalDevAuth } from './lib/localDevAuth';
 import { supabase } from './lib/supabase';
 import './components/AuthPage.css';
 
@@ -139,6 +141,31 @@ function getStoredUser() {
 function App() {
   const [hash, setHash] = useState(() => (typeof window !== 'undefined' ? window.location.hash : ''));
   const [user, setUser] = useState(() => getStoredUser());
+  const [localDevAuthReady, setLocalDevAuthReady] = useState(!LOCAL_DEV_MODE);
+  const [localDevAuthError, setLocalDevAuthError] = useState('');
+
+  useEffect(() => {
+    if (!LOCAL_DEV_MODE) return;
+
+    let cancelled = false;
+    ensureLocalDevAuth()
+      .then(() => {
+        if (cancelled) return;
+        setUser(getStoredUser());
+        setLocalDevAuthReady(true);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        const detail = error instanceof Error ? error.message : String(error);
+        setLocalDevAuthError(
+          `Could not connect to local Supabase: ${detail}`,
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Re-read auth state whenever hash changes (e.g. after login redirects to #dashboard)
   useEffect(() => {
@@ -202,7 +229,31 @@ function App() {
   // Render nothing while the async session exchange completes
   if (isSupabaseCallback) return null;
 
-  // Block dashboard access if not logged in (skipped while AUTH_REQUIRED is false in dev)
+  if (LOCAL_DEV_MODE && localDevAuthError) {
+    return (
+      <div className="auth-shell">
+        <div className="auth-bg" aria-hidden="true" />
+        <div className="auth-card">
+          <div className="auth-brand-text">StudyPilot local development</div>
+          <p className="auth-error auth-error--banner" role="alert">
+            {localDevAuthError}
+          </p>
+          <p>
+            Start the local Supabase stack, then reload this page. Local mode
+            never falls back to the hosted project.
+          </p>
+          <button className="auth-submit" type="button" onClick={() => window.location.reload()}>
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!localDevAuthReady) return null;
+
+  // Block dashboard access if not logged in. Explicit local mode has already
+  // created a real local Supabase session before reaching this branch.
   if (isDashboard) {
     if (AUTH_REQUIRED && !user) {
       window.location.hash = '#auth';

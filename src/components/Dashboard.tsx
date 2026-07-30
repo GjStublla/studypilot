@@ -212,6 +212,7 @@ export default function Dashboard() {
   const [aiUsage, setAiUsage] = useState<AiUsage | null>(null);
 
   const refreshAiUsage = useCallback(() => {
+    if (!AUTH_REQUIRED) return;
     getAiUsage().then(setAiUsage).catch(() => {
       // The migration may not be deployed yet; usage UI is optional in that case.
     });
