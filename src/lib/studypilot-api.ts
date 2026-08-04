@@ -112,9 +112,11 @@ export type TranscriptLine = {
 export async function fetchSessionTranscript(sessionId: string): Promise<TranscriptLine[]> {
   const { data, error } = await supabase
     .from('session_messages')
-    .select('id, role, message_text, time_offset_seconds')
+    .select('id, role, message_text, time_offset_seconds, server_sequence')
     .eq('session_id', sessionId)
-    .order('time_offset_seconds', { ascending: true });
+    .order('time_offset_seconds', { ascending: true })
+    .order('server_sequence', { ascending: true })
+    .order('id', { ascending: true });
 
   if (error) throw error;
 
@@ -517,7 +519,8 @@ export async function getDashboardChats(): Promise<DashboardChat[]> {
   const { data, error } = await supabase
     .from('dashboard_chats')
     .select('*')
-    .order('updated_at', { ascending: false });
+    .order('updated_at', { ascending: false })
+    .order('id', { ascending: false });
 
   if (error) throw error;
   return data || [];
@@ -531,12 +534,41 @@ export async function createDashboardChat(
   const userId = await getDashboardChatUserId();
   const { data, error } = await supabase
     .from('dashboard_chats')
-    .insert({ user_id: userId, title, session_id: sessionId ?? null })
+    .insert({
+      user_id: userId,
+      title,
+      session_id: sessionId ?? null,
+      origin_surface: 'dashboard',
+      client_key: null,
+    })
     .select()
     .single();
 
   if (error) throw error;
   return data;
+}
+
+/**
+ * Return the canonical chat linked to a captured session, creating it when
+ * necessary. The RPC derives ownership from auth.uid() and serializes
+ * concurrent dashboard/extension callers in Postgres.
+ */
+export async function getOrCreateSessionChat(
+  sessionId: string,
+  title = 'New chat',
+): Promise<DashboardChat> {
+  await injectStoredToken();
+  const { data, error } = await supabase.rpc('get_or_create_session_chat', {
+    p_session_id: sessionId,
+    p_title: title,
+    p_origin_surface: 'dashboard',
+  });
+
+  if (error) throw error;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new Error('Session chat RPC returned an invalid response');
+  }
+  return data as DashboardChat;
 }
 
 export async function updateDashboardChat(
@@ -571,7 +603,8 @@ export async function getDashboardChatMessages(chatId: string): Promise<Dashboar
     .from('dashboard_chat_messages')
     .select('*')
     .eq('chat_id', chatId)
-    .order('created_at', { ascending: true });
+    .order('server_sequence', { ascending: true })
+    .order('id', { ascending: true });
 
   if (error) throw error;
   return data || [];

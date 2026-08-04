@@ -1,33 +1,26 @@
-// Supabase Realtime hooks for dashboard synchronization.
-//
-// The dashboard updates automatically when:
-// - The Chrome extension imports a new session
-// - A document's indexing status changes
-// - Action items are created, updated, or deleted
-// - Rubric active state changes
+// Supabase Realtime subscriptions are invalidation hints. Consumers refetch
+// canonical rows instead of treating payloads as durable local state.
 
 import { useEffect, useRef } from 'react';
-import { supabase } from './supabaseClient';
-import type { Session, KnowledgeDocument } from './studypilot-types';
+import { injectStoredToken, supabase } from './supabaseClient';
+import type { KnowledgeDocument, Session } from './studypilot-types';
 
-/**
- * Combined hook for all StudyPilot realtime subscriptions.
- *
- * Callbacks are kept in a ref so the Supabase channel is only
- * created/destroyed when userId changes — not on every render.
- * This prevents an infinite re-subscription loop that would occur
- * if an inline object literal were included in the dependency array.
- */
+export interface StudyPilotRealtimeCallbacks {
+  onNewSession?: (session: Session) => void;
+  onSessionChanged?: (payload: any) => void;
+  onSessionMessageChanged?: (payload: any) => void;
+  onDocumentUpdated?: (document: KnowledgeDocument) => void;
+  onActionItemChanged?: (payload: any) => void;
+  onRubricChanged?: (payload: any) => void;
+  onDashboardChatChanged?: (payload: any) => void;
+  onDashboardChatMessageChanged?: (payload: any) => void;
+  onSubscribed?: () => void;
+}
+
 export function useStudyPilotRealtime(
   userId: string | null,
-  callbacks: {
-    onNewSession?: (session: Session) => void;
-    onDocumentUpdated?: (document: KnowledgeDocument) => void;
-    onActionItemChanged?: (payload: any) => void;
-    onRubricChanged?: (payload: any) => void;
-  },
+  callbacks: StudyPilotRealtimeCallbacks,
 ) {
-  // Always call the latest version of the callbacks without re-subscribing.
   const callbacksRef = useRef(callbacks);
   useEffect(() => {
     callbacksRef.current = callbacks;
@@ -36,77 +29,89 @@ export function useStudyPilotRealtime(
   useEffect(() => {
     if (!userId) return;
 
-    const channel = supabase
-      .channel(`studypilot_realtime_${userId}`)
-      // New session imported from the Chrome extension
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'sessions',
-          filter: `user_id=eq.${userId}`,
-        },
-        async (payload) => {
-          if (!callbacksRef.current.onNewSession) return;
-          // Fetch the full row so we have all fields
-          const { data, error } = await supabase
-            .from('sessions')
-            .select('*')
-            .eq('id', payload.new.id)
-            .single();
-          if (!error && data) {
-            callbacksRef.current.onNewSession(data as Session);
+    let cancelled = false;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    void (async () => {
+      await injectStoredToken();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (cancelled) return;
+      if (!session?.access_token) {
+        console.error('[Realtime] Cannot subscribe without an authenticated session');
+        return;
+      }
+
+      await supabase.realtime.setAuth(session.access_token);
+      if (cancelled) return;
+
+      channel = supabase
+        .channel(`studypilot_realtime_${userId}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'sessions', filter: `user_id=eq.${userId}` },
+          async (payload) => {
+            if (!callbacksRef.current.onNewSession) return;
+            const { data, error } = await supabase
+              .from('sessions')
+              .select('*')
+              .eq('id', payload.new.id)
+              .single();
+            if (!error && data) callbacksRef.current.onNewSession(data as Session);
+          },
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'sessions', filter: `user_id=eq.${userId}` },
+          (payload) => callbacksRef.current.onSessionChanged?.(payload),
+        )
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'session_messages' },
+          (payload) => callbacksRef.current.onSessionMessageChanged?.(payload),
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'knowledge_documents', filter: `user_id=eq.${userId}` },
+          (payload) => callbacksRef.current.onDocumentUpdated?.(payload.new as KnowledgeDocument),
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'action_items', filter: `user_id=eq.${userId}` },
+          (payload) => callbacksRef.current.onActionItemChanged?.(payload),
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'rubrics', filter: `user_id=eq.${userId}` },
+          (payload) => callbacksRef.current.onRubricChanged?.(payload),
+        )
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'dashboard_chats', filter: `user_id=eq.${userId}` },
+          (payload) => callbacksRef.current.onDashboardChatChanged?.(payload),
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'dashboard_chats', filter: `user_id=eq.${userId}` },
+          (payload) => callbacksRef.current.onDashboardChatChanged?.(payload),
+        )
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'dashboard_chat_messages', filter: `user_id=eq.${userId}` },
+          (payload) => callbacksRef.current.onDashboardChatMessageChanged?.(payload),
+        )
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') callbacksRef.current.onSubscribed?.();
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            console.error(`[Realtime] Combined subscription ${status.toLowerCase()}`);
           }
-        },
-      )
-      // Knowledge document indexing status changed
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'knowledge_documents',
-          filter: `user_id=eq.${userId}`,
-        },
-        (payload) => {
-          callbacksRef.current.onDocumentUpdated?.(payload.new as KnowledgeDocument);
-        },
-      )
-      // Action item created / updated / deleted
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'action_items',
-          filter: `user_id=eq.${userId}`,
-        },
-        (payload) => {
-          callbacksRef.current.onActionItemChanged?.(payload);
-        },
-      )
-      // Rubric created / updated / deleted
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'rubrics',
-          filter: `user_id=eq.${userId}`,
-        },
-        (payload) => {
-          callbacksRef.current.onRubricChanged?.(payload);
-        },
-      )
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR') {
-          console.error('[Realtime] Combined subscription error');
-        }
-      });
+        });
+    })().catch((error) => {
+      if (!cancelled) console.error('[Realtime] Subscription setup failed', error);
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      cancelled = true;
+      if (channel) void supabase.removeChannel(channel);
     };
-  }, [userId]); // only re-subscribe when the user changes
+  }, [userId]);
 }

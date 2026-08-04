@@ -1,41 +1,48 @@
 /**
- * socratic-coach — Supabase Edge Function
- *
- * Streams a Socratic coaching response from Gemini Flash using the student's
- * session context, active rubric, and chat-scoped recent history.
- *
- * Input (POST body):
- *   { chatId?: string, sessionId?: string, userMessage: string }
- *   `chatId` is verified as owned by the caller and its session is authoritative.
- *
- * Output:
- *   SSE stream: data: {"text":"..."} ... data: [DONE]
- *   On error:   { "error": "..." }
- *
- * Side effects:
- *   - Saves the user message to dashboard_chat_messages
- *   - Saves the full AI response to dashboard_chat_messages on stream complete
+ * Streams Socratic coaching responses while persisting one canonical,
+ * idempotent chat turn shared by the dashboard and browser extension.
  */
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4"
-import { consumeAiRequest, limitReachedMessage, QUOTA_UNAVAILABLE_MESSAGE } from "../shared/ai-usage.ts"
-import { createGeminiInteraction, describeGeminiError, getGeminiTextModel } from "../shared/gemini.ts"
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import {
+  QUOTA_UNAVAILABLE_MESSAGE,
+  shouldBypassAiUsageLimits,
+} from "../shared/ai-usage.ts";
+import {
+  createGeminiInteraction,
+  describeGeminiError,
+  getGeminiTextModel,
+} from "../shared/gemini.ts";
 
-const MAX_HISTORY_TURNS = 20
-const MAX_IMAGES = 2
-const MAX_IMAGE_BASE64_CHARS = 1_500_000
-const ALLOWED_IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
+const MAX_HISTORY_TURNS = 20;
+const MAX_IMAGES = 2;
+const MAX_IMAGE_BASE64_CHARS = 1_500_000;
+const ALLOWED_IMAGE_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+const ORIGIN_SURFACES = new Set(["dashboard", "extension", "legacy"]);
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-}
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
 
-// ─── System prompt ────────────────────────────────────────────────────────────
+const streamHeaders = {
+  ...corsHeaders,
+  "Content-Type": "text/event-stream",
+  "Cache-Control": "no-cache",
+  "Connection": "keep-alive",
+};
 
-const SYSTEM_PROMPT = `You are StudyPilot, a Socratic academic coach. Your role is to help students improve their own work — never to do it for them.
+const SYSTEM_PROMPT =
+  `You are StudyPilot, a Socratic academic coach. Your role is to help students improve their own work — never to do it for them.
 
 WHAT YOU MAY DO:
 - Explain rubric criteria in plain language
@@ -54,497 +61,847 @@ WHAT YOU MUST NOT DO:
 - Ignore academic integrity
 
 When you refuse to write something for the student, offer a guiding question or a structural suggestion instead.
-Example refusal: "I can't write that section for you, but I can help you think through it. What is the main claim you want your reader to walk away believing?"
+Keep responses concise. Prefer questions over lectures. When the student is on the right track, say so briefly and push them one step further.`;
 
-Keep responses concise. Prefer questions over lectures. When the student is on the right track, say so briefly and push them one step further.`
+type OriginSurface = "dashboard" | "extension" | "legacy";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+type RequestImage = {
+  mimeType: string;
+  data: string;
+};
+
+type ClientContext = {
+  page?: { title?: string; url?: string };
+  action?: string;
+  selection?: string;
+  integrity?: string;
+  screenshotShared?: boolean;
+};
+
+type ChatRow = {
+  id: string;
+  session_id: string | null;
+  title: string;
+};
+
+type TurnIdentity = {
+  userMessageId: string;
+  assistantMessageId: string;
+};
+
+type TurnRpcResult = Partial<TurnIdentity> & {
+  action:
+    | "start"
+    | "replay"
+    | "completed"
+    | "in_progress"
+    | "error"
+    | "conflict"
+    | "fenced";
+  leaseToken?: string;
+  userSequence?: number;
+  assistantSequence?: number;
+  assistantText?: string;
+  errorStatus?: number;
+  errorMessage?: string;
+  retryAfterSeconds?: number;
+};
+
+type CommittedTurn = TurnRpcResult & TurnIdentity & {
+  userSequence: number;
+  assistantSequence: number;
+  assistantText: string;
+};
+
+type MessageCommit = {
+  type: "commit";
+  chatId: string;
+  requestId: string;
+  userMessageId: string;
+  assistantMessageId: string;
+  userSequence: number;
+  assistantSequence: number;
+};
+
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function sseData(value: unknown): string {
+  return `data: ${JSON.stringify(value)}\n\n`;
+}
 
 function sseChunk(text: string): string {
-  return `data: ${JSON.stringify({ text })}\n\n`
+  return sseData({ text });
 }
 
 function sseDone(): string {
-  return `data: [DONE]\n\n`
+  return "data: [DONE]\n\n";
 }
 
 function sseError(message: string): string {
-  return `data: ${JSON.stringify({ error: message })}\n\n`
+  return sseData({ error: message });
 }
 
-type RequestHistoryTurn = {
-  role: 'user' | 'ai' | 'system'
-  text: string
+function isUuid(value: string): boolean {
+  return UUID_PATTERN.test(value);
 }
 
-type RequestImage = {
-  mimeType: string
-  data: string
+function optionalLimitedString(
+  value: unknown,
+  maxLength: number,
+): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim();
+  return normalized ? normalized.slice(0, maxLength) : undefined;
 }
 
-function normalizeHistory(value: unknown): RequestHistoryTurn[] {
-  if (!Array.isArray(value)) return []
+function normalizeClientContext(value: unknown): ClientContext | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  const record = value as Record<string, unknown>;
+  const rawPage = record.page && typeof record.page === "object" &&
+      !Array.isArray(record.page)
+    ? record.page as Record<string, unknown>
+    : undefined;
+  const title = optionalLimitedString(rawPage?.title, 500);
+  const url = optionalLimitedString(rawPage?.url, 2_000);
+  const action = optionalLimitedString(record.action, 500);
+  const selection = optionalLimitedString(record.selection, 4_000);
+  const integrity = optionalLimitedString(record.integrity, 1_000);
+  const screenshotShared = typeof record.screenshotShared === "boolean"
+    ? record.screenshotShared
+    : undefined;
 
-  return value
-    .map((turn): RequestHistoryTurn | null => {
-      if (!turn || typeof turn !== 'object') return null
-
-      const record = turn as Record<string, unknown>
-      const role = record.role
-      const text = typeof record.text === 'string' ? record.text.trim() : ''
-
-      if ((role !== 'user' && role !== 'ai' && role !== 'system') || !text) {
-        return null
-      }
-
-      return { role, text: text.slice(0, 4_000) }
-    })
-    .filter((turn): turn is RequestHistoryTurn => Boolean(turn))
-    .slice(-MAX_HISTORY_TURNS)
-}
-
-function labelHistoryRole(role: RequestHistoryTurn['role']): string {
-  if (role === 'user') return 'Student'
-  if (role === 'ai') return 'StudyPilot'
-  return 'System'
-}
-
-function normalizeImages(value: unknown): { images: RequestImage[]; error?: string } {
-  if (value === undefined || value === null) return { images: [] }
-  if (!Array.isArray(value)) return { images: [], error: 'images must be an array.' }
-  if (value.length > MAX_IMAGES) return { images: [], error: `images can include at most ${MAX_IMAGES} items.` }
-
-  const images: RequestImage[] = []
-  for (const image of value) {
-    if (!image || typeof image !== 'object') {
-      return { images: [], error: 'Each image must include mimeType and data.' }
-    }
-
-    const record = image as Record<string, unknown>
-    const mimeType = typeof record.mimeType === 'string' ? record.mimeType.trim().toLowerCase() : ''
-    const data = typeof record.data === 'string' ? record.data.trim() : ''
-
-    if (!ALLOWED_IMAGE_MIME_TYPES.has(mimeType)) {
-      return { images: [], error: 'images must be JPEG, PNG, or WebP.' }
-    }
-
-    if (!data || data.length > MAX_IMAGE_BASE64_CHARS) {
-      return { images: [], error: 'Each image must be a non-empty base64 payload under 1.5 MB.' }
-    }
-
-    images.push({ mimeType, data })
+  if (
+    !title && !url && !action && !selection && !integrity &&
+    screenshotShared === undefined
+  ) {
+    return undefined;
   }
 
-  return { images }
+  return {
+    ...(title || url
+      ? { page: { ...(title ? { title } : {}), ...(url ? { url } : {}) } }
+      : {}),
+    ...(action ? { action } : {}),
+    ...(selection ? { selection } : {}),
+    ...(integrity ? { integrity } : {}),
+    ...(screenshotShared !== undefined ? { screenshotShared } : {}),
+  };
 }
 
-// ─── Main handler ─────────────────────────────────────────────────────────────
+function formatClientContext(context: ClientContext | undefined): string {
+  if (!context) return "";
+  const lines: string[] = [];
+  if (context.page?.title) lines.push(`Page title: ${context.page.title}`);
+  if (context.page?.url) lines.push(`Page URL: ${context.page.url}`);
+  if (context.action) lines.push(`Current action: ${context.action}`);
+  if (context.selection) lines.push(`Selected text: ${context.selection}`);
+  if (context.integrity) lines.push(`Integrity guidance: ${context.integrity}`);
+  if (context.screenshotShared !== undefined) {
+    lines.push(`Screenshot shared: ${context.screenshotShared ? "yes" : "no"}`);
+  }
+  return lines.length > 0 ? `CURRENT CLIENT CONTEXT:\n${lines.join("\n")}` : "";
+}
+
+function normalizeImages(
+  value: unknown,
+): { images: RequestImage[]; error?: string } {
+  if (value === undefined || value === null) return { images: [] };
+  if (!Array.isArray(value)) {
+    return { images: [], error: "images must be an array." };
+  }
+  if (value.length > MAX_IMAGES) {
+    return {
+      images: [],
+      error: `images can include at most ${MAX_IMAGES} items.`,
+    };
+  }
+
+  const images: RequestImage[] = [];
+  for (const image of value) {
+    if (!image || typeof image !== "object" || Array.isArray(image)) {
+      return {
+        images: [],
+        error: "Each image must include mimeType and data.",
+      };
+    }
+
+    const record = image as Record<string, unknown>;
+    const mimeType = typeof record.mimeType === "string"
+      ? record.mimeType.trim().toLowerCase()
+      : "";
+    const data = typeof record.data === "string" ? record.data.trim() : "";
+    if (!ALLOWED_IMAGE_MIME_TYPES.has(mimeType)) {
+      return { images: [], error: "images must be JPEG, PNG, or WebP." };
+    }
+    if (!data || data.length > MAX_IMAGE_BASE64_CHARS) {
+      return {
+        images: [],
+        error: "Each image must be a non-empty base64 payload under 1.5 MB.",
+      };
+    }
+    images.push({ mimeType, data });
+  }
+  return { images };
+}
+
+async function sha256(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(value),
+  );
+  return Array.from(
+    new Uint8Array(digest),
+    (byte) => byte.toString(16).padStart(2, "0"),
+  ).join("");
+}
+
+async function requestHash(input: {
+  chatId: string;
+  userMessage: string;
+  originSurface: OriginSurface;
+  clientContext?: ClientContext;
+  images: RequestImage[];
+}): Promise<string> {
+  const imageDigests = await Promise.all(input.images.map(async (image) => ({
+    mimeType: image.mimeType,
+    digest: await sha256(image.data),
+  })));
+  return sha256(JSON.stringify({
+    chatId: input.chatId,
+    userMessage: input.userMessage,
+    originSurface: input.originSurface,
+    clientContext: input.clientContext ?? null,
+    images: imageDigests,
+  }));
+}
+
+function asChatRow(value: unknown): ChatRow | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const row = value as Record<string, unknown>;
+  if (typeof row.id !== "string" || typeof row.title !== "string") return null;
+  if (row.session_id !== null && typeof row.session_id !== "string") {
+    return null;
+  }
+  return {
+    id: row.id,
+    session_id: row.session_id as string | null,
+    title: row.title,
+  };
+}
+
+function firstRow<T>(value: unknown): T | null {
+  if (Array.isArray(value)) return (value[0] as T | undefined) ?? null;
+  return value && typeof value === "object" ? value as T : null;
+}
+
+function asTurnRpcResult(value: unknown): TurnRpcResult | null {
+  const row = firstRow<Record<string, unknown>>(value);
+  if (!row || typeof row.action !== "string") return null;
+  const actions = new Set([
+    "start",
+    "replay",
+    "completed",
+    "in_progress",
+    "error",
+    "conflict",
+    "fenced",
+  ]);
+  if (!actions.has(row.action)) return null;
+  return row as TurnRpcResult;
+}
+
+function isCommittedTurn(value: TurnRpcResult | null): value is CommittedTurn {
+  return Boolean(
+    value && (value.action === "replay" || value.action === "completed") &&
+      value.userMessageId && value.assistantMessageId &&
+      typeof value.userSequence === "number" &&
+      typeof value.assistantSequence === "number" &&
+      typeof value.assistantText === "string",
+  );
+}
+
+function commitEvent(
+  chatId: string,
+  requestId: string,
+  turn: TurnIdentity,
+  userSequence: number,
+  assistantSequence: number,
+): MessageCommit {
+  return {
+    type: "commit",
+    chatId,
+    requestId,
+    userMessageId: turn.userMessageId,
+    assistantMessageId: turn.assistantMessageId,
+    userSequence,
+    assistantSequence,
+  };
+}
 
 serve(async (req) => {
-  // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders })
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+  if (req.method !== "POST") {
+    return jsonResponse({ error: "Method not allowed" }, 405);
   }
 
-  if (req.method !== 'POST') {
-    return new Response(
-      JSON.stringify({ error: 'Method not allowed' }),
-      { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const authHeader = req.headers.get("Authorization") ?? "";
+  if (!authHeader.startsWith("Bearer ")) {
+    return jsonResponse({ error: "Unauthorized" }, 401);
   }
 
-  // ── Auth ─────────────────────────────────────────────────────────────────
-  // With JWT verification ON in Supabase Dashboard, the gateway has already
-  // validated the token before this code runs. We just decode the payload
-  // locally to get the user ID — no network call needed.
-  const authHeader = req.headers.get('Authorization')
-  if (!authHeader?.startsWith('Bearer ')) {
-    return new Response(
-      JSON.stringify({ error: 'Unauthorized' }),
-      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+  const userDb = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const accessToken = authHeader.slice("Bearer ".length).trim();
+  if (!accessToken) return jsonResponse({ error: "Unauthorized" }, 401);
+  const { data: { user }, error: authError } = await userDb.auth.getUser(
+    accessToken,
+  );
+  if (authError || !user) {
+    console.error(
+      "[socratic-coach] Caller authentication failed:",
+      authError?.message ?? "user missing",
+    );
+    return jsonResponse({ error: "Unauthorized" }, 401);
   }
 
-  const token = authHeader.slice(7)
+  const db = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
 
-  let userId: string
+  let body: Record<string, unknown>;
   try {
-    const payloadB64 = token.split('.')[1]
-    if (!payloadB64) throw new Error('Malformed JWT')
-    const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')))
-    if (!payload.sub) throw new Error('No subject in token')
-    // Token expiry is already checked by the Supabase gateway when JWT verify is ON
-    userId = payload.sub
-  } catch (e) {
-    return new Response(
-      JSON.stringify({ error: 'Unauthorized' }),
-      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
-  }
-
-  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-
-  // Service role client for all DB operations
-  const db = createClient(supabaseUrl, supabaseServiceKey)
-
-  // ── Parse body ────────────────────────────────────────────────────────────
-  let chatId: string | undefined
-  let sessionId: string | undefined
-  let userMessage: string
-  let requestHistory: RequestHistoryTurn[] = []
-  let requestImages: RequestImage[] = []
-
-  try {
-    const body = await req.json()
-    sessionId = body.sessionId
-    userMessage = body.userMessage
-    requestHistory = normalizeHistory(body.history)
-
-    const imageResult = normalizeImages(body.images)
-    if (imageResult.error) {
-      return new Response(
-        JSON.stringify({ error: imageResult.error }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    const parsed = await req.json();
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("invalid body");
     }
-    requestImages = imageResult.images
-
-    if (body.chatId !== undefined) {
-      if (typeof body.chatId !== 'string' || !body.chatId.trim()) {
-        return new Response(
-          JSON.stringify({ error: 'chatId must be a non-empty string when provided' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-      chatId = body.chatId.trim()
-    }
-
-    if (!userMessage || typeof userMessage !== 'string' || userMessage.trim().length === 0) {
-      return new Response(
-        JSON.stringify({ error: 'userMessage is required and must be a non-empty string' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    userMessage = userMessage.trim()
+    body = parsed as Record<string, unknown>;
   } catch {
-    return new Response(
-      JSON.stringify({ error: 'Invalid request body' }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    return jsonResponse({ error: "Invalid request body" }, 400);
   }
 
-  if (chatId) {
-    const { data: chat } = await db
-      .from('dashboard_chats')
-      .select('id, session_id')
-      .eq('id', chatId)
-      .eq('user_id', userId)
-      .maybeSingle()
+  const userMessage = typeof body.userMessage === "string"
+    ? body.userMessage.trim()
+    : "";
+  if (!userMessage) {
+    return jsonResponse({
+      error: "userMessage is required and must be a non-empty string",
+    }, 400);
+  }
 
-    if (!chat) {
-      return new Response(
-        JSON.stringify({ error: 'Chat not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+  const requestedChatId = optionalLimitedString(body.chatId, 64);
+  if (
+    body.chatId !== undefined && (!requestedChatId || !isUuid(requestedChatId))
+  ) {
+    return jsonResponse({ error: "chatId must be a UUID when provided" }, 400);
+  }
+  const requestedSessionId = optionalLimitedString(body.sessionId, 64);
+  if (
+    body.sessionId !== undefined &&
+    (!requestedSessionId || !isUuid(requestedSessionId))
+  ) {
+    return jsonResponse(
+      { error: "sessionId must be a UUID when provided" },
+      400,
+    );
+  }
+  const suppliedRequestId = optionalLimitedString(body.requestId, 64);
+  if (
+    body.requestId !== undefined &&
+    (!suppliedRequestId || !isUuid(suppliedRequestId))
+  ) {
+    return jsonResponse(
+      { error: "requestId must be a UUID when provided" },
+      400,
+    );
+  }
+
+  const rawOrigin = body.originSurface === undefined
+    ? "legacy"
+    : body.originSurface;
+  if (typeof rawOrigin !== "string" || !ORIGIN_SURFACES.has(rawOrigin)) {
+    return jsonResponse({
+      error: "originSurface must be dashboard, extension, or legacy",
+    }, 400);
+  }
+  const originSurface = rawOrigin as OriginSurface;
+  const clientContext = normalizeClientContext(body.clientContext);
+  const imageResult = normalizeImages(body.images);
+  if (imageResult.error) return jsonResponse({ error: imageResult.error }, 400);
+  const requestId = suppliedRequestId ?? crypto.randomUUID();
+
+  let chat: ChatRow | null = null;
+  if (requestedChatId) {
+    const { data, error } = await db
+      .from("dashboard_chats")
+      .select("id, session_id, title")
+      .eq("id", requestedChatId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (error) {
+      console.error("[socratic-coach] Failed to load chat:", error);
+      return jsonResponse({ error: "Unable to load chat" }, 500);
     }
-
-    sessionId = chat.session_id ?? undefined
+    chat = asChatRow(data);
+    if (!chat) return jsonResponse({ error: "Chat not found" }, 404);
+  } else {
+    const title = clientContext?.page?.title ??
+      (requestedSessionId ? "Session chat" : "StudyPilot chat");
+    const { data, error } = await userDb.rpc("get_or_create_session_chat", {
+      p_session_id: requestedSessionId ?? null,
+      p_title: title,
+      p_origin_surface: originSurface,
+    });
+    if (error) {
+      console.error(
+        "[socratic-coach] Failed to resolve canonical chat:",
+        error,
+      );
+      const status = error.code === "P0002" ? 404 : 500;
+      return jsonResponse({
+        error: status === 404 ? "Session not found" : "Unable to create chat",
+      }, status);
+    }
+    chat = asChatRow(data);
+    if (!chat) return jsonResponse({ error: "Unable to create chat" }, 500);
   }
 
-  const aiUsage = await consumeAiRequest(db, userId)
-  if (aiUsage.status === "unavailable") {
+  const chatId = chat.id;
+  const sessionId = chat.session_id ?? undefined;
+  const hash = await requestHash({
+    chatId,
+    userMessage,
+    originSurface,
+    clientContext,
+    images: imageResult.images,
+  });
+
+  const skipQuota = shouldBypassAiUsageLimits({
+    disabled: Deno.env.get("AI_USAGE_LIMITS_DISABLED"),
+    supabaseUrl,
+  });
+  const { data: startData, error: startError } = await db.rpc(
+    "start_ai_chat_turn",
+    {
+      p_user_id: user.id,
+      p_request_id: requestId,
+      p_chat_id: chatId,
+      p_request_hash: hash,
+      p_origin_surface: originSurface,
+      p_user_message: userMessage,
+      p_skip_quota: skipQuota,
+    },
+  );
+  const startedTurn = asTurnRpcResult(startData);
+  if (startError || !startedTurn) {
+    console.error(
+      "[socratic-coach] Failed to atomically start request:",
+      startError ?? startData,
+    );
+    return jsonResponse({ error: QUOTA_UNAVAILABLE_MESSAGE }, 503);
+  }
+
+  if (startedTurn.action === "conflict") {
+    return jsonResponse({
+      error: startedTurn.errorMessage ??
+        "requestId was already used for a different request",
+    }, 409);
+  }
+  if (startedTurn.action === "in_progress") {
+    return jsonResponse(
+      {
+        error: "This AI request is already in progress",
+        retryAfterSeconds: startedTurn.retryAfterSeconds,
+      },
+      409,
+    );
+  }
+  if (startedTurn.action === "error") {
+    const status = typeof startedTurn.errorStatus === "number"
+      ? startedTurn.errorStatus
+      : 503;
+    return jsonResponse({
+      error: startedTurn.errorMessage ?? "Unable to start AI request",
+    }, status);
+  }
+  if (startedTurn.action === "replay") {
+    if (!isCommittedTurn(startedTurn)) {
+      console.error(
+        "[socratic-coach] Replay payload is incomplete:",
+        startedTurn,
+      );
+      return jsonResponse(
+        { error: "Completed AI request is unavailable" },
+        503,
+      );
+    }
+    const commit = commitEvent(
+      chatId,
+      requestId,
+      startedTurn,
+      startedTurn.userSequence,
+      startedTurn.assistantSequence,
+    );
     return new Response(
-      JSON.stringify({ error: QUOTA_UNAVAILABLE_MESSAGE }),
-      { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-    )
+      `${sseChunk(startedTurn.assistantText)}${sseData(commit)}${sseDone()}`,
+      { status: 200, headers: streamHeaders },
+    );
   }
-  if (!aiUsage.usage.allowed) {
-    return new Response(
-      JSON.stringify({ error: limitReachedMessage(aiUsage.usage) }),
-      { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-    )
+  if (
+    startedTurn.action !== "start" || !startedTurn.leaseToken ||
+    !startedTurn.userMessageId || !startedTurn.assistantMessageId ||
+    typeof startedTurn.userSequence !== "number"
+  ) {
+    console.error(
+      "[socratic-coach] Start payload is incomplete:",
+      startedTurn,
+    );
+    return jsonResponse({ error: "Unable to start AI request" }, 503);
   }
 
-  // ── Load context from Supabase ─────────────────────────────────────────────
-  // 1. User profile (for active rubric store name)
+  const activeTurn = startedTurn as TurnRpcResult & TurnIdentity & {
+    leaseToken: string;
+    userSequence: number;
+  };
+  const finishTurn = async (
+    outcome: "completed" | "failed",
+    assistantText: string | null,
+    errorStatus: number | null,
+    errorMessage: string | null,
+  ): Promise<TurnRpcResult | null> => {
+    const { data, error } = await db.rpc("finish_ai_chat_turn", {
+      p_user_id: user.id,
+      p_request_id: requestId,
+      p_lease_token: activeTurn.leaseToken,
+      p_outcome: outcome,
+      p_assistant_text: assistantText,
+      p_error_status: errorStatus,
+      p_error_message: errorMessage,
+    });
+    const result = asTurnRpcResult(data);
+    if (error || !result) {
+      console.error(
+        `[socratic-coach] Failed to atomically finish request as ${outcome}:`,
+        error ?? data,
+      );
+      return null;
+    }
+    return result;
+  };
+
   const { data: profile } = await db
-    .from('profiles')
-    .select('name, default_coach_mode, gemini_file_search_store_name')
-    .eq('id', userId)
-    .single()
+    .from("profiles")
+    .select("name, default_coach_mode, gemini_file_search_store_name")
+    .eq("id", user.id)
+    .maybeSingle();
 
-  // 2. Session metadata + summary (if sessionId provided)
-  let sessionContext = ''
-  let rubricContext = ''
-
+  let sessionContext = "";
+  let sessionTranscript: Array<{
+    id: string;
+    role: string;
+    message_text: string;
+    time_offset_seconds: number;
+    server_sequence: number | null;
+  }> = [];
+  let rubricContext = "";
   if (sessionId) {
-    // Verify ownership before loading
     const { data: session } = await db
-      .from('sessions')
-      .select('title, mode, summary, rubric_id, when_timestamp')
-      .eq('id', sessionId)
-      .eq('user_id', userId)
-      .single()
+      .from("sessions")
+      .select("title, mode, summary, rubric_id, when_timestamp")
+      .eq("id", sessionId)
+      .eq("user_id", user.id)
+      .maybeSingle();
 
     if (session) {
-      sessionContext = `SESSION: "${session.title}" (${session.mode})\nSUMMARY: ${session.summary || 'No summary yet.'}`
-
-      // 3. Recent transcript (last 20 messages to stay within token limits)
+      sessionContext =
+        `SESSION: "${session.title}" (${session.mode})\nSUMMARY: ${
+          session.summary || "No summary yet."
+        }`;
       const { data: transcript } = await db
-        .from('session_messages')
-        .select('role, message_text, time_offset_seconds')
-        .eq('session_id', sessionId)
-        .order('time_offset_seconds', { ascending: false })
-        .limit(20)
+        .from("session_messages")
+        .select("id, role, message_text, time_offset_seconds, server_sequence")
+        .eq("session_id", sessionId)
+        .order("time_offset_seconds", { ascending: false })
+        .order("server_sequence", { ascending: false })
+        .limit(20);
+      sessionTranscript = transcript ?? [];
 
-      if (transcript && transcript.length > 0) {
-        const transcriptText = transcript
-          .reverse()
-          .map((m: any) => `${m.role === 'user' ? 'Student' : 'StudyPilot'}: ${m.message_text}`)
-          .join('\n')
-        sessionContext += `\n\nRECENT TRANSCRIPT:\n${transcriptText}`
-      }
-
-      // 4. Active rubric + criteria
       if (session.rubric_id) {
         const { data: rubric } = await db
-          .from('rubrics')
-          .select('title, course, extracted_text, rubric_criteria(name, score, max_score)')
-          .eq('id', session.rubric_id)
-          .eq('user_id', userId)
-          .single()
-
+          .from("rubrics")
+          .select(
+            "title, course, extracted_text, rubric_criteria(name, score, max_score)",
+          )
+          .eq("id", session.rubric_id)
+          .eq("user_id", user.id)
+          .maybeSingle();
         if (rubric) {
-          const criteriaText = (rubric.rubric_criteria as any[] || [])
-            .map((c: any) => `  - ${c.name}: ${c.score ?? 0}/${c.max_score ?? 4}`)
-            .join('\n')
-
-          rubricContext = `RUBRIC: "${rubric.title}" (${rubric.course})\nCRITERIA:\n${criteriaText}`
-
+          const criteriaText = ((rubric.rubric_criteria as
+            | Array<Record<string, unknown>>
+            | null) ?? [])
+            .map((criterion) =>
+              `  - ${criterion.name}: ${criterion.score ?? 0}/${
+                criterion.max_score ?? 4
+              }`
+            )
+            .join("\n");
+          rubricContext =
+            `RUBRIC: "${rubric.title}" (${rubric.course})\nCRITERIA:\n${criteriaText}`;
           if (rubric.extracted_text) {
-            // Truncate to avoid exceeding context limits
-            const truncated = rubric.extracted_text.slice(0, 2000)
-            rubricContext += `\n\nRUBRIC TEXT:\n${truncated}${rubric.extracted_text.length > 2000 ? '... [truncated]' : ''}`
+            const extractedText = String(rubric.extracted_text);
+            rubricContext += `\n\nRUBRIC TEXT:\n${
+              extractedText.slice(0, 2_000)
+            }${extractedText.length > 2_000 ? "... [truncated]" : ""}`;
           }
         }
       }
     }
   } else {
-    // No session — load the user's active rubric as fallback context
     const { data: activeRubric } = await db
-      .from('rubrics')
-      .select('title, course, extracted_text, rubric_criteria(name, score, max_score)')
-      .eq('user_id', userId)
-      .eq('active', true)
-      .single()
-
+      .from("rubrics")
+      .select(
+        "title, course, extracted_text, rubric_criteria(name, score, max_score)",
+      )
+      .eq("user_id", user.id)
+      .eq("active", true)
+      .maybeSingle();
     if (activeRubric) {
-      const criteriaText = (activeRubric.rubric_criteria as any[] || [])
-        .map((c: any) => `  - ${c.name}: ${c.score ?? 0}/${c.max_score ?? 4}`)
-        .join('\n')
-
-      rubricContext = `ACTIVE RUBRIC: "${activeRubric.title}" (${activeRubric.course})\nCRITERIA:\n${criteriaText}`
+      const criteriaText = ((activeRubric.rubric_criteria as
+        | Array<Record<string, unknown>>
+        | null) ?? [])
+        .map((criterion) =>
+          `  - ${criterion.name}: ${criterion.score ?? 0}/${
+            criterion.max_score ?? 4
+          }`
+        )
+        .join("\n");
+      rubricContext =
+        `ACTIVE RUBRIC: "${activeRubric.title}" (${activeRubric.course})\nCRITERIA:\n${criteriaText}`;
     }
   }
 
-  // 5. Recent chat history (last 10 exchanges = 20 messages)
-  // NOTE: Supabase query builders are immutable — each chained method returns a
-  // NEW builder. We must build the full chain in one expression so the
-  // chatId is strict. Legacy requests only see legacy rows where chat_id is null.
-  let chatHistory: Array<{ role: string; text: string }> = []
-  {
-    const baseQuery = db
-      .from('dashboard_chat_messages')
-      .select('role, text')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(20)
-
-    const historyQuery = chatId
-      ? baseQuery.eq('chat_id', chatId)
-      : sessionId
-        ? baseQuery.eq('session_id', sessionId).is('chat_id', null)
-        : baseQuery.is('chat_id', null)
-
-    const { data: history } = await historyQuery
-
-    if (history && history.length > 0) {
-      // Reverse to get chronological order.
-      chatHistory = history
-        .reverse()
-        .map((m: any) => ({
-          role: m.role === 'user' ? 'Student' : 'StudyPilot',
-          text: m.text,
-        }))
+  const { data: recentHistory, error: historyError } = await db
+    .from("dashboard_chat_messages")
+    .select("id, role, text, server_sequence")
+    .eq("user_id", user.id)
+    .eq("chat_id", chatId)
+    .neq("id", activeTurn.userMessageId)
+    .order("server_sequence", { ascending: false })
+    .limit(MAX_HISTORY_TURNS);
+  if (historyError) {
+    console.error(
+      "[socratic-coach] Failed to load canonical chat history:",
+      historyError,
+    );
+    await finishTurn(
+      "failed",
+      null,
+      503,
+      "Unable to load chat history",
+    );
+    return jsonResponse({ error: "Unable to load chat history" }, 503);
+  }
+  if (sessionTranscript.length) {
+    const canonicalMessageIds = new Set(
+      (recentHistory ?? []).map((message) => message.id),
+    );
+    canonicalMessageIds.add(activeTurn.userMessageId);
+    const transcriptText = [...sessionTranscript]
+      .reverse()
+      .filter((message) => !canonicalMessageIds.has(message.id))
+      .map((message) =>
+        `${
+          message.role === "user" ? "Student" : "StudyPilot"
+        }: ${message.message_text}`
+      )
+      .join("\n");
+    if (transcriptText) {
+      sessionContext += `\n\nRECENT TRANSCRIPT:\n${transcriptText}`;
     }
   }
+  const chatHistory = (recentHistory ?? []).reverse().map((message) => ({
+    role: message.role === "user"
+      ? "Student"
+      : message.role === "ai"
+      ? "StudyPilot"
+      : "System",
+    text: message.text,
+  }));
 
-  // ── Save the user's message to the DB (fire-and-forget) ───────────────────
-  db.from('dashboard_chat_messages').insert({
-    user_id: userId,
-    chat_id: chatId ?? null,
-    session_id: sessionId ?? null,
-    role: 'user',
-    text: userMessage,
-  }).then().catch((e: Error) => console.error('[socratic-coach] Failed to save user message:', e))
-
-  // ── Build Gemini request ──────────────────────────────────────────────────
-  // Assemble the context block shown once at the top of the conversation
-  const contextParts: string[] = []
-  if (rubricContext) contextParts.push(rubricContext)
-  if (sessionContext) contextParts.push(sessionContext)
-
+  const contextParts: string[] = [];
+  if (rubricContext) contextParts.push(rubricContext);
+  if (sessionContext) contextParts.push(sessionContext);
+  const formattedClientContext = formatClientContext(clientContext);
+  if (formattedClientContext) contextParts.push(formattedClientContext);
+  if (profile?.name) contextParts.push(`STUDENT NAME: ${profile.name}`);
   const systemWithContext = contextParts.length > 0
-    ? `${SYSTEM_PROMPT}\n\n---\nCONTEXT:\n${contextParts.join('\n\n')}\n---`
-    : SYSTEM_PROMPT
-
-  const historyText = chatHistory
-    .concat(requestHistory.map((m) => ({
-      role: labelHistoryRole(m.role),
-      text: m.text,
-    })))
-    .slice(-MAX_HISTORY_TURNS)
-    .map((m) => `${m.role}: ${m.text}`)
-    .join('\n')
-
+    ? `${SYSTEM_PROMPT}\n\n---\nCONTEXT:\n${contextParts.join("\n\n")}\n---`
+    : SYSTEM_PROMPT;
+  const historyText = chatHistory.map((message) =>
+    `${message.role}: ${message.text}`
+  ).join("\n");
   const interactionInput = historyText
     ? `Recent chat history:\n${historyText}\n\nStudent: ${userMessage}`
-    : userMessage
-
-  const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [
+    : userMessage;
+  const parts: Array<
+    { text: string } | { inlineData: { mimeType: string; data: string } }
+  > = [
     { text: interactionInput },
-    ...requestImages.map((image) => ({
-      inlineData: {
-        mimeType: image.mimeType,
-        data: image.data,
-      },
+    ...imageResult.images.map((image) => ({
+      inlineData: { mimeType: image.mimeType, data: image.data },
     })),
-  ]
+  ];
 
-  const geminiModel = getGeminiTextModel()
-
-  const geminiPayload = {
-    model: geminiModel,
-    system_instruction: systemWithContext,
-    input: interactionInput,
-    parts,
-    stream: true,
-    generation_config: {
-      temperature: 0.7,
-      maxOutputTokens: 1024,
-    },
-  }
-
-  // ── Call Gemini with streaming ─────────────────────────────────────────────
-  let geminiResponse: Response
+  let geminiResponse: Response;
   try {
-    geminiResponse = await createGeminiInteraction(geminiPayload)
-  } catch (e) {
-    console.error('[socratic-coach] Gemini fetch failed:', e)
-    return new Response(
-      JSON.stringify({ error: 'Failed to reach AI service. Please try again.' }),
-      { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    geminiResponse = await createGeminiInteraction({
+      model: getGeminiTextModel(),
+      system_instruction: systemWithContext,
+      input: interactionInput,
+      parts,
+      stream: true,
+      generation_config: { temperature: 0.7, maxOutputTokens: 1024 },
+    });
+  } catch (error) {
+    console.error("[socratic-coach] Gemini fetch failed:", error);
+    const message = "Failed to reach AI service. Please try again.";
+    await finishTurn("failed", null, 503, message);
+    return jsonResponse({ error: message }, 503);
   }
 
-  if (!geminiResponse.ok) {
-    const errText = await geminiResponse.text()
-    console.error('[socratic-coach] Gemini API error:', geminiResponse.status, errText)
-    const detail = describeGeminiError(errText)
-    return new Response(
-      JSON.stringify({ error: `AI service returned an error (Gemini ${geminiResponse.status}${detail ? ` ${detail}` : ''}). Please try again.` }),
-      { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+  if (!geminiResponse.ok || !geminiResponse.body) {
+    const errorText = await geminiResponse.text();
+    console.error(
+      "[socratic-coach] Gemini API error:",
+      geminiResponse.status,
+      errorText,
+    );
+    const detail = describeGeminiError(errorText);
+    const message =
+      `AI service returned an error (Gemini ${geminiResponse.status}${
+        detail ? ` ${detail}` : ""
+      }). Please try again.`;
+    await finishTurn("failed", null, 502, message);
+    return jsonResponse({ error: message }, 502);
   }
 
-  // ── Stream Gemini SSE → client SSE ────────────────────────────────────────
-  const { readable, writable } = new TransformStream()
-  const writer = writable.getWriter()
-  const encoder = new TextEncoder()
+  const { readable, writable } = new TransformStream();
+  const writer = writable.getWriter();
+  const encoder = new TextEncoder();
+  (async () => {
+    const reader = geminiResponse.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let fullResponse = "";
 
-  // Accumulate the full response so we can save it to the DB after streaming
-  let fullResponse = ''
-
-  ;(async () => {
-    const reader = geminiResponse.body!.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
+    const consumeLine = async (line: string) => {
+      const clean = line.trim();
+      if (!clean.startsWith("data: ")) return;
+      const raw = clean.slice(6).trim();
+      if (!raw || raw === "[DONE]") return;
+      try {
+        const parsed = JSON.parse(raw);
+        const text = parsed?.candidates?.[0]?.content?.parts
+          ?.map((part: { text?: string }) => part.text ?? "")
+          .join("") ?? "";
+        if (text) {
+          fullResponse += text;
+          await writer.write(encoder.encode(sseChunk(text)));
+        }
+        const finishReason = parsed?.candidates?.[0]?.finishReason;
+        if (
+          finishReason && finishReason !== "STOP" &&
+          finishReason !== "MAX_TOKENS"
+        ) {
+          console.error("[socratic-coach] Gemini finish reason:", finishReason);
+        }
+      } catch {
+        // Ignore malformed upstream SSE records; complete records are newline-delimited.
+      }
+    };
 
     try {
       while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) await consumeLine(line);
+      }
+      buffer += decoder.decode();
+      if (buffer.trim()) await consumeLine(buffer);
 
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() ?? ''
+      const finalText = fullResponse.trim();
+      if (!finalText) throw new Error("AI service returned an empty response");
 
-        for (const line of lines) {
-          const clean = line.trim()
-          if (!clean.startsWith('data: ')) continue
+      const completed = await finishTurn(
+        "completed",
+        finalText,
+        null,
+        null,
+      );
+      if (!isCommittedTurn(completed)) {
+        throw new Error(
+          completed?.errorMessage ?? "Unable to atomically commit AI response",
+        );
+      }
 
-          const raw = clean.slice(6).trim()
-          if (raw === '[DONE]') continue  // Gemini's own done signal - we send ours below
-
-          try {
-            const parsed = JSON.parse(raw)
-
-            // Real Gemini streamGenerateContent SSE format:
-            // { "candidates": [{ "content": { "parts": [{ "text": "..." }] } }] }
-            const text: string =
-              parsed?.candidates?.[0]?.content?.parts
-                ?.map((p: any) => p.text ?? '')
-                .join('') ?? ''
-
-            if (text) {
-              fullResponse += text
-              await writer.write(encoder.encode(sseChunk(text)))
-            }
-
-            // Check for finish reason errors
-            const finishReason = parsed?.candidates?.[0]?.finishReason
-            if (finishReason && finishReason !== 'STOP' && finishReason !== 'MAX_TOKENS') {
-              console.error('[socratic-coach] Gemini finish reason:', finishReason)
-            }
-          } catch {
-            // Partial JSON chunk — safe to skip
-          }
+      const commit = commitEvent(
+        chatId,
+        requestId,
+        completed,
+        completed.userSequence,
+        completed.assistantSequence,
+      );
+      await writer.write(encoder.encode(sseData(commit)));
+      await writer.write(encoder.encode(sseDone()));
+    } catch (error) {
+      console.error("[socratic-coach] Stream or persistence error:", error);
+      const settled = await finishTurn(
+        "failed",
+        null,
+        502,
+        error instanceof Error ? error.message : "Stream interrupted",
+      );
+      try {
+        if (isCommittedTurn(settled)) {
+          const commit = commitEvent(
+            chatId,
+            requestId,
+            settled,
+            settled.userSequence,
+            settled.assistantSequence,
+          );
+          await writer.write(encoder.encode(sseData(commit)));
+        } else {
+          await writer.write(
+            encoder.encode(
+              sseError("Stream interrupted before the response was saved."),
+            ),
+          );
         }
+        await writer.write(encoder.encode(sseDone()));
+      } catch {
+        // The client disconnected; persistence status was still recorded above.
       }
-
-      // Send our own DONE signal
-      await writer.write(encoder.encode(sseDone()))
-    } catch (e) {
-      console.error('[socratic-coach] Stream read error:', e)
-      await writer.write(encoder.encode(sseError('Stream interrupted.')))
-      await writer.write(encoder.encode(sseDone()))
     } finally {
-      await writer.close()
-
-      // Save the complete AI response to the DB (fire-and-forget)
-      if (fullResponse.trim()) {
-        db.from('dashboard_chat_messages').insert({
-          user_id: userId,
-          chat_id: chatId ?? null,
-          session_id: sessionId ?? null,
-          role: 'ai',
-          text: fullResponse.trim(),
-        }).then().catch((e: Error) =>
-          console.error('[socratic-coach] Failed to save AI message:', e)
-        )
-      }
+      await writer.close().catch(() => undefined);
     }
-  })()
+  })();
 
-  return new Response(readable, {
-    status: 200,
-    headers: {
-      ...corsHeaders,
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-    },
-  })
-})
+  return new Response(readable, { status: 200, headers: streamHeaders });
+});

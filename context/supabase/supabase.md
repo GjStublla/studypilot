@@ -282,7 +282,9 @@ VITE_SUPABASE_ANON_KEY
 
 ## 7. Database Schema
 
-Run this SQL in the Supabase SQL Editor.
+This is the consolidated reference schema. Versioned files in
+`supabase/migrations/` are the executable source of truth; do not re-run this
+combined reference block against an existing project.
 
 > **Note on table order:** `sessions` must be created before `knowledge_documents` because `knowledge_documents` has a foreign key to `sessions`. The `rubrics ↔ knowledge_documents` circular FK is handled at the end with `ALTER TABLE`.
 
@@ -350,7 +352,8 @@ CREATE TABLE public.rubrics (
     file_search_error TEXT,
 
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE (id, user_id)
 );
 
 CREATE TRIGGER set_timestamp_rubrics
@@ -372,17 +375,29 @@ CREATE TABLE public.rubric_criteria (
 CREATE TABLE public.sessions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-    rubric_id UUID REFERENCES public.rubrics(id) ON DELETE SET NULL,
+    rubric_id UUID,
     title TEXT NOT NULL,
     source TEXT DEFAULT 'Chrome Extension',
     mode TEXT NOT NULL CHECK (mode IN ('Essay Coach', 'Presentation Coach', 'Study Coach', 'Lecture', 'Research Reader')),
     duration_seconds INT NOT NULL DEFAULT 0,
     page_title TEXT,
     page_url TEXT,
+    screenshot_path TEXT,
     summary TEXT,
     when_timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+
+    UNIQUE (id, user_id),
+    FOREIGN KEY (rubric_id, user_id)
+      REFERENCES public.rubrics(id, user_id)
+      ON DELETE SET NULL (rubric_id)
 );
+
+CREATE TRIGGER set_timestamp_sessions
+BEFORE UPDATE ON public.sessions
+FOR EACH ROW
+EXECUTE FUNCTION trigger_set_timestamp();
 
 -- Knowledge documents indexed into Gemini File Search.
 -- This table is the Supabase-side metadata source for managed RAG documents.
@@ -434,8 +449,12 @@ CREATE TABLE public.session_messages (
     role TEXT NOT NULL CHECK (role IN ('user', 'ai', 'system')),
     message_text TEXT NOT NULL,
     time_offset_seconds INT NOT NULL DEFAULT 0,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    server_sequence BIGINT GENERATED ALWAYS AS IDENTITY
 );
+
+-- In the upgrade migration, existing rows receive server_sequence values in
+-- time_offset_seconds, created_at, id order before identity generation starts.
 
 -- Action items generated from sessions
 CREATE TABLE public.action_items (
@@ -458,10 +477,18 @@ EXECUTE FUNCTION trigger_set_timestamp();
 CREATE TABLE public.dashboard_chats (
     id UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-    session_id UUID REFERENCES public.sessions(id) ON DELETE SET NULL,
+    session_id UUID,
     title TEXT NOT NULL DEFAULT 'New chat',
+    origin_surface TEXT NOT NULL DEFAULT 'dashboard'
+      CHECK (origin_surface IN ('dashboard', 'extension', 'legacy')),
+    client_key TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+
+    UNIQUE (id, user_id),
+    FOREIGN KEY (session_id, user_id)
+      REFERENCES public.sessions(id, user_id)
+      ON DELETE SET NULL (session_id)
 );
 
 CREATE TRIGGER set_timestamp_dashboard_chats
@@ -469,22 +496,75 @@ BEFORE UPDATE ON public.dashboard_chats
 FOR EACH ROW
 EXECUTE FUNCTION trigger_set_timestamp();
 
--- Dashboard chat messages. `chat_id` is nullable only for legacy rows.
+-- Dashboard chat messages. A compatibility trigger attaches DB-first legacy
+-- writes before the NOT NULL constraint is checked.
 CREATE TABLE public.dashboard_chat_messages (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-    chat_id UUID REFERENCES public.dashboard_chats(id) ON DELETE CASCADE,
-    session_id UUID REFERENCES public.sessions(id) ON DELETE CASCADE,
+    chat_id UUID NOT NULL,
+    -- Deprecated rollout column. New code derives the session through chat_id.
+    session_id UUID,
     role TEXT NOT NULL CHECK (role IN ('user', 'ai', 'system')),
     text TEXT NOT NULL,
+    origin_surface TEXT NOT NULL DEFAULT 'legacy'
+      CHECK (origin_surface IN ('dashboard', 'extension', 'legacy')),
+    request_id UUID,
+    server_sequence BIGINT GENERATED ALWAYS AS IDENTITY,
 
     -- Optional RAG metadata for UI/debugging
     used_file_search BOOLEAN DEFAULT false,
     file_search_store_name TEXT,
     grounding_metadata JSONB,
 
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+
+    CONSTRAINT dashboard_chat_messages_canonical_fields_check CHECK (
+      origin_surface = 'legacy'
+      OR (chat_id IS NOT NULL AND request_id IS NOT NULL)
+    ),
+
+    FOREIGN KEY (chat_id, user_id)
+      REFERENCES public.dashboard_chats(id, user_id) ON DELETE CASCADE,
+    FOREIGN KEY (session_id, user_id)
+      REFERENCES public.sessions(id, user_id) ON DELETE SET NULL (session_id)
 );
+
+-- In the upgrade migration, existing rows receive server_sequence values in
+-- created_at, id order before identity generation starts.
+
+-- Internal idempotency claim. No authenticated policies are created; only the
+-- service role used by socratic-coach may read or mutate this table.
+CREATE TABLE public.dashboard_chat_turns (
+    user_id UUID NOT NULL,
+    id UUID NOT NULL,
+    chat_id UUID NOT NULL,
+    request_hash TEXT NOT NULL,
+    origin_surface TEXT NOT NULL
+      CHECK (origin_surface IN ('dashboard', 'extension', 'legacy')),
+    status TEXT NOT NULL DEFAULT 'pending'
+      CHECK (status IN ('pending', 'completed', 'failed', 'rejected')),
+    user_message_id UUID NOT NULL DEFAULT extensions.uuid_generate_v4(),
+    assistant_message_id UUID NOT NULL DEFAULT extensions.uuid_generate_v4(),
+    error_status INT,
+    error_message TEXT,
+    lease_token UUID,
+    lease_expires_at TIMESTAMPTZ,
+    quota_consumed_at TIMESTAMPTZ,
+    attempt_count INT NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    completed_at TIMESTAMPTZ,
+    PRIMARY KEY (user_id, id),
+    UNIQUE (user_message_id),
+    UNIQUE (assistant_message_id),
+    FOREIGN KEY (chat_id, user_id)
+      REFERENCES public.dashboard_chats(id, user_id) ON DELETE CASCADE
+);
+
+CREATE TRIGGER set_timestamp_dashboard_chat_turns
+BEFORE UPDATE ON public.dashboard_chat_turns
+FOR EACH ROW
+EXECUTE FUNCTION trigger_set_timestamp();
 
 -- Recent activity log
 CREATE TABLE public.activity_logs (
@@ -505,26 +585,64 @@ ON DELETE SET NULL;
 -- Performance indexes
 CREATE INDEX idx_rubrics_user ON public.rubrics(user_id);
 CREATE INDEX idx_sessions_user ON public.sessions(user_id);
+CREATE INDEX idx_sessions_user_updated ON public.sessions(user_id, updated_at DESC, id);
 CREATE INDEX idx_action_items_user ON public.action_items(user_id);
 CREATE INDEX idx_session_messages_session ON public.session_messages(session_id);
+CREATE UNIQUE INDEX session_messages_server_sequence_key
+  ON public.session_messages(server_sequence);
+CREATE INDEX idx_session_messages_session_sequence
+  ON public.session_messages(session_id, time_offset_seconds, server_sequence, id);
 CREATE INDEX idx_activity_logs_user ON public.activity_logs(user_id);
 CREATE INDEX idx_dashboard_chats_user_updated ON public.dashboard_chats(user_id, updated_at DESC);
+CREATE UNIQUE INDEX dashboard_chats_user_session_key
+  ON public.dashboard_chats(user_id, session_id) WHERE session_id IS NOT NULL;
+CREATE UNIQUE INDEX dashboard_chats_user_client_key
+  ON public.dashboard_chats(user_id, client_key) WHERE client_key IS NOT NULL;
 CREATE INDEX idx_chat_messages_session ON public.dashboard_chat_messages(session_id);
-CREATE INDEX idx_chat_messages_chat ON public.dashboard_chat_messages(chat_id);
+CREATE INDEX idx_dashboard_chat_messages_chat_sequence
+  ON public.dashboard_chat_messages(chat_id, server_sequence, id);
+CREATE UNIQUE INDEX dashboard_chat_messages_server_sequence_key
+  ON public.dashboard_chat_messages(server_sequence);
+CREATE UNIQUE INDEX dashboard_chat_messages_request_role_key
+  ON public.dashboard_chat_messages(chat_id, request_id, role)
+  WHERE chat_id IS NOT NULL AND request_id IS NOT NULL;
 CREATE INDEX idx_rubric_criteria_rubric ON public.rubric_criteria(rubric_id);
 CREATE INDEX idx_knowledge_documents_user ON public.knowledge_documents(user_id);
 CREATE INDEX idx_knowledge_documents_rubric ON public.knowledge_documents(rubric_id);
 CREATE INDEX idx_knowledge_documents_status ON public.knowledge_documents(index_status);
 CREATE INDEX idx_knowledge_documents_store ON public.knowledge_documents(gemini_file_search_store_name);
+CREATE INDEX idx_dashboard_chat_turns_chat_created
+  ON public.dashboard_chat_turns(chat_id, created_at, id);
+CREATE INDEX idx_dashboard_chat_turns_pending_lease
+  ON public.dashboard_chat_turns(lease_expires_at, user_id, id)
+  WHERE status = 'pending';
+
+-- DB-first rollout compatibility. The SECURITY INVOKER trigger function in
+-- the migration handles only origin_surface='legacy' rows whose chat_id was
+-- omitted by the previous Edge Function. It creates or reuses the owned
+-- session chat, or client_key='legacy-general' when no session is present.
+-- INSERT ... ON CONFLICT DO UPDATE ... RETURNING makes concurrent first writes
+-- converge on the same chat before chat_id's NOT NULL check runs.
+REVOKE EXECUTE ON FUNCTION public.attach_legacy_dashboard_chat()
+FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.attach_legacy_dashboard_chat()
+TO service_role;
+
+CREATE TRIGGER attach_legacy_dashboard_chat_on_message
+BEFORE INSERT ON public.dashboard_chat_messages
+FOR EACH ROW
+EXECUTE FUNCTION public.attach_legacy_dashboard_chat();
 
 -- Keep conversations ordered by message activity.
 CREATE OR REPLACE FUNCTION public.touch_dashboard_chat()
 RETURNS TRIGGER AS $$
 BEGIN
-  UPDATE public.dashboard_chats SET updated_at = NOW() WHERE id = NEW.chat_id;
+  UPDATE public.dashboard_chats
+  SET updated_at = NOW()
+  WHERE id = NEW.chat_id AND user_id = NEW.user_id;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog;
+$$ LANGUAGE plpgsql SECURITY INVOKER SET search_path = '';
 
 REVOKE EXECUTE ON FUNCTION public.touch_dashboard_chat() FROM PUBLIC, anon, authenticated;
 
@@ -532,6 +650,80 @@ CREATE TRIGGER touch_dashboard_chat_on_message
 AFTER INSERT ON public.dashboard_chat_messages
 FOR EACH ROW WHEN (NEW.chat_id IS NOT NULL)
 EXECUTE FUNCTION public.touch_dashboard_chat();
+
+-- Concurrency-safe continuation for a captured session. auth.uid() supplies
+-- the owner, and the partial unique index makes dashboard/extension races
+-- converge on one chat. The implementation lives in the migration; signature:
+-- public.get_or_create_session_chat(
+--   p_session_id UUID DEFAULT NULL,
+--   p_title TEXT DEFAULT 'New chat',
+--   p_origin_surface TEXT DEFAULT 'dashboard'
+-- ) RETURNS JSONB SECURITY INVOKER
+
+REVOKE EXECUTE ON FUNCTION public.get_or_create_session_chat(UUID, TEXT, TEXT)
+FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_or_create_session_chat(UUID, TEXT, TEXT)
+TO authenticated, service_role;
+
+-- Extension imports create a chat and session with the same UUID, then use
+-- this narrowly scoped RPC to link them. It derives auth.uid(), locks the owned
+-- chat, requires an owned same-ID session, allows only NULL -> same-ID, and is
+-- idempotent when that link already exists. It returns the canonical chat JSON.
+-- Direct authenticated table updates remain title-only.
+-- public.link_dashboard_chat_session(p_chat_id UUID)
+--   RETURNS JSONB SECURITY DEFINER SET search_path = ''
+REVOKE EXECUTE ON FUNCTION public.link_dashboard_chat_session(UUID)
+FROM PUBLIC, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.link_dashboard_chat_session(UUID)
+TO authenticated;
+
+-- Service-only request lifecycle. start_ai_chat_turn locks or creates the
+-- deterministic claim, consumes quota and inserts the user row in one
+-- transaction, and returns a 15-minute fenced lease. An expired pending lease
+-- may be taken over without consuming quota again. finish_ai_chat_turn accepts
+-- only the active lease; success inserts the assistant row and completes the
+-- claim atomically, while failure records the durable error state. If a prior
+-- transaction committed but its response was lost, both RPCs reconcile and
+-- replay the already-durable pair.
+-- public.start_ai_chat_turn(
+--   p_user_id UUID,
+--   p_request_id UUID,
+--   p_chat_id UUID,
+--   p_request_hash TEXT,
+--   p_origin_surface TEXT,
+--   p_user_message TEXT,
+--   p_skip_quota BOOLEAN DEFAULT FALSE
+-- ) RETURNS JSONB SECURITY INVOKER SET search_path = ''
+-- public.finish_ai_chat_turn(
+--   p_user_id UUID,
+--   p_request_id UUID,
+--   p_lease_token UUID,
+--   p_outcome TEXT,
+--   p_assistant_text TEXT,
+--   p_error_status INTEGER,
+--   p_error_message TEXT
+-- ) RETURNS JSONB SECURITY INVOKER SET search_path = ''
+
+REVOKE EXECUTE ON FUNCTION public.start_ai_chat_turn(
+  UUID, UUID, UUID, TEXT, TEXT, TEXT, BOOLEAN
+) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.start_ai_chat_turn(
+  UUID, UUID, UUID, TEXT, TEXT, TEXT, BOOLEAN
+) TO service_role;
+
+REVOKE EXECUTE ON FUNCTION public.finish_ai_chat_turn(
+  UUID, UUID, UUID, TEXT, TEXT, INTEGER, TEXT
+) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.finish_ai_chat_turn(
+  UUID, UUID, UUID, TEXT, TEXT, INTEGER, TEXT
+) TO service_role;
+
+-- Explicit publication membership is required for Postgres Changes. Clients
+-- treat events as invalidations and refetch on subscribe/focus/reconnect.
+-- The migration adds each table only when supabase_realtime exists, is not an
+-- all-tables publication, and does not already contain that table. Published
+-- invalidation tables are: sessions, session_messages, dashboard_chats,
+-- dashboard_chat_messages, knowledge_documents, action_items, and rubrics.
 
 -- AI usage RPCs
 -- consume_ai_request atomically reserves one request from a user's shared
@@ -727,6 +919,7 @@ ALTER TABLE public.session_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.action_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.dashboard_chats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.dashboard_chat_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.dashboard_chat_turns ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
 ```
 
@@ -795,33 +988,38 @@ ON public.knowledge_documents FOR DELETE USING (auth.uid() = user_id);
 
 -- Sessions
 CREATE POLICY "Students can read their own imported sessions"
-ON public.sessions FOR SELECT USING (auth.uid() = user_id);
+ON public.sessions FOR SELECT TO authenticated
+USING ((select auth.uid()) = user_id);
 
 CREATE POLICY "Students can import new coaching sessions"
-ON public.sessions FOR INSERT WITH CHECK (auth.uid() = user_id);
+ON public.sessions FOR INSERT TO authenticated
+WITH CHECK ((select auth.uid()) = user_id);
 
 CREATE POLICY "Students can update their own sessions"
-ON public.sessions FOR UPDATE USING (auth.uid() = user_id);
+ON public.sessions FOR UPDATE TO authenticated
+USING ((select auth.uid()) = user_id)
+WITH CHECK ((select auth.uid()) = user_id);
 
 CREATE POLICY "Students can delete their own sessions"
-ON public.sessions FOR DELETE USING (auth.uid() = user_id);
+ON public.sessions FOR DELETE TO authenticated
+USING ((select auth.uid()) = user_id);
 
 -- Session messages
 CREATE POLICY "Students can read transcripts from their sessions"
-ON public.session_messages FOR SELECT USING (
+ON public.session_messages FOR SELECT TO authenticated USING (
   EXISTS (
     SELECT 1 FROM public.sessions
     WHERE sessions.id = session_messages.session_id
-    AND sessions.user_id = auth.uid()
+    AND sessions.user_id = (select auth.uid())
   )
 );
 
 CREATE POLICY "Students can save messages into transcripts"
-ON public.session_messages FOR INSERT WITH CHECK (
+ON public.session_messages FOR INSERT TO authenticated WITH CHECK (
   EXISTS (
     SELECT 1 FROM public.sessions
     WHERE sessions.id = session_messages.session_id
-    AND sessions.user_id = auth.uid()
+    AND sessions.user_id = (select auth.uid())
   )
 );
 
@@ -840,28 +1038,57 @@ ON public.action_items FOR DELETE USING (auth.uid() = user_id);
 
 -- Dashboard chats
 CREATE POLICY "Students can view their own dashboard chats"
-ON public.dashboard_chats FOR SELECT USING (auth.uid() = user_id);
+ON public.dashboard_chats FOR SELECT TO authenticated
+USING ((select auth.uid()) = user_id);
 
 CREATE POLICY "Students can create their own dashboard chats"
-ON public.dashboard_chats FOR INSERT WITH CHECK (auth.uid() = user_id);
+ON public.dashboard_chats FOR INSERT TO authenticated
+WITH CHECK ((select auth.uid()) = user_id);
 
 CREATE POLICY "Students can update their own dashboard chats"
-ON public.dashboard_chats FOR UPDATE
-USING (auth.uid() = user_id)
-WITH CHECK (auth.uid() = user_id);
+ON public.dashboard_chats FOR UPDATE TO authenticated
+USING ((select auth.uid()) = user_id)
+WITH CHECK ((select auth.uid()) = user_id);
 
 CREATE POLICY "Students can delete their own dashboard chats"
-ON public.dashboard_chats FOR DELETE USING (auth.uid() = user_id);
+ON public.dashboard_chats FOR DELETE TO authenticated
+USING ((select auth.uid()) = user_id);
+
+-- Relationship and provenance columns are immutable from browser clients.
+-- The timestamp trigger may still set updated_at during an allowed rename.
+REVOKE ALL ON public.dashboard_chats FROM anon, authenticated;
+GRANT SELECT, INSERT, DELETE ON public.dashboard_chats TO authenticated;
+GRANT UPDATE (title) ON public.dashboard_chats TO authenticated;
 
 -- Dashboard chat messages
 CREATE POLICY "Students can view dashboard follow-up chat histories"
-ON public.dashboard_chat_messages FOR SELECT USING (auth.uid() = user_id);
+ON public.dashboard_chat_messages FOR SELECT TO authenticated
+USING ((select auth.uid()) = user_id);
 
-CREATE POLICY "Students can post messages to dashboard follow-up chats"
-ON public.dashboard_chat_messages FOR INSERT WITH CHECK (auth.uid() = user_id);
+-- No authenticated INSERT/UPDATE/DELETE policy exists for chat messages, and
+-- dashboard_chat_turns has no authenticated policy at all. socratic-coach uses
+-- the service role so every visible message passes auth, idempotency, and quota.
+REVOKE ALL ON public.dashboard_chat_messages FROM anon, authenticated;
+GRANT SELECT ON public.dashboard_chat_messages TO authenticated;
+REVOKE ALL ON public.dashboard_chat_turns FROM anon, authenticated;
+GRANT ALL ON public.dashboard_chat_turns TO service_role;
 
-CREATE POLICY "Students can delete their own dashboard follow-up chat messages"
-ON public.dashboard_chat_messages FOR DELETE USING (auth.uid() = user_id);
+REVOKE ALL ON SEQUENCE public.dashboard_chat_messages_server_sequence_seq
+FROM public, anon, authenticated;
+GRANT USAGE, SELECT
+ON SEQUENCE public.dashboard_chat_messages_server_sequence_seq
+TO service_role;
+
+REVOKE ALL ON SEQUENCE public.session_messages_server_sequence_seq
+FROM public, anon;
+GRANT USAGE, SELECT
+ON SEQUENCE public.session_messages_server_sequence_seq
+TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.attach_legacy_dashboard_chat()
+FROM public, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.attach_legacy_dashboard_chat()
+TO service_role;
 
 -- Activity logs
 CREATE POLICY "Students can view their recent action logs feed"
@@ -876,19 +1103,44 @@ GRANT EXECUTE ON FUNCTION public.consume_ai_request(UUID) TO service_role;
 
 REVOKE EXECUTE ON FUNCTION public.get_ai_usage() FROM public, anon;
 GRANT EXECUTE ON FUNCTION public.get_ai_usage() TO authenticated;
+
+REVOKE EXECUTE ON FUNCTION public.get_or_create_session_chat(UUID, TEXT, TEXT)
+FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.get_or_create_session_chat(UUID, TEXT, TEXT)
+TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.link_dashboard_chat_session(UUID)
+FROM public, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.link_dashboard_chat_session(UUID)
+TO authenticated;
+
+REVOKE EXECUTE ON FUNCTION public.start_ai_chat_turn(
+  UUID, UUID, UUID, TEXT, TEXT, TEXT, BOOLEAN
+) FROM public, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.start_ai_chat_turn(
+  UUID, UUID, UUID, TEXT, TEXT, TEXT, BOOLEAN
+) TO service_role;
+
+REVOKE EXECUTE ON FUNCTION public.finish_ai_chat_turn(
+  UUID, UUID, UUID, TEXT, TEXT, INTEGER, TEXT
+) FROM public, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.finish_ai_chat_turn(
+  UUID, UUID, UUID, TEXT, TEXT, INTEGER, TEXT
+) TO service_role;
 ```
 
 ---
 
 ## 11. Storage Buckets
 
-Create a Supabase Storage bucket:
+StudyPilot uses two private Supabase Storage buckets:
 
 ```text
 rubrics
+session-captures
 ```
 
-Recommended bucket settings:
+Recommended `rubrics` settings:
 
 ```text
 Private bucket: yes
@@ -899,6 +1151,46 @@ Allowed file types:
 - docx optional later
 Maximum file size:
 - 10MB for MVP
+```
+
+The `session-captures` migration creates/repairs that bucket with:
+
+```text
+Private bucket: yes
+Public access: no
+Allowed MIME type: image/jpeg
+Maximum file size: 2MB
+```
+
+Session captures must use `{user_id}/...` object names. Authenticated users may
+insert, select, and update only objects whose first folder equals `auth.uid()`.
+UPDATE is required because the extension overwrites a stable capture path.
+
+```sql
+CREATE POLICY "Students can upload own session captures"
+ON storage.objects FOR INSERT TO authenticated
+WITH CHECK (
+  bucket_id = 'session-captures'
+  AND (storage.foldername(name))[1] = (select auth.uid())::text
+);
+
+CREATE POLICY "Students can read own session captures"
+ON storage.objects FOR SELECT TO authenticated
+USING (
+  bucket_id = 'session-captures'
+  AND (storage.foldername(name))[1] = (select auth.uid())::text
+);
+
+CREATE POLICY "Students can update own session captures"
+ON storage.objects FOR UPDATE TO authenticated
+USING (
+  bucket_id = 'session-captures'
+  AND (storage.foldername(name))[1] = (select auth.uid())::text
+)
+WITH CHECK (
+  bucket_id = 'session-captures'
+  AND (storage.foldername(name))[1] = (select auth.uid())::text
+);
 ```
 
 Store files under this path pattern:
@@ -1213,15 +1505,24 @@ Input:
 ```json
 {
   "chatId": "uuid",
-  "userMessage": "What should I revise first?"
+  "requestId": "client-generated-uuid",
+  "userMessage": "What should I revise first?",
+  "originSurface": "dashboard",
+  "clientContext": {
+    "page": { "title": "Essay draft", "url": "https://example.test" },
+    "action": "explain"
+  }
 }
 ```
 
 `chatId` is optional for backward compatibility. When present, the function
 loads `dashboard_chats.id = chatId` for the authenticated user, returns 404 if
 it does not exist, and uses that row's `session_id` instead of any body
-`sessionId`. New dashboard clients send `chatId` only. Old clients may continue
-to send `sessionId` without `chatId`.
+`sessionId`. New clients send `chatId` and a stable `requestId`; old clients may
+continue to omit both, in which case the function generates a request ID and
+attaches the request to the caller's deterministic legacy chat. `userMessage`
+is always the plain visible student prompt. Page selection, integrity rules,
+and action metadata belong in `clientContext`, not in the visible message.
 
 Output:
 
@@ -1229,8 +1530,18 @@ Output:
 SSE stream:
 data: {"text":"Start with your thesis..."}
 data: {"text":" The rubric asks..."}
+data: {"type":"commit","chatId":"uuid","requestId":"uuid","userMessageId":"uuid","assistantMessageId":"uuid","userSequence":101,"assistantSequence":102}
 data: [DONE]
 ```
+
+The service-only `start_ai_chat_turn` RPC atomically reserves quota, persists
+the deterministic user row, and grants the worker a fenced lease. The commit
+event is emitted only after `finish_ai_chat_turn` atomically inserts the
+assistant row and marks the retry claim complete. A completed duplicate replays
+the stored assistant text and the same commit without consuming quota again. A
+live pending duplicate returns 409; an expired lease can be taken over with the
+same quota reservation. Quota rejection records the internal claim but does not
+persist the visible user message.
 
 Context loaded from Supabase:
 
@@ -1249,10 +1560,12 @@ Context loaded from Supabase:
 Chat-memory scoping rules:
 
 ```text
-- With chatId: query only dashboard_chat_messages.chat_id = chatId.
-- Without chatId and with sessionId: query session_id = sessionId and chat_id IS NULL.
-- Without either: query only chat_id IS NULL.
-- Existing nullable chat_id rows are legacy history. They are never included in a chat-scoped request.
+- With chatId: query only dashboard_chat_messages.chat_id = chatId and use this canonical history.
+- Client-supplied history is ignored for canonical chats, avoiding duplicated turns.
+- session_messages that mirror canonical chat message IDs are excluded from the prompt, so linked-session context is not repeated.
+- Without chatId: resolve or create an owned session chat, or the deterministic legacy-general chat.
+- Legacy chat resolution may create that one idempotent metadata row before the turn RPC; quota denial still creates no message or Gemini call.
+- Existing chat-less rows are backfilled into canonical legacy chats by migration.
 ```
 
 Gemini call should use:
@@ -1749,15 +2062,25 @@ src/lib/socraticCoach.ts
 import { supabase } from './supabaseClient';
 
 export async function sendCoachingMessage(
-  sessionId: string,
+  chatId: string,
   userMessageText: string,
   onTokenReceived: (token: string) => void,
+  onCommitReceived: (commit: {
+    type: 'commit';
+    chatId: string;
+    requestId: string;
+    userMessageId: string;
+    assistantMessageId: string;
+    userSequence: number;
+    assistantSequence: number;
+  }) => void,
   onStreamComplete: () => void,
   onStreamError: (err: unknown) => void
 ) {
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Student is not signed in.');
+    const requestId = crypto.randomUUID();
 
     const response = await fetch(
       `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/socratic-coach`,
@@ -1769,14 +2092,17 @@ export async function sendCoachingMessage(
           apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({
-          sessionId,
+          chatId,
+          requestId,
+          originSurface: 'dashboard',
           userMessage: userMessageText,
         }),
       }
     );
 
     if (!response.ok) {
-      throw new Error(`Edge Function failed: ${response.statusText}`);
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.error ?? `Request failed: ${response.status}`);
     }
 
     const reader = response.body?.getReader();
@@ -1785,6 +2111,7 @@ export async function sendCoachingMessage(
     if (!reader) throw new Error('No stream body available.');
 
     let buffer = '';
+    let commitSeen = false;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -1802,104 +2129,123 @@ export async function sendCoachingMessage(
           const content = clean.substring(6).trim();
 
           if (content === '[DONE]') {
+            if (!commitSeen) throw new Error('Stream ended before its durable commit.');
             onStreamComplete();
             return;
           }
 
           try {
             const parsed = JSON.parse(content);
-            if (parsed.text) onTokenReceived(parsed.text);
-          } catch {
-            // Ignore partial malformed chunks.
+            if (parsed.type === 'commit') {
+              if (parsed.chatId !== chatId || parsed.requestId !== requestId) {
+                throw new Error('Stream commit did not match this request.');
+              }
+              commitSeen = true;
+              onCommitReceived(parsed);
+            } else if (parsed.text) {
+              onTokenReceived(parsed.text);
+            }
+          } catch (error) {
+            throw new Error(`Malformed AI stream event: ${String(error)}`);
           }
         }
       }
     }
 
-    onStreamComplete();
+    throw new Error('AI stream ended before completion.');
   } catch (error) {
     onStreamError(error);
+    throw error;
   }
 }
 ```
+
+The production parser in `src/lib/socraticCoach.ts` buffers complete SSE blocks
+rather than individual transport chunks. Token events remain `{ text }` for
+rolling compatibility, while completion requires a matching durable `commit`
+followed by `[DONE]`.
 
 ---
 
 ## 18. Supabase Realtime
 
-Use Realtime so the dashboard updates automatically when the extension saves a new session or when a document is indexed.
+Realtime events are invalidation hints, not authoritative client state. The
+dashboard authenticates one channel, refetches canonical rows after subscribe,
+focus, and reconnect, and refetches the affected resource for these events:
+
+```text
+sessions: INSERT, UPDATE
+session_messages: INSERT
+dashboard_chats: INSERT, UPDATE
+dashboard_chat_messages: INSERT
+knowledge_documents: UPDATE
+action_items: INSERT, UPDATE, DELETE
+rubrics: INSERT, UPDATE, DELETE
+```
+
+All tables above are explicit members of `supabase_realtime`. Tables carrying
+`user_id` use a Realtime filter; `session_messages` relies on its session-owner
+RLS policy and triggers a scoped transcript refetch.
 
 ```typescript
 import { useEffect } from 'react';
-import { supabase } from './supabaseClient';
+import { injectStoredToken, supabase } from './supabaseClient';
 
-export function useRealtimeSessionListener(
+export function useStudyPilotRealtime(
   userId: string,
-  onNewSessionImported: (newSession: any) => void
+  invalidate: (resource: 'sessions' | 'transcript' | 'chats' | 'messages' | 'rag' | 'actions' | 'rubrics') => void,
 ) {
   useEffect(() => {
     if (!userId) return;
 
-    const channel = supabase
-      .channel('studypilot_extension_sync')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'sessions',
-          filter: `user_id=eq.${userId}`,
-        },
-        async (payload) => {
-          const { data: completedSession, error } = await supabase
-            .from('sessions')
-            .select(`
-              id, title, source, mode, duration_seconds, summary, when_timestamp, rubric_id,
-              action_items(id, done)
-            `)
-            .eq('id', payload.new.id)
-            .single();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
 
-          if (!error && completedSession) {
-            onNewSessionImported(completedSession);
-          }
-        }
-      )
-      .subscribe();
+    void (async () => {
+      await injectStoredToken();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (cancelled || !session) return;
+      await supabase.realtime.setAuth(session.access_token);
+
+      channel = supabase
+        .channel(`studypilot_realtime_${userId}`)
+        .on('postgres_changes', {
+          event: '*', schema: 'public', table: 'sessions',
+          filter: `user_id=eq.${userId}`,
+        }, () => invalidate('sessions'))
+        .on('postgres_changes', {
+          event: 'INSERT', schema: 'public', table: 'session_messages',
+        }, () => invalidate('transcript'))
+        .on('postgres_changes', {
+          event: '*', schema: 'public', table: 'dashboard_chats',
+          filter: `user_id=eq.${userId}`,
+        }, () => invalidate('chats'))
+        .on('postgres_changes', {
+          event: 'INSERT', schema: 'public', table: 'dashboard_chat_messages',
+          filter: `user_id=eq.${userId}`,
+        }, () => invalidate('messages'))
+        .on('postgres_changes', {
+          event: 'UPDATE', schema: 'public', table: 'knowledge_documents',
+          filter: `user_id=eq.${userId}`,
+        }, () => invalidate('rag'))
+        .on('postgres_changes', {
+          event: '*', schema: 'public', table: 'action_items',
+          filter: `user_id=eq.${userId}`,
+        }, () => invalidate('actions'))
+        .on('postgres_changes', {
+          event: '*', schema: 'public', table: 'rubrics',
+          filter: `user_id=eq.${userId}`,
+        }, () => invalidate('rubrics'))
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') invalidate('sessions');
+        });
+    })();
 
     return () => {
-      supabase.removeChannel(channel);
+      cancelled = true;
+      if (channel) void supabase.removeChannel(channel);
     };
-  }, [userId, onNewSessionImported]);
-}
-
-export function useRealtimeKnowledgeDocumentListener(
-  userId: string,
-  onDocumentUpdated: (document: any) => void
-) {
-  useEffect(() => {
-    if (!userId) return;
-
-    const channel = supabase
-      .channel('studypilot_rag_sync')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'knowledge_documents',
-          filter: `user_id=eq.${userId}`,
-        },
-        (payload) => {
-          onDocumentUpdated(payload.new);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [userId, onDocumentUpdated]);
+  }, [userId, invalidate]);
 }
 ```
 
@@ -1914,6 +2260,7 @@ Flow:
 ```text
 1. User clicks Stop Session.
 2. Extension collects:
+   - the active dashboard chat ID
    - title
    - rubric_id
    - source
@@ -1922,13 +2269,15 @@ Flow:
    - page_title
    - page_url
    - transcript messages
-3. Extension inserts into sessions.
-4. Extension inserts transcript rows into session_messages.
-5. Extension calls summarize-session Edge Function.
-6. Edge Function updates sessions.summary.
-7. Edge Function inserts action_items.
-8. Dashboard receives Realtime session insert.
-9. User can click Continue in chat.
+3. Extension inserts the session with `sessions.id = dashboard_chats.id`.
+4. Extension calls `link_dashboard_chat_session(p_chat_id)`; direct
+   `dashboard_chats.session_id` updates are not granted to clients.
+5. Extension inserts stable-ID transcript rows into session_messages.
+6. Extension calls summarize-session Edge Function.
+7. Edge Function updates sessions.summary.
+8. Edge Function inserts action_items.
+9. Realtime events invalidate the dashboard session/chat caches.
+10. User can continue the same canonical chat on either surface.
 ```
 
 Pseudo-code:
@@ -1941,6 +2290,7 @@ async function saveLiveSession(payload) {
   const { data: session, error: sessionError } = await supabase
     .from('sessions')
     .insert({
+      id: payload.chatId,
       user_id: user.id,
       rubric_id: payload.rubricId,
       title: payload.title,
@@ -1955,12 +2305,22 @@ async function saveLiveSession(payload) {
 
   if (sessionError) throw sessionError;
 
+  const { error: linkError } = await supabase.rpc(
+    'link_dashboard_chat_session',
+    { p_chat_id: session.id }
+  );
+
+  if (linkError) throw linkError;
+
   const messages = payload.transcript.map((m) => ({
+    id: m.id || crypto.randomUUID(),
     session_id: session.id,
     role: m.role,
     message_text: m.text,
     time_offset_seconds: m.timeOffsetSeconds || 0,
   }));
+
+  // server_sequence is allocated by Postgres; retries reuse each stable id.
 
   if (messages.length > 0) {
     const { error: messagesError } = await supabase
