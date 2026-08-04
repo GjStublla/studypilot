@@ -50,10 +50,15 @@ export async function verifyRequest(
 ): Promise<{ user: { id: string; email?: string | null }; db: SupabaseClient } | null> {
   const authHeader = req.headers.get('Authorization')
   if (!authHeader?.startsWith('Bearer ')) return null
+  const accessToken = authHeader.slice('Bearer '.length).trim()
+  if (!accessToken) return null
 
   const { authClient, db } = createEdgeClients(authHeader)
 
-  const { data: { user }, error } = await authClient.auth.getUser()
+  // This repository pins supabase-js 2.38. With persistSession disabled,
+  // getUser() without an explicit JWT reports "Auth session missing" even
+  // though the PostgREST client has a global Authorization header.
+  const { data: { user }, error } = await authClient.auth.getUser(accessToken)
   if (error || !user) return null
 
   return { user, db }

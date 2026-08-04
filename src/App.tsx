@@ -261,7 +261,7 @@ function App() {
     }
     return (
       <Suspense fallback={null}>
-        <Dashboard />
+        <Dashboard routeHash={hash} />
       </Suspense>
     );
   }

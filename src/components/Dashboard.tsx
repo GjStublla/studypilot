@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { ComponentType, MouseEvent, ReactNode, SVGProps } from 'react';
 import { clearAuth, apiFetch } from '../lib/api';
 import { AUTH_REQUIRED } from '../lib/authConfig';
@@ -15,12 +15,21 @@ import {
   deleteDashboardChat,
   getDashboardChatMessages,
   getDashboardChats,
+  getOrCreateSessionChat,
   updateDashboardChat,
   type AiUsage,
 } from '../lib/studypilot-api';
 import { sendCoachingMessage } from '../lib/socraticCoach';
 import { useStudyPilotRealtime } from '../lib/useRealtime';
-import type { DashboardChat, DashboardChatMessage } from '../lib/studypilot-types';
+import type { DashboardChat } from '../lib/studypilot-types';
+import {
+  dashboardChatReducer,
+  isChatBusy,
+  isChatHistoryLoading,
+  selectChatMessages,
+  type ChatViewMessage,
+} from '../lib/dashboard-chat-state';
+import { formatDashboardRoute, parseDashboardRoute } from '../lib/dashboard-route';
 import './Dashboard.css';
 
 type Session = any;
@@ -97,13 +106,7 @@ function getInitialTheme(): Theme {
 
 type LucideIcon = ComponentType<SVGProps<SVGSVGElement> & { size?: number | string }>;
 
-type Message = {
-  id: string;
-  role: 'ai' | 'user';
-  text: string;
-  lines: readonly string[];
-  time: string;
-};
+type Message = ChatViewMessage;
 
 type SessionRow = {
   session: Session;
@@ -187,17 +190,28 @@ const homeDateFormatter = new Intl.DateTimeFormat('en-US', {
   day: 'numeric',
 });
 
-function createMessage(message: Omit<Message, 'lines'>): Message {
-  return {
-    ...message,
-    lines: message.text.split('\n'),
-  };
-}
-
 /* ---------- Component ---------- */
 
-export default function Dashboard() {
-  const [view, setView] = useState<View>('home');
+function replaceDashboardHash(chatId?: string | null): void {
+  if (typeof window === 'undefined') return;
+  const nextHash = formatDashboardRoute(chatId);
+  if (window.location.hash === nextHash) return;
+  window.history.replaceState(
+    window.history.state,
+    '',
+    `${window.location.pathname}${window.location.search}${nextHash}`,
+  );
+  window.dispatchEvent(new HashChangeEvent('hashchange'));
+}
+
+export default function Dashboard({
+  routeHash = typeof window === 'undefined' ? '#dashboard' : window.location.hash,
+}: {
+  routeHash?: string;
+}) {
+  const [view, setView] = useState<View>(() => (
+    parseDashboardRoute(routeHash).chatId ? 'chat' : 'home'
+  ));
 
   // ── Live data from the backend ──────────────────────────────────────────────
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -205,11 +219,24 @@ export default function Dashboard() {
   const [actionItems, setActionItems] = useState<ActionItem[]>([]);
   const [chats, setChats] = useState<DashboardChat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [chatState, dispatchChat] = useReducer(dashboardChatReducer, {});
+  const [draftCreating, setDraftCreating] = useState(false);
+  const [chatsLoaded, setChatsLoaded] = useState(false);
   const [transcripts, setTranscripts] = useState<Record<string, TranscriptLine[]>>({});
   const [transcriptLoading, setTranscriptLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [aiUsage, setAiUsage] = useState<AiUsage | null>(null);
+  const chatsRef = useRef<DashboardChat[]>([]);
+  const activeChatIdRef = useRef<string | null>(null);
+  const chatListVersionRef = useRef(0);
+  const hasLoadedChatsRef = useRef(false);
+  const chatLoadVersionsRef = useRef(new Map<string, number>());
+  const inFlightChatIdsRef = useRef(new Set<string>());
+  const draftCreatingRef = useRef(false);
+
+  useEffect(() => { chatsRef.current = chats; }, [chats]);
+  useEffect(() => { activeChatIdRef.current = activeChatId; }, [activeChatId]);
 
   const refreshAiUsage = useCallback(() => {
     if (!AUTH_REQUIRED) return;
@@ -217,6 +244,45 @@ export default function Dashboard() {
       // The migration may not be deployed yet; usage UI is optional in that case.
     });
   }, []);
+
+  const refreshChats = useCallback(async (): Promise<DashboardChat[]> => {
+    const version = ++chatListVersionRef.current;
+    const rows = await getDashboardChats();
+    if (version !== chatListVersionRef.current) return chatsRef.current;
+
+    const firstLoad = !hasLoadedChatsRef.current;
+    hasLoadedChatsRef.current = true;
+    setChats(rows);
+    setChatsLoaded(true);
+    const current = activeChatIdRef.current;
+    const next = firstLoad && current === null
+      ? rows[0]?.id ?? null
+      : current && !rows.some((chat) => chat.id === current)
+        ? rows[0]?.id ?? null
+        : current;
+    activeChatIdRef.current = next;
+    setActiveChatId(next);
+    if (!firstLoad && current && current !== next) replaceDashboardHash(next);
+    return rows;
+  }, []);
+
+  const loadChatMessages = useCallback(async (chatId: string): Promise<void> => {
+    const version = (chatLoadVersionsRef.current.get(chatId) ?? 0) + 1;
+    chatLoadVersionsRef.current.set(chatId, version);
+    dispatchChat({ type: 'load-started', chatId, version });
+    try {
+      const rows = await getDashboardChatMessages(chatId);
+      dispatchChat({ type: 'load-succeeded', chatId, version, rows });
+    } catch (error) {
+      console.error('Failed to load dashboard chat messages:', error);
+      dispatchChat({ type: 'load-failed', chatId, version });
+    }
+  }, []);
+
+  const invalidateChat = useCallback((chatId: string) => {
+    dispatchChat({ type: 'invalidate', chatId });
+    if (activeChatIdRef.current === chatId) void loadChatMessages(chatId);
+  }, [loadChatMessages]);
 
   // ── Realtime subscriptions ─────────────────────────────────────────────────
   const [userId, setUserId] = useState<string | null>(null);
@@ -240,8 +306,18 @@ export default function Dashboard() {
   }, []);
 
   useStudyPilotRealtime(userId, {
-    onNewSession: (newSession) => {
-      setSessions((prev) => [newSession, ...prev]);
+    onNewSession: () => {
+      void fetchSessions().then(setSessions).catch(() => undefined);
+    },
+    onSessionChanged: () => {
+      void fetchSessions().then(setSessions).catch(() => undefined);
+    },
+    onSessionMessageChanged: (payload) => {
+      const sessionId = payload.new?.session_id;
+      if (typeof sessionId !== 'string') return;
+      void fetchSessionTranscript(sessionId)
+        .then((lines) => setTranscripts((current) => ({ ...current, [sessionId]: lines })))
+        .catch(() => undefined);
     },
     onDocumentUpdated: (doc) => {
       // Update rubric status if document is linked to a rubric
@@ -280,6 +356,18 @@ export default function Dashboard() {
       } else if (payload.event === 'DELETE') {
         setRubrics((prev) => prev.filter((r) => r.id !== payload.old.id));
       }
+    },
+    onDashboardChatChanged: () => {
+      void refreshChats().catch(() => undefined);
+    },
+    onDashboardChatMessageChanged: (payload) => {
+      const chatId = payload.new?.chat_id;
+      if (typeof chatId === 'string') invalidateChat(chatId);
+    },
+    onSubscribed: () => {
+      void refreshChats().catch(() => undefined);
+      const activeId = activeChatIdRef.current;
+      if (activeId) void loadChatMessages(activeId);
     },
   });
 
@@ -333,7 +421,7 @@ export default function Dashboard() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    Promise.allSettled([fetchSessions(), fetchRubrics(), fetchActionItems(), getDashboardChats()])
+    Promise.allSettled([fetchSessions(), fetchRubrics(), fetchActionItems(), refreshChats()])
       .then(([s, r, a, c]) => {
         if (cancelled) return;
         if (s.status === 'fulfilled') setSessions(s.value);
@@ -343,10 +431,7 @@ export default function Dashboard() {
           if (active) setActiveRubricId((prev) => prev || active.id);
         }
         if (a.status === 'fulfilled') setActionItems(a.value);
-        if (c.status === 'fulfilled') {
-          setChats(c.value);
-          setActiveChatId(c.value[0]?.id ?? null);
-        }
+        if (c.status === 'rejected') setChatsLoaded(true);
         if (
           AUTH_REQUIRED &&
           s.status === 'rejected' &&
@@ -362,11 +447,57 @@ export default function Dashboard() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshChats]);
 
   useEffect(() => {
     refreshAiUsage();
   }, [refreshAiUsage]);
+
+  const replaceChatRoute = useCallback(replaceDashboardHash, []);
+
+  useEffect(() => {
+    if (!chatsLoaded) return;
+    const requestedChatId = parseDashboardRoute(routeHash).chatId;
+    if (!requestedChatId) return;
+
+    const target = chatsRef.current.find((chat) => chat.id === requestedChatId);
+    const fallback = target ?? chatsRef.current[0];
+    setView('chat');
+    setActiveChatId(fallback?.id ?? null);
+    if (!target) replaceChatRoute(fallback?.id ?? null);
+  }, [chatsLoaded, replaceChatRoute, routeHash]);
+
+  useEffect(() => {
+    if (activeChatId) void loadChatMessages(activeChatId);
+  }, [activeChatId, loadChatMessages]);
+
+  useEffect(() => {
+    let refreshPending = false;
+    const refreshCanonicalState = () => {
+      if (document.visibilityState === 'hidden' || refreshPending) return;
+      refreshPending = true;
+      const activeId = activeChatIdRef.current;
+      void Promise.allSettled([
+        refreshChats(),
+        activeId ? loadChatMessages(activeId) : Promise.resolve(),
+        fetchSessions().then(setSessions),
+        selectedSessionId
+          ? fetchSessionTranscript(selectedSessionId).then((lines) => {
+            setTranscripts((current) => ({ ...current, [selectedSessionId]: lines }));
+          })
+          : Promise.resolve(),
+      ]).finally(() => {
+        refreshPending = false;
+      });
+    };
+
+    window.addEventListener('focus', refreshCanonicalState);
+    document.addEventListener('visibilitychange', refreshCanonicalState);
+    return () => {
+      window.removeEventListener('focus', refreshCanonicalState);
+      document.removeEventListener('visibilitychange', refreshCanonicalState);
+    };
+  }, [loadChatMessages, refreshChats, selectedSessionId]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -416,6 +547,14 @@ export default function Dashboard() {
     () => (activeChat?.session_id ? sessionsById.get(activeChat.session_id) : undefined),
     [activeChat, sessionsById],
   );
+  const activeChatMessages = useMemo(
+    () => selectChatMessages(chatState, activeChatId),
+    [activeChatId, chatState],
+  );
+  const activeChatBusy = activeChatId
+    ? isChatBusy(chatState, activeChatId)
+    : draftCreating;
+  const activeChatHistoryLoading = isChatHistoryLoading(chatState, activeChatId);
 
   const openActionItems = useMemo(() => actionItems.filter((a) => !a.done), [actionItems]);
   const doneActionItems = useMemo(() => actionItems.filter((a) => a.done), [actionItems]);
@@ -475,12 +614,8 @@ export default function Dashboard() {
   // time a transcript is fetched.
   const transcriptsRef = useRef(transcripts);
   useEffect(() => { transcriptsRef.current = transcripts; });
-  const chatsRef = useRef(chats);
   const sessionsRef = useRef(sessions);
-  const activeChatIdRef = useRef(activeChatId);
-  useEffect(() => { chatsRef.current = chats; }, [chats]);
   useEffect(() => { sessionsRef.current = sessions; }, [sessions]);
-  useEffect(() => { activeChatIdRef.current = activeChatId; }, [activeChatId]);
 
   const ensureTranscript = useCallback(
     (sessionId: string) => {
@@ -494,22 +629,39 @@ export default function Dashboard() {
     [], // stable — reads transcripts via ref, not closure
   );
 
+  const navigateToView = useCallback((nextView: View) => {
+    setView(nextView);
+    replaceChatRoute(nextView === 'chat' ? activeChatIdRef.current : null);
+  }, [replaceChatRoute]);
+
   const selectChat = useCallback((chatId: string) => {
+    activeChatIdRef.current = chatId;
     setActiveChatId(chatId);
     setView('chat');
-  }, []);
+    replaceChatRoute(chatId);
+  }, [replaceChatRoute]);
 
   const startNewChat = useCallback(() => {
+    activeChatIdRef.current = null;
     setActiveChatId(null);
     setView('chat');
-  }, []);
+    replaceChatRoute(null);
+  }, [replaceChatRoute]);
 
   const createChat = useCallback(async (title: string, sessionId?: string | null) => {
-    const chat = await createDashboardChat(title, sessionId);
-    setChats((current) => [chat, ...current.filter((item) => item.id !== chat.id)]);
+    const chat = sessionId
+      ? await getOrCreateSessionChat(sessionId, title)
+      : await createDashboardChat(title, null);
+    setChats((current) => {
+      const next = [chat, ...current.filter((item) => item.id !== chat.id)];
+      chatsRef.current = next;
+      return next;
+    });
+    activeChatIdRef.current = chat.id;
     setActiveChatId(chat.id);
+    replaceChatRoute(chat.id);
     return chat;
-  }, []);
+  }, [replaceChatRoute]);
 
   const renameChat = useCallback((chatId: string, title: string) => {
     const previous = chatsRef.current.find((chat) => chat.id === chatId);
@@ -539,16 +691,25 @@ export default function Dashboard() {
 
     const previousActiveChatId = activeChatIdRef.current;
     const nextActiveChatId = previousActiveChatId === chatId ? nextChats[0]?.id ?? null : previousActiveChatId;
+    chatsRef.current = nextChats;
     setChats(nextChats);
-    if (previousActiveChatId === chatId) setActiveChatId(nextActiveChatId);
+    dispatchChat({ type: 'chat-deleted', chatId });
+    if (previousActiveChatId === chatId) {
+      activeChatIdRef.current = nextActiveChatId;
+      setActiveChatId(nextActiveChatId);
+      replaceChatRoute(nextActiveChatId);
+    }
 
     deleteDashboardChat(chatId).catch(() => {
+      chatsRef.current = previousChats;
       setChats(previousChats);
       if (activeChatIdRef.current === nextActiveChatId) {
         setActiveChatId(previousActiveChatId);
+        activeChatIdRef.current = previousActiveChatId;
+        replaceChatRoute(previousActiveChatId);
       }
     });
-  }, []);
+  }, [replaceChatRoute]);
 
   const touchChat = useCallback((chatId: string) => {
     setChats((current) => {
@@ -561,28 +722,106 @@ export default function Dashboard() {
     });
   }, []);
 
+  const sendChatMessage = useCallback((text: string, sessionId?: string | null): boolean => {
+    const value = text.trim();
+    if (!value || (aiUsage !== null && aiUsage.used >= aiUsage.limit)) return false;
+
+    const currentChatId = activeChatIdRef.current;
+    if (currentChatId) {
+      if (inFlightChatIdsRef.current.has(currentChatId)) return false;
+      inFlightChatIdsRef.current.add(currentChatId);
+    } else {
+      if (draftCreatingRef.current) return false;
+      draftCreatingRef.current = true;
+      setDraftCreating(true);
+    }
+
+    void (async () => {
+      let chatId = currentChatId;
+      try {
+        if (!chatId) {
+          const chat = await createChat(titleFromFirstMessage(value), sessionId ?? null);
+          chatId = chat.id;
+          if (inFlightChatIdsRef.current.has(chatId)) return;
+          inFlightChatIdsRef.current.add(chatId);
+        }
+      } catch (error) {
+        console.error('Failed to create chat:', error);
+        return;
+      } finally {
+        if (!currentChatId) {
+          draftCreatingRef.current = false;
+          setDraftCreating(false);
+        }
+      }
+
+      if (!chatId) return;
+      const requestId = crypto.randomUUID();
+      dispatchChat({
+        type: 'turn-started',
+        chatId,
+        requestId,
+        userText: value,
+        createdAt: new Date().toISOString(),
+        originSurface: 'dashboard',
+      });
+
+      try {
+        const result = await sendCoachingMessage(
+          chatId,
+          value,
+          { requestId, originSurface: 'dashboard' },
+          {
+            onTokenReceived: (token) => {
+              dispatchChat({ type: 'token-received', chatId, requestId, token });
+            },
+          },
+        );
+        if (result.commit) {
+          dispatchChat({ type: 'turn-committed', chatId, requestId, commit: result.commit });
+        } else {
+          dispatchChat({ type: 'turn-completed', chatId, requestId });
+        }
+        touchChat(chatId);
+      } catch (error) {
+        console.error('Chat stream error:', error);
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        dispatchChat({ type: 'turn-failed', chatId, requestId, error: message });
+      } finally {
+        inFlightChatIdsRef.current.delete(chatId);
+        refreshAiUsage();
+        dispatchChat({ type: 'invalidate', chatId });
+        void loadChatMessages(chatId);
+        void refreshChats().catch(() => undefined);
+      }
+    })();
+
+    return true;
+  }, [aiUsage, createChat, loadChatMessages, refreshAiUsage, refreshChats, touchChat]);
+
   const openInChat = useCallback((sessionId: string) => {
     const existing = chatsRef.current.find((chat) => chat.session_id === sessionId);
     setView('chat');
     if (existing) {
-      setActiveChatId(existing.id);
+      selectChat(existing.id);
       return;
     }
 
+    activeChatIdRef.current = null;
     setActiveChatId(null);
     const session = sessionsRef.current.find((item) => item.id === sessionId);
     void createChat(session?.title ?? 'Session chat', sessionId).catch(() => {
       /* Leave the user in a fresh rubric-only draft if the chat could not be created. */
     });
-  }, [createChat]);
+  }, [createChat, selectChat]);
 
   const openSessionDetail = useCallback(
     (sessionId: string) => {
       setSelectedSessionId(sessionId);
-      setView('session-detail');
+      navigateToView('session-detail');
       ensureTranscript(sessionId);
     },
-    [ensureTranscript],
+    [ensureTranscript, navigateToView],
   );
 
   const toggleSidebar = useCallback(() => setSidebarOpen((v) => !v), []);
@@ -618,7 +857,7 @@ export default function Dashboard() {
   const continueContextInChat = useCallback(() => {
     if (chatSession) openInChat(chatSession.id);
   }, [chatSession, openInChat]);
-  const backToSessions = useCallback(() => setView('sessions'), []);
+  const backToSessions = useCallback(() => navigateToView('sessions'), [navigateToView]);
   const askAboutRubric = useCallback(
     (rubricId: string) => {
       const session = sessions.find((s) => s.rubricId === rubricId);
@@ -664,7 +903,7 @@ export default function Dashboard() {
       <Sidebar
         student={student}
         view={view}
-        setView={setView}
+        setView={navigateToView}
         openCount={openActionItems.length}
         sessionsCount={sessions.length}
         rubricsCount={rubrics.length}
@@ -709,7 +948,7 @@ export default function Dashboard() {
                   onContinueInChat={continueLatestInChat}
                   onOpenSession={openSessionDetail}
                   onToggleAction={toggleAction}
-                  onGoTo={setView}
+                  onGoTo={navigateToView}
                 />
               )}
 
@@ -720,15 +959,17 @@ export default function Dashboard() {
                   session={chatSession}
                   chats={chats}
                   activeChatId={activeChatId}
+                  messages={activeChatMessages}
+                  historyLoading={activeChatHistoryLoading}
+                  activeChatBusy={activeChatBusy}
+                  draftCreating={draftCreating}
                   aiUsage={aiUsage}
                   onOpenSession={openChatSessionDetail}
                   onSelectChat={selectChat}
                   onStartNewChat={startNewChat}
-                  onCreateChat={createChat}
                   onRenameChat={renameChat}
                   onDeleteChat={deleteChat}
-                  onChatActivity={touchChat}
-                  onAiRequestSettled={refreshAiUsage}
+                  onSendMessage={sendChatMessage}
                 />
               )}
 
@@ -800,7 +1041,7 @@ export default function Dashboard() {
         selectedSession={selectedSession}
         openActionItemCount={openActionItems.length}
         aiUsage={aiUsage}
-        onGoTo={setView}
+        onGoTo={navigateToView}
         onContinueInChat={continueContextInChat}
         onOpenExtension={openExtension}
       />
@@ -1215,26 +1456,11 @@ const HomeView = memo(function HomeView({
    Chat view
    ============================================================================ */
 
-/** Map a persisted dashboard chat message into a visible bubble. */
-function dbMessageToMessage(row: DashboardChatMessage): Message | null {
-  if (row.role === 'system') return null;
-
-  const createdAt = new Date(row.created_at);
-  const time = Number.isNaN(createdAt.getTime())
-    ? ''
-    : createdAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-
-  return createMessage({
-    id: row.id,
-    role: row.role === 'user' ? 'user' : 'ai',
-    text: row.text,
-    time,
-  });
-}
-
 function titleFromFirstMessage(text: string): string {
   return text.replace(/\s+/g, ' ').trim().slice(0, 40) || 'New chat';
 }
+
+const NEW_CHAT_DRAFT_KEY = '__new-chat__';
 
 export const ChatView = memo(function ChatView({
   student,
@@ -1242,109 +1468,52 @@ export const ChatView = memo(function ChatView({
   session,
   chats,
   activeChatId,
+  messages,
+  historyLoading,
+  activeChatBusy,
+  draftCreating,
   aiUsage,
   onOpenSession,
   onSelectChat,
   onStartNewChat,
-  onCreateChat,
   onRenameChat,
   onDeleteChat,
-  onChatActivity,
-  onAiRequestSettled,
+  onSendMessage,
 }: {
   student: typeof STUDENT;
   activeRubric: Rubric | undefined;
   session: Session | undefined;
   chats: DashboardChat[];
   activeChatId: string | null;
+  messages: Message[];
+  historyLoading: boolean;
+  activeChatBusy: boolean;
+  draftCreating: boolean;
   aiUsage: AiUsage | null;
   onOpenSession: () => void;
   onSelectChat: (chatId: string) => void;
   onStartNewChat: () => void;
-  onCreateChat: (title: string, sessionId?: string | null) => Promise<DashboardChat>;
   onRenameChat: (chatId: string, title: string) => void;
   onDeleteChat: (chatId: string) => void;
-  onChatActivity: (chatId: string) => void;
-  onAiRequestSettled: () => void;
+  onSendMessage: (text: string, sessionId?: string | null) => boolean;
 }) {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [micOn, setMicOn] = useState(false);
-  // Per-chat id of the AI placeholder still waiting for its first streamed token.
-  const [thinkingByChatId, setThinkingByChatId] = useState<Record<string, string | null>>({});
-  const [inFlightChatIds, setInFlightChatIds] = useState<Set<string>>(() => new Set());
-  const inFlightChatIdsRef = useRef<Set<string>>(new Set());
-  const [draftCreating, setDraftCreating] = useState(false);
-  const draftCreatingRef = useRef(false);
-  const limitReached = aiUsage !== null && aiUsage.used >= aiUsage.limit;
-  const remainingRequests = aiUsage === null ? null : Math.max(aiUsage.limit - aiUsage.used, 0);
-  const activeChatBusy = activeChatId
-    ? inFlightChatIds.has(activeChatId)
-    : draftCreating;
-  const composerDisabled = limitReached || activeChatBusy;
-  const activeThinkingId = activeChatId ? thinkingByChatId[activeChatId] ?? null : null;
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const activeChatIdRef = useRef<string | null>(activeChatId);
-  const suppressNextHistoryLoadRef = useRef<string | null>(null);
-  const historyLoadVersionRef = useRef(0);
+  const draftKey = activeChatId ?? NEW_CHAT_DRAFT_KEY;
+  const input = drafts[draftKey] ?? '';
+  const setInput = useCallback((value: string) => {
+    setDrafts((current) => {
+      if ((current[draftKey] ?? '') === value) return current;
+      if (value) return { ...current, [draftKey]: value };
 
-  const markChatInFlight = useCallback((chatId: string) => {
-    inFlightChatIdsRef.current.add(chatId);
-    setInFlightChatIds(new Set(inFlightChatIdsRef.current));
-  }, []);
-
-  const clearChatInFlight = useCallback((chatId: string) => {
-    inFlightChatIdsRef.current.delete(chatId);
-    setInFlightChatIds(new Set(inFlightChatIdsRef.current));
-    setThinkingByChatId((current) => {
-      if (!(chatId in current)) return current;
       const next = { ...current };
-      delete next[chatId];
+      delete next[draftKey];
       return next;
     });
-  }, []);
-
-  useEffect(() => {
-    activeChatIdRef.current = activeChatId;
-  }, [activeChatId]);
-
-  useEffect(() => {
-    const loadVersion = ++historyLoadVersionRef.current;
-    if (!activeChatId) {
-      setMessages([]);
-      setHistoryLoading(false);
-      return;
-    }
-
-    if (suppressNextHistoryLoadRef.current === activeChatId) {
-      suppressNextHistoryLoadRef.current = null;
-      setHistoryLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    setMessages([]);
-    setHistoryLoading(true);
-    getDashboardChatMessages(activeChatId)
-      .then((rows) => {
-        if (cancelled || loadVersion !== historyLoadVersionRef.current) return;
-        setMessages(
-          rows
-            .map(dbMessageToMessage)
-            .filter((message): message is Message => message !== null),
-        );
-      })
-      .catch(() => {
-        if (!cancelled && loadVersion === historyLoadVersionRef.current) setMessages([]);
-      })
-      .finally(() => {
-        if (!cancelled && loadVersion === historyLoadVersionRef.current) setHistoryLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeChatId]);
+  }, [draftKey]);
+  const limitReached = aiUsage !== null && aiUsage.used >= aiUsage.limit;
+  const remainingRequests = aiUsage === null ? null : Math.max(aiUsage.limit - aiUsage.used, 0);
+  const composerDisabled = limitReached || activeChatBusy;
   const messagesRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollFrameRef = useRef<number | null>(null);
@@ -1392,150 +1561,22 @@ export const ChatView = memo(function ChatView({
     };
   }, [input]);
 
-  const send = useCallback(async (text?: string) => {
+  const send = useCallback((text?: string) => {
     if (limitReached) return;
-
     const value = (text ?? input).trim();
     if (!value) return;
-
-    let chatIdForSend = activeChatIdRef.current;
-
-    if (!chatIdForSend) {
-      if (draftCreatingRef.current) return;
-      draftCreatingRef.current = true;
-      setDraftCreating(true);
-      try {
-        const chat = await onCreateChat(titleFromFirstMessage(value), session?.id ?? null);
-        chatIdForSend = chat.id;
-        suppressNextHistoryLoadRef.current = chat.id;
-        activeChatIdRef.current = chat.id;
-        markChatInFlight(chatIdForSend);
-      } catch (error) {
-        console.error('Failed to create chat:', error);
-        return;
-      } finally {
-        draftCreatingRef.current = false;
-        setDraftCreating(false);
-      }
-    } else {
-      if (inFlightChatIdsRef.current.has(chatIdForSend)) return;
-      markChatInFlight(chatIdForSend);
-    }
-
-    if (!chatIdForSend) return;
-
-    historyLoadVersionRef.current += 1;
-
-    const now = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    const userMsg = createMessage({
-      id: `local-${Date.now()}`,
-      role: 'user',
-      text: value,
-      time: now,
-    });
-    const aiMsgId = `ai-${Date.now()}`;
-    const aiMsg = createMessage({
-      id: aiMsgId,
-      role: 'ai',
-      text: '',
-      time: now,
-    });
-
-    if (activeChatIdRef.current === chatIdForSend) {
-      setMessages((current) => [...current, userMsg, aiMsg]);
-      setInput('');
-    } else {
-      setInput('');
-    }
-    setThinkingByChatId((current) => ({ ...current, [chatIdForSend]: aiMsgId }));
-
-    let accumulatedText = '';
-    try {
-      await sendCoachingMessage(chatIdForSend, value, {
-        onTokenReceived: (token) => {
-          accumulatedText += token;
-          if (activeChatIdRef.current !== chatIdForSend) return;
-          setThinkingByChatId((current) =>
-            current[chatIdForSend] === aiMsgId
-              ? { ...current, [chatIdForSend]: null }
-              : current,
-          );
-          setMessages((current) =>
-            current.map((message) =>
-              message.id === aiMsgId
-                ? { ...message, text: accumulatedText, lines: accumulatedText.split('\n') }
-                : message,
-            ),
-          );
-        },
-        onStreamComplete: () => {
-          if (activeChatIdRef.current === chatIdForSend) {
-            setThinkingByChatId((current) =>
-              current[chatIdForSend] === aiMsgId
-                ? { ...current, [chatIdForSend]: null }
-                : current,
-            );
-            setMessages((current) =>
-              current.map((message) =>
-                message.id === aiMsgId
-                  ? { ...message, text: accumulatedText, lines: accumulatedText.split('\n') }
-                  : message,
-              ),
-            );
-          }
-          onChatActivity(chatIdForSend);
-        },
-        onStreamError: (error) => {
-          console.error('Chat stream error:', error);
-          if (activeChatIdRef.current !== chatIdForSend) return;
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          setThinkingByChatId((current) =>
-            current[chatIdForSend] === aiMsgId
-              ? { ...current, [chatIdForSend]: null }
-              : current,
-          );
-          setMessages((current) =>
-            current.map((message) =>
-              message.id === aiMsgId
-                ? { ...message, text: `Error: ${errorMessage}`, lines: [`Error: ${errorMessage}`] }
-                : message,
-            ),
-          );
-        },
-      });
-    } catch (error) {
-      console.error('Unexpected chat send failure:', error);
-      if (activeChatIdRef.current === chatIdForSend) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        setThinkingByChatId((current) =>
-          current[chatIdForSend] === aiMsgId
-            ? { ...current, [chatIdForSend]: null }
-            : current,
-        );
-        setMessages((current) =>
-          current.map((message) =>
-            message.id === aiMsgId
-              ? { ...message, text: `Error: ${errorMessage}`, lines: [`Error: ${errorMessage}`] }
-              : message,
-          ),
-        );
-      }
-    } finally {
-      clearChatInFlight(chatIdForSend);
-      onAiRequestSettled();
-    }
-  }, [
-    clearChatInFlight,
-    input,
-    limitReached,
-    markChatInFlight,
-    onAiRequestSettled,
-    onChatActivity,
-    onCreateChat,
-    session?.id,
-  ]);
+    if (onSendMessage(value, session?.id ?? null)) setInput('');
+  }, [input, limitReached, onSendMessage, session?.id, setInput]);
 
   const toggleMic = useCallback(() => setMicOn((v) => !v), []);
+  const activeChat = chats.find((chat) => chat.id === activeChatId);
+  const chatOrigin = activeChat?.origin_surface ?? 'dashboard';
+  const originLabel = chatOrigin === 'extension'
+    ? 'Started in Chrome extension'
+    : chatOrigin === 'legacy'
+      ? 'Imported legacy chat'
+      : 'Started in dashboard';
+  const composerBusy = activeChatBusy || draftCreating;
 
   return (
     <div className="ds-view ds-view-chat">
@@ -1580,8 +1621,10 @@ export const ChatView = memo(function ChatView({
           </span>
         )}
         <span className="ds-context-chip">
-          <Chrome size={11} strokeWidth={1.8} />
-          <span>Imported from Chrome extension</span>
+          {chatOrigin === 'extension'
+            ? <Chrome size={11} strokeWidth={1.8} />
+            : <MessageCircle size={11} strokeWidth={1.8} />}
+          <span>{originLabel}</span>
         </span>
         {session && (
           <span className="ds-context-chip ds-chip-muted">
@@ -1604,7 +1647,12 @@ export const ChatView = memo(function ChatView({
           />
         ) : (
           messages.map((m) => (
-            <MessageBubble key={m.id} message={m} student={student} thinking={m.id === activeThinkingId} />
+            <MessageBubble
+              key={m.id}
+              message={m}
+              student={student}
+              thinking={m.role === 'ai' && m.status === 'thinking'}
+            />
           ))
         )}
       </div>
@@ -1628,7 +1676,7 @@ export const ChatView = memo(function ChatView({
         <form
           className="ds-composer"
           role="form"
-          aria-busy={activeChatBusy}
+          aria-busy={composerBusy}
           onSubmit={(e) => {
             e.preventDefault();
             send();
@@ -1731,7 +1779,16 @@ const ChatListRow = memo(function ChatListRow({
         }
       }}
     >
-      {chat.session_id && <ScrollText className="ds-chat-session-glyph" size={13} strokeWidth={1.8} />}
+      {chat.origin_surface === 'extension' ? (
+        <Chrome
+          className="ds-chat-session-glyph"
+          size={13}
+          strokeWidth={1.8}
+          aria-label="Started in Chrome extension"
+        />
+      ) : chat.session_id ? (
+        <ScrollText className="ds-chat-session-glyph" size={13} strokeWidth={1.8} />
+      ) : null}
       {editing ? (
         <input
           className="ds-chat-rename-input"

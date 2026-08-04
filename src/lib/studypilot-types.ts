@@ -76,6 +76,7 @@ export interface TranscriptMessage {
   role: 'user' | 'ai' | 'system';
   message_text: string;
   time_offset_seconds: number;
+  server_sequence?: number;
 }
 
 export interface Session {
@@ -111,9 +112,13 @@ export interface DashboardChat {
   user_id: string;
   session_id?: string | null;
   title: string;
+  origin_surface: OriginSurface;
+  client_key?: string | null;
   created_at: string;
   updated_at: string;
 }
+
+export type OriginSurface = 'dashboard' | 'extension' | 'legacy';
 
 export interface DashboardChatMessage {
   id: string;
@@ -122,6 +127,9 @@ export interface DashboardChatMessage {
   session_id?: string | null;
   role: 'user' | 'ai' | 'system';
   text: string;
+  origin_surface: OriginSurface;
+  request_id?: string | null;
+  server_sequence: number;
   used_file_search?: boolean;
   file_search_store_name?: string | null;
   grounding_metadata?: unknown;
@@ -174,12 +182,30 @@ export interface SocraticCoachRequest {
   chatId?: string;
   sessionId?: string;
   userMessage: string;
+  requestId?: string;
+  originSurface?: OriginSurface;
+  clientContext?: Record<string, unknown>;
   history?: Array<{ role: 'user' | 'ai' | 'system'; text: string }>;
   images?: Array<{ mimeType: string; data: string }>;
 }
 
 export interface SocraticCoachStreamChunk {
   text: string;
+}
+
+export interface SocraticCoachCommit {
+  type: 'commit';
+  chatId: string;
+  requestId: string;
+  userMessageId: string;
+  assistantMessageId: string;
+  userSequence: number;
+  assistantSequence: number;
+}
+
+export interface SocraticCoachStreamError {
+  type?: 'error';
+  error: string;
 }
 
 export interface SummarizeSessionRequest {

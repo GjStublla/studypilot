@@ -12,7 +12,7 @@ export interface AiUsageDbClient {
   rpc(
     fn: string,
     args?: Record<string, unknown>,
-  ): Promise<{ data: unknown; error: unknown }>
+  ): PromiseLike<{ data: unknown; error: unknown }>
 }
 
 export const QUOTA_UNAVAILABLE_MESSAGE =

@@ -1,80 +1,59 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import type { ChatViewMessage } from '../lib/dashboard-chat-state';
 import type { AiUsage, DashboardChat } from '../lib/studypilot-types';
-import type { SocraticCoachCallbacks } from '../lib/socraticCoach';
-
-vi.mock('../lib/socraticCoach', () => ({
-  sendCoachingMessage: vi.fn(),
-}));
-
-vi.mock('../lib/studypilot-api', async () => {
-  const actual = await vi.importActual<typeof import('../lib/studypilot-api')>('../lib/studypilot-api');
-  return {
-    ...actual,
-    getDashboardChatMessages: vi.fn(async () => []),
-    getAiUsage: vi.fn(async () => ({ used: 0, limit: 50 })),
-  };
-});
 
 vi.mock('../lib/supabaseClient', () => ({
-  supabase: {
-    auth: {
-      getSession: vi.fn(async () => ({ data: { session: null } })),
-    },
-  },
+  supabase: { auth: { getSession: vi.fn(async () => ({ data: { session: null } })) } },
+  injectStoredToken: vi.fn(async () => true),
 }));
-
-vi.mock('../lib/api', () => ({
-  clearAuth: vi.fn(),
-  apiFetch: vi.fn(),
-}));
-
-vi.mock('../lib/useRealtime', () => ({
-  useStudyPilotRealtime: vi.fn(),
-}));
-
+vi.mock('../lib/api', () => ({ clearAuth: vi.fn(), apiFetch: vi.fn() }));
+vi.mock('../lib/useRealtime', () => ({ useStudyPilotRealtime: vi.fn() }));
 vi.mock('./Dashboard.css', () => ({}));
 
-import { sendCoachingMessage } from '../lib/socraticCoach';
 import { ChatView } from './Dashboard';
 
-const sendCoachingMessageMock = vi.mocked(sendCoachingMessage);
-
-type StreamHandle = {
-  chatId: string;
-  callbacks: SocraticCoachCallbacks;
-  resolve: () => void;
-};
-
-function makeChat(id: string, title = `Chat ${id}`): DashboardChat {
+function makeChat(id: string, origin: DashboardChat['origin_surface'] = 'dashboard'): DashboardChat {
   return {
     id,
     user_id: 'user-1',
-    title,
+    title: `Chat ${id}`,
     session_id: null,
-    created_at: '2026-07-10T00:00:00.000Z',
-    updated_at: '2026-07-10T00:00:00.000Z',
+    origin_surface: origin,
+    client_key: null,
+    created_at: '2026-08-04T10:00:00.000Z',
+    updated_at: '2026-08-04T10:00:00.000Z',
+  };
+}
+
+function makeMessage(status: ChatViewMessage['status'] = 'persisted'): ChatViewMessage {
+  return {
+    id: 'message-1',
+    requestId: 'request-1',
+    role: 'ai',
+    text: status === 'thinking' ? '' : 'A useful answer',
+    lines: status === 'thinking' ? [''] : ['A useful answer'],
+    time: '10:00 AM',
+    originSurface: 'dashboard',
+    status,
   };
 }
 
 function Harness({
-  initialChats,
-  initialActiveChatId,
   aiUsage = { used: 0, limit: 50 },
-  onAiRequestSettled = vi.fn(),
-  onCreateChat,
+  message = makeMessage(),
+  busy = false,
+  onSendMessage = vi.fn(() => true),
 }: {
-  initialChats: DashboardChat[];
-  initialActiveChatId: string | null;
   aiUsage?: AiUsage | null;
-  onAiRequestSettled?: () => void;
-  onCreateChat?: (title: string, sessionId?: string | null) => Promise<DashboardChat>;
+  message?: ChatViewMessage;
+  busy?: boolean;
+  onSendMessage?: (text: string) => boolean;
 }) {
-  const [chats, setChats] = useState(initialChats);
-  const [activeChatId, setActiveChatId] = useState(initialActiveChatId);
-
+  const chats = [makeChat('chat-a', 'extension'), makeChat('chat-b')];
+  const [activeChatId, setActiveChatId] = useState<string | null>('chat-a');
   return (
     <ChatView
       student={{ name: 'Ada', initials: 'A', email: 'ada@example.com' }}
@@ -82,230 +61,103 @@ function Harness({
       session={undefined}
       chats={chats}
       activeChatId={activeChatId}
+      messages={[message]}
+      historyLoading={false}
+      activeChatBusy={busy}
+      draftCreating={false}
       aiUsage={aiUsage}
       onOpenSession={() => undefined}
       onSelectChat={setActiveChatId}
       onStartNewChat={() => setActiveChatId(null)}
-      onCreateChat={async (title, sessionId) => {
-        if (onCreateChat) return onCreateChat(title, sessionId);
-        const chat = makeChat(`created-${chats.length + 1}`, title);
-        setChats((current) => [chat, ...current]);
-        setActiveChatId(chat.id);
-        return chat;
-      }}
       onRenameChat={() => undefined}
       onDeleteChat={() => undefined}
-      onChatActivity={() => undefined}
-      onAiRequestSettled={onAiRequestSettled}
+      onSendMessage={onSendMessage}
     />
   );
 }
 
-describe('ChatView multi-chat AI request tracking', () => {
-  let streams: StreamHandle[];
-
-  beforeEach(() => {
-    streams = [];
-    sendCoachingMessageMock.mockReset();
-    sendCoachingMessageMock.mockImplementation((chatId, _text, callbacks) => {
-      return new Promise<void>((resolve) => {
-        streams.push({
-          chatId,
-          callbacks,
-          resolve: () => {
-            callbacks.onStreamComplete();
-            resolve();
-          },
-        });
-      });
-    });
-  });
-
-  it('blocks rapid double submission in one chat to a single request', async () => {
+describe('ChatView', () => {
+  it('submits accepted text once and clears the composer', async () => {
     const user = userEvent.setup();
-    const { container } = render(
-      <Harness
-        initialChats={[makeChat('chat-a')]}
-        initialActiveChatId="chat-a"
-      />,
-    );
+    const onSendMessage = vi.fn(() => true);
+    render(<Harness onSendMessage={onSendMessage} />);
 
     const input = screen.getByPlaceholderText(/Ask about your rubric/i);
-    await user.type(input, 'First question');
-    await user.click(screen.getByLabelText('Send'));
+    await user.type(input, 'How should I revise?');
     await user.click(screen.getByLabelText('Send'));
 
-    await waitFor(() => expect(sendCoachingMessageMock).toHaveBeenCalledTimes(1));
-    expect(container.querySelector('form.ds-composer')).toHaveAttribute('aria-busy', 'true');
+    expect(onSendMessage).toHaveBeenCalledWith('How should I revise?', null);
+    expect(input).toHaveValue('');
   });
 
-  it('creates only one chat for a draft double submission', async () => {
+  it('keeps unsent drafts isolated when switching between existing chats', async () => {
     const user = userEvent.setup();
-    let createCalls = 0;
-    const onCreateChat = vi.fn(async (title: string) => {
-      createCalls += 1;
-      await new Promise((resolve) => setTimeout(resolve, 30));
-      return makeChat('draft-1', title);
-    });
-
-    render(
-      <Harness
-        initialChats={[]}
-        initialActiveChatId={null}
-        onCreateChat={onCreateChat}
-      />,
-    );
+    render(<Harness />);
 
     const input = screen.getByPlaceholderText(/Ask about your rubric/i);
-    await user.type(input, 'Draft hello');
-    const sendButton = screen.getByLabelText('Send');
-    await Promise.all([user.click(sendButton), user.click(sendButton)]);
+    await user.type(input, 'Draft for Alpha');
+    await user.click(screen.getByText('Chat chat-b').closest('[role="button"]')!);
 
-    await waitFor(() => expect(createCalls).toBe(1));
-    await waitFor(() => expect(sendCoachingMessageMock).toHaveBeenCalledTimes(1));
-    expect(onCreateChat).toHaveBeenCalledTimes(1);
+    expect(input).toHaveValue('');
+
+    await user.type(input, 'Draft for Beta');
+    await user.click(screen.getByText('Chat chat-a').closest('[role="button"]')!);
+    expect(input).toHaveValue('Draft for Alpha');
+
+    await user.click(screen.getByText('Chat chat-b').closest('[role="button"]')!);
+    expect(input).toHaveValue('Draft for Beta');
   });
 
-  it('keeps chat A locked when revisited while its stream is active, and allows chat B', async () => {
+  it('keeps the new-chat draft separate from existing chat drafts', async () => {
     const user = userEvent.setup();
-    const { container } = render(
-      <Harness
-        initialChats={[makeChat('chat-a'), makeChat('chat-b')]}
-        initialActiveChatId="chat-a"
-      />,
-    );
+    render(<Harness />);
 
-    await user.type(screen.getByPlaceholderText(/Ask about your rubric/i), 'From A');
+    const input = screen.getByPlaceholderText(/Ask about your rubric/i);
+    await user.type(input, 'Existing chat draft');
+    await user.click(screen.getByRole('button', { name: 'New chat' }));
+
+    expect(input).toHaveValue('');
+
+    await user.type(input, 'Fresh chat draft');
+    await user.click(screen.getByText('Chat chat-a').closest('[role="button"]')!);
+    expect(input).toHaveValue('Existing chat draft');
+
+    await user.click(screen.getByRole('button', { name: 'New chat' }));
+    expect(input).toHaveValue('Fresh chat draft');
+  });
+
+  it('clears only the active chat draft after an accepted send', async () => {
+    const user = userEvent.setup();
+    const onSendMessage = vi.fn(() => true);
+    render(<Harness onSendMessage={onSendMessage} />);
+
+    const input = screen.getByPlaceholderText(/Ask about your rubric/i);
+    await user.type(input, 'Draft for Alpha');
+    await user.click(screen.getByText('Chat chat-b').closest('[role="button"]')!);
+    await user.type(input, 'Question for Beta');
     await user.click(screen.getByLabelText('Send'));
-    await waitFor(() => expect(sendCoachingMessageMock).toHaveBeenCalledTimes(1));
 
-    await user.click(screen.getByText('Chat chat-b'));
-    await waitFor(() =>
-      expect(container.querySelector('form.ds-composer')).toHaveAttribute('aria-busy', 'false'),
-    );
+    expect(onSendMessage).toHaveBeenCalledWith('Question for Beta', null);
+    expect(input).toHaveValue('');
 
-    await user.type(screen.getByPlaceholderText(/Ask about your rubric/i), 'From B');
-    await user.click(screen.getByLabelText('Send'));
-    await waitFor(() => expect(sendCoachingMessageMock).toHaveBeenCalledTimes(2));
+    await user.click(screen.getByText('Chat chat-a').closest('[role="button"]')!);
+    expect(input).toHaveValue('Draft for Alpha');
+  });
 
-    await user.click(screen.getByText('Chat chat-a'));
-    await waitFor(() =>
-      expect(container.querySelector('form.ds-composer')).toHaveAttribute('aria-busy', 'true'),
-    );
+  it('shows the thinking indicator supplied by per-chat root state', () => {
+    render(<Harness message={makeMessage('thinking')} busy />);
+    expect(screen.getByLabelText('StudyPilot is thinking')).toBeInTheDocument();
     expect(screen.getByLabelText('Send')).toBeDisabled();
   });
 
-  it('isolates thinking indicators and settles usage once per request', async () => {
-    const user = userEvent.setup();
-    const onAiRequestSettled = vi.fn();
-
-    render(
-      <Harness
-        initialChats={[makeChat('chat-a'), makeChat('chat-b')]}
-        initialActiveChatId="chat-a"
-        onAiRequestSettled={onAiRequestSettled}
-      />,
-    );
-
-    await user.type(screen.getByPlaceholderText(/Ask about your rubric/i), 'A asks');
-    await user.click(screen.getByLabelText('Send'));
-    await waitFor(() => expect(streams).toHaveLength(1));
-    expect(screen.getByLabelText('StudyPilot is thinking')).toBeInTheDocument();
-
-    await user.click(screen.getByText('Chat chat-b'));
-    await user.type(screen.getByPlaceholderText(/Ask about your rubric/i), 'B asks');
-    await user.click(screen.getByLabelText('Send'));
-    await waitFor(() => expect(streams).toHaveLength(2));
-    expect(screen.getByLabelText('StudyPilot is thinking')).toBeInTheDocument();
-
-    await act(async () => {
-      streams[0].callbacks.onTokenReceived('hello-a');
-    });
-    expect(screen.queryByText('hello-a')).not.toBeInTheDocument();
-
-    await act(async () => {
-      streams[1].callbacks.onTokenReceived('hello-b');
-    });
-    expect(screen.getByText('hello-b')).toBeInTheDocument();
-
-    await act(async () => {
-      streams[0].resolve();
-      streams[1].resolve();
-    });
-
-    await waitFor(() => expect(onAiRequestSettled).toHaveBeenCalledTimes(2));
-  });
-
-  it('shows quota exhaustion copy and disables send', async () => {
-    render(
-      <Harness
-        initialChats={[makeChat('chat-a')]}
-        initialActiveChatId="chat-a"
-        aiUsage={{ used: 50, limit: 50 }}
-      />,
-    );
-
+  it('shows quota exhaustion and disables send', () => {
+    render(<Harness aiUsage={{ used: 50, limit: 50 }} />);
     expect(screen.getByText(/Daily AI limit reached \(50 of 50\)/i)).toBeInTheDocument();
     expect(screen.getByLabelText('Send')).toBeDisabled();
   });
 
-  it('shows remaining-request copy when five or fewer remain', () => {
-    render(
-      <Harness
-        initialChats={[makeChat('chat-a')]}
-        initialActiveChatId="chat-a"
-        aiUsage={{ used: 46, limit: 50 }}
-      />,
-    );
-
-    expect(screen.getByText('4 AI requests left today.')).toBeInTheDocument();
-  });
-
-  it('renders 429 and 503 stream errors in the active chat and settles once', async () => {
-    const user = userEvent.setup();
-    const onAiRequestSettled = vi.fn();
-
-    sendCoachingMessageMock.mockImplementation(async (_chatId, _text, callbacks) => {
-      callbacks.onStreamError(
-        new Error('Daily AI limit reached (50 of 50 used). Your limit resets at midnight UTC.'),
-      );
-    });
-
-    const { unmount } = render(
-      <Harness
-        initialChats={[makeChat('chat-a')]}
-        initialActiveChatId="chat-a"
-        onAiRequestSettled={onAiRequestSettled}
-      />,
-    );
-
-    await user.type(screen.getByPlaceholderText(/Ask about your rubric/i), 'Hit limit');
-    await user.click(screen.getByLabelText('Send'));
-    await waitFor(() =>
-      expect(screen.getByText(/Error: Daily AI limit reached/i)).toBeInTheDocument(),
-    );
-    await waitFor(() => expect(onAiRequestSettled).toHaveBeenCalledTimes(1));
-    unmount();
-
-    sendCoachingMessageMock.mockImplementation(async (_chatId, _text, callbacks) => {
-      callbacks.onStreamError(
-        new Error('AI usage tracking is temporarily unavailable. Please try again in a moment.'),
-      );
-    });
-
-    render(
-      <Harness
-        initialChats={[makeChat('chat-a')]}
-        initialActiveChatId="chat-a"
-        onAiRequestSettled={onAiRequestSettled}
-      />,
-    );
-
-    await user.type(screen.getByPlaceholderText(/Ask about your rubric/i), 'Hit outage');
-    await user.click(screen.getByLabelText('Send'));
-    await waitFor(() =>
-      expect(screen.getByText(/Error: AI usage tracking is temporarily unavailable/i)).toBeInTheDocument(),
-    );
-    await waitFor(() => expect(onAiRequestSettled).toHaveBeenCalledTimes(2));
+  it('labels an extension-originated chat accurately', () => {
+    render(<Harness />);
+    expect(screen.getByText('Started in Chrome extension')).toBeInTheDocument();
   });
 });
