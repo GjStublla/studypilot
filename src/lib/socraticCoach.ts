@@ -19,36 +19,20 @@ export interface SocraticCoachCallbacks {
  * Both are valid Supabase JWTs — the Edge Function accepts either.
  */
 async function getAuthToken(): Promise<string> {
-  // Check for an active OAuth session first (no network call)
+  // Check for an active OAuth session first (no network call needed).
   const { data: { session } } = await supabase.auth.getSession();
   if (session?.access_token) {
-    // Decode exp to check if token is still valid
     try {
       const payload = JSON.parse(atob(session.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-      const isExpired = payload.exp < Date.now() / 1000;
-      console.log(`[socraticCoach] OAuth session token — exp: ${new Date(payload.exp * 1000).toISOString()}, expired: ${isExpired}`);
-      if (isExpired) {
-        console.log('[socraticCoach] Session token expired, falling back to localStorage');
-      } else {
-        return session.access_token;
-      }
+      if (payload.exp > Date.now() / 1000) return session.access_token;
     } catch {
       return session.access_token;
     }
   }
 
-  // Email/password users: the token in localStorage is a valid Supabase JWT
+  // Email/password users: token is in localStorage.
   const raw = localStorage.getItem('sp_access_token');
-  if (raw) {
-    try {
-      const payload = JSON.parse(atob(raw.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-      const isExpired = payload.exp < Date.now() / 1000;
-      console.log(`[socraticCoach] localStorage token — exp: ${new Date(payload.exp * 1000).toISOString()}, expired: ${isExpired}`);
-    } catch {
-      console.log('[socraticCoach] Using localStorage token (could not decode)');
-    }
-    return raw;
-  }
+  if (raw) return raw;
 
   throw new Error('Not authenticated. Please sign in again.');
 }
