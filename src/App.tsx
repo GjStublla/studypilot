@@ -378,14 +378,14 @@ function Hero({ user, onLogout }: { user: ReturnType<typeof getStoredUser>; onLo
               transition={{ duration: 0.48, ease: [0.23, 1, 0.32, 1] }}
             >
               <span className="line">
-                <span>Study</span> from{' '}
+                Study from{' '}
                 <i>any</i>{' '}
                 tab.
               </span>
               <span className="line">
-                Ask without{' '}
-                <i>switching</i>{' '}
-                apps.
+                Ask questions without{' '}
+                <i>leaving</i>{' '}
+                the page.
               </span>
             </m.h1>
 
@@ -395,10 +395,10 @@ function Hero({ user, onLogout }: { user: ReturnType<typeof getStoredUser>; onLo
               transition={{ duration: 0.36, ease: [0.23, 1, 0.32, 1] }}
             >
               <Button href="#install">
-                Add to Chrome <ArrowRight size={15} />
+                Install extension <ArrowRight size={15} />
               </Button>
               <Button href="#workflow" variant="secondary">
-                See how it works <ArrowUpRight size={14} />
+                See the flow <ArrowUpRight size={14} />
               </Button>
             </m.div>
 
@@ -480,8 +480,8 @@ function HeroNav({ user, onLogout }: { user: ReturnType<typeof getStoredUser>; o
       </a>
       <nav aria-label="Primary">
         <a className="active" href="#">Home</a>
-        <a href="#capabilities">Modes</a>
-        <a href="#workflow">Workflow</a>
+        <a href="#capabilities">Features</a>
+        <a href="#workflow">How it works</a>
         <a href="#install">Install</a>
         {user ? (
           <a href="#dashboard" onMouseEnter={prefetchDashboard} onFocus={prefetchDashboard}>
@@ -772,12 +772,11 @@ function Install() {
           Pin it once. <i>Use</i> it everywhere.
         </h2>
         <p>
-          Free during beta. Audio and transcripts stay on your device by default — cloud sync
-          is a single toggle, never a default.
+          Free during beta. Audio and transcripts stay on your device by default, and the web app keeps everything connected in one place.
         </p>
         <div className="install-actions">
           <Button href="#chrome">
-            Add to Chrome <Chrome size={15} />
+            Get the extension <Chrome size={15} />
           </Button>
         </div>
       </m.div>
