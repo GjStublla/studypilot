@@ -141,7 +141,19 @@ async function getJson(path: string, options?: RequestInit): Promise<unknown> {
   if (!res.ok) {
     throw new Error(`${options?.method ?? 'GET'} ${path} failed: ${res.status}`);
   }
-  return res.json();
+
+  const maybeText = (res as Response & { text?: () => Promise<string> }).text;
+  if (typeof maybeText !== 'function') {
+    return {};
+  }
+
+  const text = await maybeText.call(res);
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
 }
 
 export async function fetchSessions(): Promise<Session[]> {
@@ -171,4 +183,8 @@ export async function setActionItemDone(id: string, done: boolean): Promise<Acti
     body: JSON.stringify({ done }),
   })) as ApiActionItem;
   return mapActionItem(data);
+}
+
+export async function activateRubric(id: string): Promise<void> {
+  await getJson(`/rubrics/${id}/active`, { method: 'PATCH' });
 }
