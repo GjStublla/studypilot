@@ -25,16 +25,18 @@ export interface SocraticCoachResult {
 }
 
 async function getAuthToken(): Promise<string> {
+  // Check for an active OAuth session first (no network call needed).
   const { data: { session } } = await supabase.auth.getSession();
   if (session?.access_token) {
     try {
       const payload = JSON.parse(atob(session.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-      if (payload.exp >= Date.now() / 1000) return session.access_token;
+      if (payload.exp > Date.now() / 1000) return session.access_token;
     } catch {
       return session.access_token;
     }
   }
 
+  // Email/password users: token is in localStorage.
   const raw = localStorage.getItem('sp_access_token');
   if (raw) return raw;
 

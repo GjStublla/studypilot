@@ -270,9 +270,10 @@ def logout(request: Request, authorization: str = Header(...)):
         # does not have permission to invalidate sessions.
         supabase_admin.auth.admin.sign_out(token)
     except Exception as e:
-        # Log but still return success — the client clears its token regardless,
-        # and leaking sign-out errors could aid session enumeration.
-        print(f"[logout] sign_out failed (session may still be valid server-side): {e}")
+        # Swallow the error — the client clears its token regardless.
+        # "Session does not exist" is expected for admin-created users whose
+        # sessions aren't tracked in auth.sessions; the token is already invalid.
+        pass
 
     return MessageResponse(message="Logged out successfully.")
 

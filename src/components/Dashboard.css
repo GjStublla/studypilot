@@ -2106,3 +2106,124 @@
     transform: none;
   }
 }
+
+/* ---------- Upload Rubric Modal ---------- */
+
+.app-dashboard .ds-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(2, 3, 10, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.app-dashboard .ds-modal {
+  width: 100%;
+  max-width: 480px;
+  border: 1px solid var(--ds-line-strong);
+  border-radius: var(--ds-radius-lg);
+  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.012)), var(--ds-canvas);
+  box-shadow: 0 40px 80px -24px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04);
+  overflow: hidden;
+}
+
+.app-dashboard .ds-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 18px 0;
+}
+
+.app-dashboard .ds-modal-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ds-ink);
+  letter-spacing: -0.005em;
+}
+
+.app-dashboard .ds-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 18px 18px;
+}
+
+.app-dashboard .ds-modal-fields { display: flex; flex-direction: column; gap: 10px; }
+.app-dashboard .ds-modal-field { display: flex; flex-direction: column; gap: 6px; }
+
+.app-dashboard .ds-modal-field label {
+  font-size: 12px; font-weight: 500; color: var(--ds-muted);
+}
+
+.app-dashboard .ds-modal-field input {
+  height: 36px; padding: 0 12px;
+  border: 1px solid var(--ds-line-strong); border-radius: 8px;
+  background: var(--ds-surface); color: var(--ds-ink);
+  font-family: inherit; font-size: 13.5px; outline: none;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+.app-dashboard .ds-modal-field input::placeholder { color: var(--ds-quiet); }
+.app-dashboard .ds-modal-field input:focus {
+  border-color: rgba(124,92,255,0.5); background: rgba(124,92,255,0.05);
+}
+.app-dashboard .ds-modal-field input:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.app-dashboard .ds-modal-error {
+  margin: 0; padding: 9px 12px;
+  border: 1px solid rgba(255,79,100,0.22); border-radius: 7px;
+  background: rgba(255,79,100,0.07); color: #ff7080; font-size: 12.5px; line-height: 1.5;
+}
+
+.app-dashboard .ds-modal-foot {
+  display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-top: 4px;
+}
+
+/* ---------- Dropzone ---------- */
+
+.app-dashboard .ds-dropzone {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; min-height: 110px; padding: 20px;
+  border: 1px dashed var(--ds-line-strong); border-radius: var(--ds-radius);
+  background: var(--ds-surface); color: var(--ds-muted);
+  cursor: pointer; text-align: center; user-select: none;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+.app-dashboard .ds-dropzone:hover,
+.app-dashboard .ds-dropzone.is-over {
+  border-color: rgba(124,92,255,0.45); background: rgba(124,92,255,0.06); color: var(--ds-ink);
+}
+.app-dashboard .ds-dropzone.has-file {
+  border-style: solid; border-color: var(--ds-line); min-height: 56px; padding: 14px 16px;
+}
+.app-dashboard .ds-dropzone-input { display: none; }
+.app-dashboard .ds-dropzone-label { margin: 0; font-size: 13px; color: var(--ds-muted); }
+.app-dashboard .ds-dropzone-hint {
+  margin: 0; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.06em; color: var(--ds-quiet);
+}
+.app-dashboard .ds-dropzone-file {
+  display: flex; align-items: center; gap: 10px; width: 100%; font-size: 13px; color: var(--ds-ink);
+}
+.app-dashboard .ds-dropzone-file span {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left;
+}
+.app-dashboard .ds-dropzone-remove {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 4px; color: var(--ds-quiet);
+  transition: color 120ms ease, background 120ms ease;
+}
+.app-dashboard .ds-dropzone-remove:hover { color: #ff7080; background: rgba(255,79,100,0.08); }
+
+/* Light theme overrides */
+.app-dashboard.is-light .ds-modal-backdrop { background: rgba(240,235,224,0.72); }
+.app-dashboard.is-light .ds-modal {
+  background: linear-gradient(180deg, rgba(20,17,12,0.03), rgba(20,17,12,0.008)), var(--ds-canvas);
+  box-shadow: 0 40px 80px -24px rgba(20,17,12,0.3), 0 0 0 1px rgba(20,17,12,0.06);
+}
+.app-dashboard.is-light .ds-modal-field input:focus { border-color: rgba(90,48,197,0.45); background: rgba(90,48,197,0.04); }
+.app-dashboard.is-light .ds-dropzone:hover,
+.app-dashboard.is-light .ds-dropzone.is-over { border-color: rgba(90,48,197,0.4); background: rgba(90,48,197,0.05); }
