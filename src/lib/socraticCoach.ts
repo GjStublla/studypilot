@@ -5,11 +5,15 @@
 // and email/password users (FastAPI JWT in localStorage).
 
 import { supabase } from './supabaseClient';
+import type { OriginSurface, SocraticCoachCommit } from './studypilot-types';
+
+export interface SocraticCoachOptions {
+  requestId: string;
+  originSurface: OriginSurface;
+}
 
 export interface SocraticCoachCallbacks {
   onTokenReceived: (token: string) => void;
-  onStreamComplete: () => void;
-  onStreamError: (error: unknown) => void;
 }
 
 /**
@@ -39,88 +43,101 @@ async function getAuthToken(): Promise<string> {
 
 /**
  * Send a message to the Socratic coach and stream the response.
- * Calls onTokenReceived for each streamed token, then onStreamComplete.
- * Calls onStreamError if anything goes wrong.
+ * Calls onTokenReceived for each streamed token.
+ * Resolves with { commit } when the stream ends with a [DONE] signal.
+ * Rejects if the stream closes without [DONE] or the server sends an error.
  */
 export async function sendCoachingMessage(
   chatId: string,
   userMessageText: string,
+  options: SocraticCoachOptions,
   callbacks: SocraticCoachCallbacks,
-): Promise<void> {
-  const { onTokenReceived, onStreamComplete, onStreamError } = callbacks;
+): Promise<{ commit?: SocraticCoachCommit }> {
+  const { requestId, originSurface } = options;
+  const { onTokenReceived } = callbacks;
 
-  try {
-    const authToken = await getAuthToken();
+  const authToken = await getAuthToken();
 
-    const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/socratic-coach`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`,
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({
-          chatId,
-          userMessage: userMessageText,
-        }),
+  const response = await fetch(
+    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/socratic-coach`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`,
+        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
       },
+      body: JSON.stringify({
+        chatId,
+        userMessage: userMessageText,
+        requestId,
+        originSurface,
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(
+      (errData as { error?: string }).error ?? `Request failed: ${response.status} ${response.statusText}`,
     );
+  }
 
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      throw new Error(
-        (errData as { error?: string }).error ?? `Request failed: ${response.status} ${response.statusText}`,
-      );
-    }
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('No response body stream available.');
 
-    const reader = response.body?.getReader();
-    if (!reader) throw new Error('No response body stream available.');
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let commit: SocraticCoachCommit | undefined;
 
-    const decoder = new TextDecoder();
-    let buffer = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
 
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() ?? '';
+    for (const line of lines) {
+      const clean = line.trim();
+      if (!clean.startsWith('data: ')) continue;
 
-      for (const line of lines) {
-        const clean = line.trim();
-        if (!clean.startsWith('data: ')) continue;
+      const content = clean.slice(6).trim();
+      if (content === '[DONE]') {
+        return { commit };
+      }
 
-        const content = clean.slice(6).trim();
-        if (content === '[DONE]') {
-          onStreamComplete();
-          return;
+      try {
+        const parsed = JSON.parse(content) as {
+          type?: string;
+          text?: string;
+          error?: string;
+          chatId?: string;
+          requestId?: string;
+          userMessageId?: string;
+          assistantMessageId?: string;
+          userSequence?: number;
+          assistantSequence?: number;
+        };
+        if (parsed.error) {
+          throw new Error(parsed.error);
         }
-
-        try {
-          const parsed = JSON.parse(content) as { text?: string; error?: string };
-          if (parsed.error) {
-            throw new Error(parsed.error);
-          }
-          if (parsed.text) {
-            onTokenReceived(parsed.text);
-          }
-        } catch (parseErr) {
-          // Only re-throw if it's our own error, not a partial JSON chunk
-          if (parseErr instanceof Error && parseErr.message !== content) {
-            throw parseErr;
-          }
+        if (parsed.type === 'commit') {
+          commit = parsed as unknown as SocraticCoachCommit;
+        } else if (parsed.text) {
+          onTokenReceived(parsed.text);
+        }
+      } catch (parseErr) {
+        // Only re-throw if it's our own error, not a partial JSON chunk
+        if (parseErr instanceof Error && parseErr.message !== content) {
+          throw parseErr;
         }
       }
     }
-
-    // Stream ended without a [DONE] signal — still complete successfully
-    onStreamComplete();
-  } catch (error) {
-    onStreamError(error);
   }
+
+  // Stream closed without a [DONE] signal — treat as an error
+  throw new Error('Stream ended before completion');
 }
 
 /**
@@ -134,16 +151,18 @@ export async function streamCoachingResponse(
 ): Promise<string> {
   let fullResponse = '';
 
-  await new Promise<void>((resolve, reject) => {
-    sendCoachingMessage(chatId, userMessageText, {
+  const requestId = crypto.randomUUID();
+  await sendCoachingMessage(
+    chatId,
+    userMessageText,
+    { requestId, originSurface: 'dashboard' },
+    {
       onTokenReceived: (token) => {
         fullResponse += token;
         onToken(token);
       },
-      onStreamComplete: resolve,
-      onStreamError: reject,
-    });
-  });
+    },
+  );
 
   return fullResponse;
 }
