@@ -27,7 +27,7 @@ export default function AuthPage() {
         {/* Logo */}
         <div className="auth-brand">
           <StudyPilotMark size={40} />
-          <span className="auth-brand-text">studypilot.</span>
+          <span className="auth-brand-text">StudyPilot</span>
         </div>
 
         {/* OAuth error banner — shown when Google sign-in fails at the

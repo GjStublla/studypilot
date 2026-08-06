@@ -275,6 +275,77 @@ export async function deleteRubric(rubricId: string): Promise<void> {
   if (error) throw error;
 }
 
+export type RubricUploadResult = {
+  rubricId: string;
+  title: string;
+  course: string;
+  extractedText: string;
+  criteria: Array<{ name: string; max_score: number }>;
+};
+
+/**
+ * Upload any file as a rubric:
+ *   1. Create the rubric DB row
+ *   2. Upload the file to Supabase Storage (bucket: rubrics)
+ *   3. Call the extract-rubric Edge Function so Gemini parses criteria
+ *
+ * Accepts any file type — the extract-rubric function reads text content
+ * from plain text files and PDFs directly.
+ */
+export async function uploadRubricFile(
+  file: File,
+  title: string,
+  course: string,
+): Promise<RubricUploadResult> {
+  await injectStoredToken();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  // 1. Create the rubric row to get an ID for the storage path.
+  const { data: rubric, error: rubricError } = await supabase
+    .from('rubrics')
+    .insert({
+      user_id: user.id,
+      title,
+      course,
+      active: false,
+      file_search_status: 'not_indexed',
+    })
+    .select('id, title, course')
+    .single();
+
+  if (rubricError || !rubric) {
+    throw new Error(rubricError?.message ?? 'Could not create rubric.');
+  }
+
+  // 2. Upload to Storage. Path: {userId}/{rubricId}/{filename}
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const storagePath = `${user.id}/${rubric.id}/${safeName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('rubrics')
+    .upload(storagePath, file, { upsert: true });
+
+  if (uploadError) {
+    await supabase.from('rubrics').delete().eq('id', rubric.id);
+    throw new Error(`File upload failed: ${uploadError.message}`);
+  }
+
+  await supabase.from('rubrics').update({ file_path: storagePath }).eq('id', rubric.id);
+
+  // 3. Extract criteria via the Edge Function.
+  const extracted = await extractRubric(rubric.id, storagePath);
+
+  return {
+    rubricId: rubric.id,
+    title: rubric.title,
+    course: rubric.course,
+    extractedText: extracted.extractedText,
+    criteria: extracted.criteria,
+  };
+}
+
 // ─── Knowledge Document Operations ────────────────────────────────────────────────
 
 export async function getKnowledgeDocuments(): Promise<KnowledgeDocument[]> {
@@ -338,13 +409,27 @@ export async function deleteKnowledgeDocument(documentId: string): Promise<void>
   if (error) throw error;
 }
 
+// ─── Edge Function auth helper ────────────────────────────────────────────────
+
+/**
+ * Returns the best available JWT for calling Supabase Edge Functions.
+ * Works for both OAuth users (Supabase session) and email/password users
+ * (FastAPI-managed JWT in localStorage). Both are valid Supabase JWTs.
+ */
+async function getEdgeFunctionToken(): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.access_token) return session.access_token;
+  const raw = localStorage.getItem('sp_access_token');
+  if (raw) return raw;
+  throw new Error('Not authenticated. Please sign in again.');
+}
+
 // ─── Edge Function: Index Knowledge Document ─────────────────────────────────────
 
 export async function indexKnowledgeDocument(
   knowledgeDocumentId: string
 ): Promise<IndexKnowledgeDocumentResponse> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error('Not authenticated');
+  const token = await getEdgeFunctionToken();
 
   const response = await fetch(
     `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/index-knowledge-document`,
@@ -352,7 +437,7 @@ export async function indexKnowledgeDocument(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
         apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
       },
       body: JSON.stringify({ knowledgeDocumentId }),
@@ -360,7 +445,13 @@ export async function indexKnowledgeDocument(
   );
 
   if (!response.ok) {
-    throw new Error(`Indexing failed: ${response.statusText}`);
+    const errorBody = await response.json().catch(() => ({}));
+    const message = (errorBody as { error?: unknown }).error;
+    throw new Error(
+      typeof message === 'string' && message.trim()
+        ? message
+        : `Indexing failed: ${response.statusText}`,
+    );
   }
 
   return response.json();
@@ -639,8 +730,7 @@ export async function createActivityLog(
 // ─── Edge Function: Summarize Session ─────────────────────────────────────────────
 
 export async function summarizeSession(sessionId: string): Promise<SummarizeSessionResponse> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error('Not authenticated');
+  const token = await getEdgeFunctionToken();
 
   const response = await fetch(
     `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/summarize-session`,
@@ -648,7 +738,7 @@ export async function summarizeSession(sessionId: string): Promise<SummarizeSess
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
         apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
       },
       body: JSON.stringify({ sessionId }),
@@ -671,8 +761,7 @@ export async function summarizeSession(sessionId: string): Promise<SummarizeSess
 // ─── Edge Function: Extract Rubric ────────────────────────────────────────────────
 
 export async function extractRubric(rubricId: string, filePath?: string): Promise<ExtractRubricResponse> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error('Not authenticated');
+  const token = await getEdgeFunctionToken();
 
   const response = await fetch(
     `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/extract-rubric`,
@@ -680,7 +769,7 @@ export async function extractRubric(rubricId: string, filePath?: string): Promis
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
         apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
       },
       body: JSON.stringify({ rubricId, filePath }),
@@ -703,8 +792,7 @@ export async function extractRubric(rubricId: string, filePath?: string): Promis
 // ─── Edge Function: Ensure File Search Store ─────────────────────────────────────
 
 export async function ensureFileSearchStore() {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error('Not authenticated');
+  const token = await getEdgeFunctionToken();
 
   const response = await fetch(
     `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ensure-file-search-store`,
@@ -712,7 +800,7 @@ export async function ensureFileSearchStore() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
         apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
       },
       body: JSON.stringify({}),
@@ -729,8 +817,7 @@ export async function ensureFileSearchStore() {
 // ─── Edge Function: Live Token ───────────────────────────────────────────────────
 
 export async function getLiveToken(sessionId?: string) {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error('Not authenticated');
+  const token = await getEdgeFunctionToken();
 
   const response = await fetch(
     `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/live-token`,
@@ -738,7 +825,7 @@ export async function getLiveToken(sessionId?: string) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
         apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
       },
       body: JSON.stringify({ sessionId }),

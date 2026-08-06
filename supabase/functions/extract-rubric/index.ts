@@ -73,8 +73,34 @@ serve(async (req) => {
         .download(filePath)
 
       if (!downloadError && fileBlob) {
-        // Blob → text (handles plain text and most text-based formats)
-        sourceText = await fileBlob.text()
+        const mimeType = fileBlob.type?.toLowerCase() ?? ''
+
+        if (
+          mimeType.includes('pdf') ||
+          mimeType.includes('word') ||
+          mimeType.includes('octet-stream')
+        ) {
+          // For binary formats, extract the readable ASCII characters.
+          // This is a best-effort approach — it works well for most PDFs
+          // since they embed readable text strings in the binary stream.
+          const arrayBuffer = await fileBlob.arrayBuffer()
+          const bytes = new Uint8Array(arrayBuffer)
+          const chars: string[] = []
+          for (let i = 0; i < bytes.length; i++) {
+            const b = bytes[i]
+            // Include printable ASCII and common whitespace
+            if ((b >= 32 && b < 127) || b === 9 || b === 10 || b === 13) {
+              chars.push(String.fromCharCode(b))
+            } else {
+              chars.push(' ')
+            }
+          }
+          // Collapse whitespace runs that result from binary noise
+          sourceText = chars.join('').replace(/\s{4,}/g, ' ').trim()
+        } else {
+          // Plain text, Markdown, CSV, etc.
+          sourceText = await fileBlob.text()
+        }
       }
     }
 
