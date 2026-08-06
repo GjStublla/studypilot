@@ -4,21 +4,25 @@ import { clearAuth, apiFetch } from '../lib/api';
 import { AUTH_REQUIRED } from '../lib/authConfig';
 import { supabase } from '../lib/supabaseClient';
 import {
-  fetchSessions,
-  fetchRubrics,
-  fetchActionItems,
-  fetchSessionTranscript,
   createSessionCaptureSignedUrl,
   getAiUsage,
-  setActionItemDone,
   createDashboardChat,
   deleteDashboardChat,
   getDashboardChatMessages,
   getDashboardChats,
   getOrCreateSessionChat,
   updateDashboardChat,
+  uploadRubricFile,
   type AiUsage,
 } from '../lib/studypilot-api';
+import {
+  fetchSessions,
+  fetchRubrics,
+  fetchActionItems,
+  fetchSessionTranscript,
+  setActionItemDone,
+  activateRubric,
+} from '../lib/dashboardApi';
 import { sendCoachingMessage } from '../lib/socraticCoach';
 import { useStudyPilotRealtime } from '../lib/useRealtime';
 import type { DashboardChat } from '../lib/studypilot-types';
@@ -39,7 +43,7 @@ type TranscriptLine = {
   id: string;
   who: string;
   text: string;
-  t: number;
+  t: string;
 };
 import {
   ArrowRight,
@@ -68,6 +72,8 @@ import {
   ShieldCheck,
   Sparkles,
   Sun,
+  Upload,
+  X,
 } from 'lucide-react';
 
 /* ============================================================================
@@ -859,12 +865,25 @@ export default function Dashboard({
   }, [chatSession, openInChat]);
   const backToSessions = useCallback(() => navigateToView('sessions'), [navigateToView]);
   const askAboutRubric = useCallback(
-    (rubricId: string) => {
+    async (rubricId: string) => {
+      // Set the rubric active locally and on the server so the edge function
+      // can find it via the active-rubric fallback query.
+      setRubrics((prev) => prev.map((r) => ({ ...r, active: r.id === rubricId })));
+      setActiveRubricId(rubricId);
+      try {
+        await activateRubric(rubricId);
+      } catch {
+        // Keep the chat flow working even if activation fails.
+      }
+
       const session = sessions.find((s) => s.rubricId === rubricId);
-      if (session) openInChat(session.id);
-      else startNewChat();
+      if (session) {
+        openInChat(session.id);
+      } else {
+        startNewChat();
+      }
     },
-    [openInChat, sessions, startNewChat],
+    [openInChat, sessions, startNewChat, setRubrics, setActiveRubricId],
   );
   const openExtension = useCallback(() => {
     /* placeholder - would deep link the extension */
@@ -1002,6 +1021,16 @@ export default function Dashboard({
                   query={query}
                   onSetActive={setActiveRubricId}
                   onAskAbout={askAboutRubric}
+                  onRubricUploaded={(newRubric) => {
+                    const adapted = {
+                      ...newRubric,
+                      sessionsCount: 0,
+                      uploaded: new Date(newRubric.uploaded_at ?? new Date()).toLocaleDateString(),
+                      criteria: (newRubric.criteria ?? []).map((c: any) => ({ ...c, max: c.max_score })),
+                    };
+                    setRubrics((prev) => [adapted, ...prev]);
+                    if (rubrics.length === 0) setActiveRubricId(adapted.id);
+                  }}
                 />
               )}
 
@@ -1664,7 +1693,18 @@ export const ChatView = memo(function ChatView({
               key={p}
               type="button"
               className="ds-quick-prompt"
-              onClick={() => send(p)}
+              onClick={() => {
+                // For the rubric prompt, enrich with criteria so the AI has context
+                // even before the active-rubric DB query resolves.
+                if (p === 'Explain this rubric' && activeRubric) {
+                  const criteria = activeRubric.criteria?.map((c: any) =>
+                    `${c.name} (${c.score ?? 0}/${c.max ?? c.max_score ?? 4})`
+                  ).join(', ') || 'no criteria';
+                  send(`Explain this rubric to me: "${activeRubric.title}" (${activeRubric.course}). Criteria: ${criteria}.`);
+                } else {
+                  send(p);
+                }
+              }}
               disabled={composerDisabled}
             >
               <Sparkles size={11} strokeWidth={1.7} />
@@ -2204,13 +2244,16 @@ const RubricsView = memo(function RubricsView({
   query,
   onSetActive,
   onAskAbout,
+  onRubricUploaded,
 }: {
   rubrics: Rubric[];
   activeRubricId: string;
   query: string;
   onSetActive: (id: string) => void;
   onAskAbout: (id: string) => void;
+  onRubricUploaded: (rubric: any) => void;
 }) {
+  const [uploadOpen, setUploadOpen] = useState(false);
   const q = query.trim().toLowerCase();
   const filtered = useMemo(
     () =>
@@ -2234,10 +2277,20 @@ const RubricsView = memo(function RubricsView({
             scoring — including your imports from the extension.
           </p>
         </div>
-        <DsButton variant="secondary">
-          <Plus size={13} strokeWidth={1.7} /> Upload rubric
+        <DsButton variant="secondary" onClick={() => setUploadOpen(true)}>
+          <Upload size={13} strokeWidth={1.7} /> Upload rubric
         </DsButton>
       </header>
+
+      {uploadOpen && (
+        <UploadRubricModal
+          onClose={() => setUploadOpen(false)}
+          onUploaded={(rubric) => {
+            onRubricUploaded(rubric);
+            setUploadOpen(false);
+          }}
+        />
+      )}
 
       {rubrics.length === 0 ? (
         <EmptyState
@@ -2300,6 +2353,146 @@ const RubricsView = memo(function RubricsView({
         })}
       </ul>
       )}
+    </div>
+  );
+});
+
+/* ============================================================================
+   Upload Rubric Modal
+   ============================================================================ */
+
+const UploadRubricModal = memo(function UploadRubricModal({
+  onClose,
+  onUploaded,
+}: {
+  onClose: () => void;
+  onUploaded: (rubric: any) => void;
+}) {
+  const [title, setTitle] = useState('');
+  const [course, setCourse] = useState('');
+  const [file, setFile] = useState<File | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const MAX_MB = 20;
+
+  function handleFileSelect(f: File) {
+    if (f.size > MAX_MB * 1024 * 1024) {
+      setError(`File must be under ${MAX_MB} MB.`);
+      return;
+    }
+    setError('');
+    setFile(f);
+    if (!title) setTitle(f.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ').trim());
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!file) { setError('Please select a file.'); return; }
+    if (!title.trim()) { setError('Please enter a rubric title.'); return; }
+    if (!course.trim()) { setError('Please enter a course name.'); return; }
+    setUploading(true);
+    setError('');
+    try {
+      const result = await uploadRubricFile(file, title.trim(), course.trim());
+      onUploaded({
+        id: result.rubricId,
+        title: result.title,
+        course: result.course,
+        uploaded_at: new Date().toISOString(),
+        active: false,
+        sessions_count: 0,
+        file_search_status: 'not_indexed',
+        criteria: result.criteria.map((c) => ({ ...c, score: 0, max: c.max_score })),
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed. Please try again.');
+      setUploading(false);
+    }
+  }
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="ds-modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Upload rubric"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="ds-modal">
+        <div className="ds-modal-head">
+          <h3 className="ds-modal-title">Upload rubric</h3>
+          <button type="button" className="ds-icon-btn" onClick={onClose} aria-label="Close">
+            <X size={14} strokeWidth={1.7} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="ds-modal-body" noValidate>
+          <div
+            className={`ds-dropzone${dragOver ? ' is-over' : ''}${file ? ' has-file' : ''}`}
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFileSelect(f); }}
+            role="button"
+            tabIndex={0}
+            aria-label="Drop file here or click to browse"
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click(); }}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="ds-dropzone-input"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); }}
+            />
+            {file ? (
+              <div className="ds-dropzone-file">
+                <FileText size={20} strokeWidth={1.4} />
+                <span>{file.name}</span>
+                <button type="button" className="ds-dropzone-remove" aria-label="Remove"
+                  onClick={(e) => { e.stopPropagation(); setFile(null); setError(''); }}>
+                  <X size={12} strokeWidth={2} />
+                </button>
+              </div>
+            ) : (
+              <>
+                <Upload size={22} strokeWidth={1.4} />
+                <p className="ds-dropzone-label">Drop any file here or click to browse</p>
+                <p className="ds-dropzone-hint">PDF, DOCX, TXT, MD, images — max {MAX_MB} MB</p>
+              </>
+            )}
+          </div>
+          <div className="ds-modal-fields">
+            <div className="ds-modal-field">
+              <label htmlFor="rubric-title">Rubric title</label>
+              <input id="rubric-title" type="text" value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Argumentative Essay Rubric" disabled={uploading} required />
+            </div>
+            <div className="ds-modal-field">
+              <label htmlFor="rubric-course">Course</label>
+              <input id="rubric-course" type="text" value={course}
+                onChange={(e) => setCourse(e.target.value)}
+                placeholder="ENG 102 · Composition II" disabled={uploading} required />
+            </div>
+          </div>
+          {error && <p className="ds-modal-error" role="alert">{error}</p>}
+          <div className="ds-modal-foot">
+            <DsButton variant="ghost" type="button" onClick={onClose} disabled={uploading}>Cancel</DsButton>
+            <DsButton variant="primary" type="submit" disabled={uploading || !file}>
+              {uploading
+                ? <><span className="ds-state-spinner" style={{ width: 12, height: 12 }} aria-hidden="true" /> Uploading…</>
+                : <><Upload size={13} strokeWidth={1.7} /> Upload &amp; extract</>}
+            </DsButton>
+          </div>
+        </form>
+      </div>
     </div>
   );
 });
