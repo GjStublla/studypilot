@@ -60,6 +60,7 @@ function Harness({
       activeRubric={undefined}
       session={undefined}
       chats={chats}
+      rubricsById={new Map()}
       activeChatId={activeChatId}
       messages={[message]}
       historyLoading={false}

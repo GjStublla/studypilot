@@ -30,10 +30,50 @@ interface SigningIdentity {
 
 interface CachedToken {
   accessToken: string;
+  /** Cache validity (absolute expiry minus safety margin). */
   expiresAt: number;
+  /** Wall-clock expiry of the minted token (no margin). */
+  absoluteExpiryMs: number;
+  expiresInSeconds: number;
+  scopes: string[];
 }
 
-let cachedToken: CachedToken | null = null;
+const CLOUD_PLATFORM_SCOPE = 'https://www.googleapis.com/auth/cloud-platform';
+const AIPLATFORM_SCOPE = 'https://www.googleapis.com/auth/aiplatform';
+const GENERATIVE_LANGUAGE_SCOPE =
+  'https://www.googleapis.com/auth/generative-language';
+const GENERATIVE_LANGUAGE_RETRIEVER_SCOPE =
+  'https://www.googleapis.com/auth/generative-language.retriever';
+
+/** RAG / Interactions / admin Edge paths — not returned to browsers. */
+export const ADMIN_OAUTH_SCOPES = [
+  CLOUD_PLATFORM_SCOPE,
+  GENERATIVE_LANGUAGE_SCOPE,
+  GENERATIVE_LANGUAGE_RETRIEVER_SCOPE,
+] as const;
+
+/**
+ * Live WebSocket token candidates, narrowest first.
+ * Vertex BidiGenerateContent documents cloud-platform; aiplatform /
+ * generative-language are attempted so we do not assume that without trying.
+ */
+export const LIVE_OAUTH_SCOPE_CANDIDATES: readonly (readonly string[])[] = [
+  [AIPLATFORM_SCOPE],
+  [GENERATIVE_LANGUAGE_SCOPE],
+  [CLOUD_PLATFORM_SCOPE],
+];
+
+/** Google SA JWT max is 3600s. Live WS is ~10 min — mint 15 min, not 1 h. */
+export const LIVE_TOKEN_LIFETIME_SECONDS = 900;
+export const ADMIN_TOKEN_LIFETIME_SECONDS = 3600;
+
+let adminCachedToken: CachedToken | null = null;
+let liveCachedToken: CachedToken | null = null;
+let liveWinningScopes: string[] | null = null;
+
+export function usesCloudPlatformScope(scopes: readonly string[]): boolean {
+  return scopes.includes(CLOUD_PLATFORM_SCOPE);
+}
 
 function getSigningIdentity(): SigningIdentity {
   const clientEmail = Deno.env.get('GOOGLE_CLIENT_EMAIL');
@@ -73,7 +113,8 @@ function getSigningIdentity(): SigningIdentity {
 export function getGoogleProjectId(): string | undefined {
   const explicit = Deno.env.get('GOOGLE_PROJECT_ID')
     || Deno.env.get('GOOGLE_CLOUD_PROJECT')
-    || Deno.env.get('GCP_PROJECT_ID');
+    || Deno.env.get('GCP_PROJECT_ID')
+    || Deno.env.get('GEMINI_PROJECT_ID');
   if (explicit) return explicit;
 
   const credentialsJson = Deno.env.get('GEMINI_SERVICE_ACCOUNT_CREDENTIALS');
@@ -127,9 +168,15 @@ async function importPrivateKey(pem: string): Promise<CryptoKey> {
 
 /**
  * Create a signed RS256 JWT for Google Cloud service account auth.
+ * `lifetimeSeconds` is capped at 3600 (Google SA JWT maximum).
  */
-async function createServiceAccountJWT(creds: SigningIdentity): Promise<string> {
+async function createServiceAccountJWT(
+  creds: SigningIdentity,
+  scopes: readonly string[],
+  lifetimeSeconds: number,
+): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
+  const lifetime = Math.min(Math.max(lifetimeSeconds, 60), 3600);
 
   const header = base64urlJson({
     alg: 'RS256',
@@ -141,12 +188,8 @@ async function createServiceAccountJWT(creds: SigningIdentity): Promise<string> 
     sub: creds.client_email,
     aud: creds.token_uri,
     iat: now,
-    exp: now + 3600,
-    scope: [
-      'https://www.googleapis.com/auth/cloud-platform',
-      'https://www.googleapis.com/auth/generative-language',
-      'https://www.googleapis.com/auth/generative-language.retriever',
-    ].join(' '),
+    exp: now + lifetime,
+    scope: scopes.join(' '),
   });
 
   const signingInput = `${header}.${payload}`;
@@ -177,37 +220,127 @@ async function exchangeJWTForToken(
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Token exchange failed (${res.status}): ${text}`);
+    const err = new Error(`Token exchange failed (${res.status}): ${text}`);
+    (err as Error & { status?: number; body?: string }).status = res.status;
+    (err as Error & { status?: number; body?: string }).body = text;
+    throw err;
   }
 
   const data = await res.json();
   return { access_token: data.access_token, expires_in: data.expires_in };
 }
 
-/**
- * Get a valid Google Cloud access token.
- * Caches the token in memory for its lifetime minus a 5-minute safety margin.
- */
-export async function getAccessToken(): Promise<string> {
-  if (cachedToken && cachedToken.expiresAt > Date.now()) {
-    return cachedToken.accessToken;
-  }
+function isInvalidScopeError(error: unknown): boolean {
+  const err = error as { status?: number; body?: string; message?: string };
+  const body = `${err.body ?? ''} ${err.message ?? ''}`.toLowerCase();
+  return err.status === 400 &&
+    (body.includes('invalid_scope') || body.includes('invalid scope'));
+}
 
+async function mintAccessToken(
+  scopes: readonly string[],
+  lifetimeSeconds: number,
+  cacheSafetyMs: number,
+): Promise<CachedToken> {
   const creds = getSigningIdentity();
-  const jwt = await createServiceAccountJWT(creds);
+  const jwt = await createServiceAccountJWT(creds, scopes, lifetimeSeconds);
   const tokenData = await exchangeJWTForToken(jwt, creds.token_uri);
-
-  cachedToken = {
+  const googleExpires = Number(tokenData.expires_in) || lifetimeSeconds;
+  // Cap reported/cache lifetime at the JWT we requested — do not keep a 1h
+  // admin-style token around for Live even if Google returns expires_in=3600.
+  const expiresInSeconds = Math.min(googleExpires, lifetimeSeconds);
+  const absoluteExpiryMs = Date.now() + expiresInSeconds * 1000;
+  return {
     accessToken: tokenData.access_token,
-    expiresAt: Date.now() + tokenData.expires_in * 1000 - 300_000,
+    expiresAt: absoluteExpiryMs - cacheSafetyMs,
+    absoluteExpiryMs,
+    expiresInSeconds,
+    scopes: [...scopes],
   };
-
-  return cachedToken.accessToken;
 }
 
 /**
- * Invalidate the cached token (e.g. after a 401 from the Gemini API).
+ * Get a valid Google Cloud access token for server-side RAG / Interactions.
+ * Never return this token from live-token — use getLiveAccessToken instead.
+ */
+export async function getAccessToken(): Promise<string> {
+  if (adminCachedToken && adminCachedToken.expiresAt > Date.now()) {
+    return adminCachedToken.accessToken;
+  }
+
+  adminCachedToken = await mintAccessToken(
+    ADMIN_OAUTH_SCOPES,
+    ADMIN_TOKEN_LIFETIME_SECONDS,
+    300_000,
+  );
+  return adminCachedToken.accessToken;
+}
+
+export type LiveAccessToken = {
+  accessToken: string;
+  expiresAt: number;
+  expiresInSeconds: number;
+  scopes: string[];
+  usedCloudPlatform: boolean;
+};
+
+function toLiveAccessToken(cached: CachedToken): LiveAccessToken {
+  return {
+    accessToken: cached.accessToken,
+    expiresAt: cached.absoluteExpiryMs,
+    expiresInSeconds: Math.max(
+      0,
+      Math.floor((cached.absoluteExpiryMs - Date.now()) / 1000),
+    ),
+    scopes: cached.scopes,
+    usedCloudPlatform: usesCloudPlatformScope(cached.scopes),
+  };
+}
+
+/**
+ * Mint a Live-only OAuth token. Separate cache from RAG/admin. Tries
+ * aiplatform, then generative-language, then cloud-platform. Google SA JWT
+ * lifetime is 15 minutes (Live WS is ~10 min).
+ */
+export async function getLiveAccessToken(): Promise<LiveAccessToken> {
+  if (liveCachedToken && liveCachedToken.expiresAt > Date.now()) {
+    return toLiveAccessToken(liveCachedToken);
+  }
+
+  const candidates = liveWinningScopes
+    ? [liveWinningScopes]
+    : LIVE_OAUTH_SCOPE_CANDIDATES.map((scopes) => [...scopes]);
+
+  let lastError: unknown;
+  for (const scopes of candidates) {
+    try {
+      const minted = await mintAccessToken(
+        scopes,
+        LIVE_TOKEN_LIFETIME_SECONDS,
+        60_000,
+      );
+      liveWinningScopes = minted.scopes;
+      liveCachedToken = minted;
+      return toLiveAccessToken(minted);
+    } catch (error) {
+      lastError = error;
+      if (liveWinningScopes || !isInvalidScopeError(error)) throw error;
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error('Unable to mint a Live OAuth access token');
+}
+
+/**
+ * Invalidate the cached admin token (e.g. after a 401 from the Gemini API).
+ * Does not drop the Live-only cache — those tokens are never reused for RAG.
  */
 export function invalidateToken(): void {
-  cachedToken = null;
+  adminCachedToken = null;
+}
+
+export function invalidateLiveToken(): void {
+  liveCachedToken = null;
 }

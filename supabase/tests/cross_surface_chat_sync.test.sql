@@ -22,8 +22,8 @@ select ok(
 );
 
 select ok(
-  to_regclass('public.dashboard_chats_user_session_key') is not null,
-  'one canonical chat is allowed per linked session'
+  to_regclass('public.dashboard_chats_user_session_key') is null,
+  'many sessions may share one chat (session unique index removed)'
 );
 select ok(
   to_regclass('public.dashboard_chat_messages_request_role_key') is not null,
@@ -155,7 +155,7 @@ select is(
 select is(
   has_function_privilege(
     'authenticated',
-    'public.finish_ai_chat_turn(uuid,uuid,uuid,text,text,integer,text)',
+    'public.finish_ai_chat_turn(uuid,uuid,uuid,text,text,integer,text,boolean,text,jsonb)',
     'execute'
   ),
   false,
@@ -164,7 +164,7 @@ select is(
 select is(
   has_function_privilege(
     'service_role',
-    'public.finish_ai_chat_turn(uuid,uuid,uuid,text,text,integer,text)',
+    'public.finish_ai_chat_turn(uuid,uuid,uuid,text,text,integer,text,boolean,text,jsonb)',
     'execute'
   ),
   true,
@@ -180,7 +180,7 @@ select is(
 select is(
   (select not prosecdef
    from pg_proc
-   where oid = 'public.finish_ai_chat_turn(uuid,uuid,uuid,text,text,integer,text)'::regprocedure),
+   where oid = 'public.finish_ai_chat_turn(uuid,uuid,uuid,text,text,integer,text,boolean,text,jsonb)'::regprocedure),
   true,
   'AI turn finisher is SECURITY INVOKER'
 );

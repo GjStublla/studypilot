@@ -10,7 +10,9 @@ import {
   deleteDashboardChat,
   getDashboardChatMessages,
   getDashboardChats,
+  getOrCreateRubricChat,
   getOrCreateSessionChat,
+  retryRubricIndexing,
   updateDashboardChat,
   uploadRubricFile,
   type AiUsage,
@@ -25,7 +27,7 @@ import {
 } from '../lib/dashboardApi';
 import { sendCoachingMessage } from '../lib/socraticCoach';
 import { useStudyPilotRealtime } from '../lib/useRealtime';
-import type { DashboardChat } from '../lib/studypilot-types';
+import type { DashboardChat, GroundingCitation } from '../lib/studypilot-types';
 import {
   dashboardChatReducer,
   isChatBusy,
@@ -34,6 +36,10 @@ import {
   type ChatViewMessage,
 } from '../lib/dashboard-chat-state';
 import { formatDashboardRoute, parseDashboardRoute } from '../lib/dashboard-route';
+import {
+  normalizeIndexStatus,
+  resolveChatRubricContext,
+} from '../lib/chat-rubric-context';
 import './Dashboard.css';
 
 type Session = any;
@@ -328,10 +334,16 @@ export default function Dashboard({
     onDocumentUpdated: (doc) => {
       // Update rubric status if document is linked to a rubric
       if (doc.rubric_id) {
+        const status = normalizeIndexStatus(doc.index_status);
         setRubrics((prev) =>
           prev.map((r) =>
             r.id === doc.rubric_id
-              ? { ...r, file_search_status: doc.index_status }
+              ? {
+                ...r,
+                file_search_status: status,
+                fileSearchStatus: status,
+                knowledgeDocumentId: doc.id ?? r.knowledgeDocumentId,
+              }
               : r
           )
         );
@@ -553,6 +565,16 @@ export default function Dashboard({
     () => (activeChat?.session_id ? sessionsById.get(activeChat.session_id) : undefined),
     [activeChat, sessionsById],
   );
+  const chatRubricContext = useMemo(
+    () => resolveChatRubricContext({
+      chat: activeChat,
+      session: chatSession,
+      rubricsById,
+      activeRubric,
+    }),
+    [activeChat, chatSession, rubricsById, activeRubric],
+  );
+  const chatRubric = chatRubricContext.rubric;
   const activeChatMessages = useMemo(
     () => selectChatMessages(chatState, activeChatId),
     [activeChatId, chatState],
@@ -806,8 +828,19 @@ export default function Dashboard({
   }, [aiUsage, createChat, loadChatMessages, refreshAiUsage, refreshChats, touchChat]);
 
   const openInChat = useCallback((sessionId: string) => {
-    const existing = chatsRef.current.find((chat) => chat.session_id === sessionId);
     setView('chat');
+    const session = sessionsRef.current.find((item) => item.id === sessionId);
+    const linkedChatId = session?.chatId ?? session?.chat_id ?? null;
+
+    if (typeof linkedChatId === 'string' && linkedChatId) {
+      const byChatId = chatsRef.current.find((chat) => chat.id === linkedChatId);
+      if (byChatId) {
+        selectChat(byChatId.id);
+        return;
+      }
+    }
+
+    const existing = chatsRef.current.find((chat) => chat.session_id === sessionId);
     if (existing) {
       selectChat(existing.id);
       return;
@@ -815,7 +848,6 @@ export default function Dashboard({
 
     activeChatIdRef.current = null;
     setActiveChatId(null);
-    const session = sessionsRef.current.find((item) => item.id === sessionId);
     void createChat(session?.title ?? 'Session chat', sessionId).catch(() => {
       /* Leave the user in a fresh rubric-only draft if the chat could not be created. */
     });
@@ -864,27 +896,84 @@ export default function Dashboard({
     if (chatSession) openInChat(chatSession.id);
   }, [chatSession, openInChat]);
   const backToSessions = useCallback(() => navigateToView('sessions'), [navigateToView]);
+  const setActiveRubricOnServer = useCallback(async (rubricId: string) => {
+    const previousId = activeRubricId;
+    setRubrics((prev) => prev.map((r) => ({ ...r, active: r.id === rubricId })));
+    setActiveRubricId(rubricId);
+    try {
+      await activateRubric(rubricId);
+    } catch (error) {
+      console.error('Failed to activate rubric:', error);
+      setRubrics((prev) => prev.map((r) => ({ ...r, active: r.id === previousId })));
+      setActiveRubricId(previousId);
+    }
+  }, [activeRubricId]);
+
   const askAboutRubric = useCallback(
     async (rubricId: string) => {
-      // Set the rubric active locally and on the server so the edge function
-      // can find it via the active-rubric fallback query.
-      setRubrics((prev) => prev.map((r) => ({ ...r, active: r.id === rubricId })));
-      setActiveRubricId(rubricId);
+      // Open (or reuse) the durable rubric chat without changing the global default.
+      setView('chat');
       try {
-        await activateRubric(rubricId);
-      } catch {
-        // Keep the chat flow working even if activation fails.
-      }
-
-      const session = sessions.find((s) => s.rubricId === rubricId);
-      if (session) {
-        openInChat(session.id);
-      } else {
+        const chat = await getOrCreateRubricChat(rubricId);
+        setChats((current) => {
+          const next = [chat, ...current.filter((item) => item.id !== chat.id)];
+          chatsRef.current = next;
+          return next;
+        });
+        activeChatIdRef.current = chat.id;
+        setActiveChatId(chat.id);
+        replaceChatRoute(chat.id);
+        void loadChatMessages(chat.id);
+      } catch (error) {
+        console.error('Failed to open rubric chat:', error);
         startNewChat();
       }
     },
-    [openInChat, sessions, startNewChat, setRubrics, setActiveRubricId],
+    [loadChatMessages, replaceChatRoute, startNewChat],
   );
+
+  const retryIndexRubric = useCallback(async (rubricId: string) => {
+    const rubric = rubrics.find((r) => r.id === rubricId);
+    const knowledgeDocumentId = rubric?.knowledgeDocumentId ?? rubric?.knowledge_document_id;
+    if (!knowledgeDocumentId) return;
+
+    setRubrics((prev) =>
+      prev.map((r) =>
+        r.id === rubricId
+          ? { ...r, file_search_status: 'indexing', fileSearchStatus: 'indexing', fileSearchError: null }
+          : r,
+      ),
+    );
+    try {
+      const result = await retryRubricIndexing(knowledgeDocumentId);
+      const status = normalizeIndexStatus(result.status);
+      setRubrics((prev) =>
+        prev.map((r) =>
+          r.id === rubricId
+            ? {
+              ...r,
+              file_search_status: status,
+              fileSearchStatus: status,
+              fileSearchError: status === 'failed' ? (result.error ?? null) : null,
+            }
+            : r,
+        ),
+      );
+    } catch (error) {
+      setRubrics((prev) =>
+        prev.map((r) =>
+          r.id === rubricId
+            ? {
+              ...r,
+              file_search_status: 'failed',
+              fileSearchStatus: 'failed',
+              fileSearchError: error instanceof Error ? error.message : 'Indexing failed',
+            }
+            : r,
+        ),
+      );
+    }
+  }, [rubrics]);
   const openExtension = useCallback(() => {
     /* placeholder - would deep link the extension */
   }, []);
@@ -974,9 +1063,11 @@ export default function Dashboard({
               {view === 'chat' && (
                 <ChatView
                   student={student}
-                  activeRubric={activeRubric}
+                  activeRubric={chatRubric}
+                  rubricRemoved={chatRubricContext.rubricRemoved}
                   session={chatSession}
                   chats={chats}
+                  rubricsById={rubricsById}
                   activeChatId={activeChatId}
                   messages={activeChatMessages}
                   historyLoading={activeChatHistoryLoading}
@@ -989,6 +1080,7 @@ export default function Dashboard({
                   onRenameChat={renameChat}
                   onDeleteChat={deleteChat}
                   onSendMessage={sendChatMessage}
+                  onRetryIndex={retryIndexRubric}
                 />
               )}
 
@@ -1019,17 +1111,26 @@ export default function Dashboard({
                   rubrics={rubrics}
                   activeRubricId={activeRubricId}
                   query={query}
-                  onSetActive={setActiveRubricId}
+                  onSetActive={setActiveRubricOnServer}
                   onAskAbout={askAboutRubric}
+                  onRetryIndex={retryIndexRubric}
                   onRubricUploaded={(newRubric) => {
                     const adapted = {
                       ...newRubric,
                       sessionsCount: 0,
                       uploaded: new Date(newRubric.uploaded_at ?? new Date()).toLocaleDateString(),
-                      criteria: (newRubric.criteria ?? []).map((c: any) => ({ ...c, max: c.max_score })),
+                      knowledgeDocumentId: newRubric.knowledgeDocumentId ?? newRubric.knowledge_document_id ?? null,
+                      fileSearchStatus: newRubric.file_search_status ?? newRubric.fileSearchStatus ?? 'not_indexed',
+                      file_search_status: newRubric.file_search_status ?? newRubric.fileSearchStatus ?? 'not_indexed',
+                      criteria: (newRubric.criteria ?? []).map((c: any) => ({ ...c, max: c.max_score ?? c.max })),
                     };
-                    setRubrics((prev) => [adapted, ...prev]);
-                    if (rubrics.length === 0) setActiveRubricId(adapted.id);
+                    const shouldActivate = Boolean(newRubric.active) || rubrics.length === 0;
+                    setRubrics((prev) => {
+                      const next = [adapted, ...prev.filter((r) => r.id !== adapted.id)];
+                      if (!shouldActivate) return next;
+                      return next.map((r) => ({ ...r, active: r.id === adapted.id }));
+                    });
+                    if (shouldActivate) setActiveRubricId(adapted.id);
                   }}
                 />
               )}
@@ -1494,8 +1595,10 @@ const NEW_CHAT_DRAFT_KEY = '__new-chat__';
 export const ChatView = memo(function ChatView({
   student,
   activeRubric,
+  rubricRemoved = false,
   session,
   chats,
+  rubricsById,
   activeChatId,
   messages,
   historyLoading,
@@ -1508,11 +1611,15 @@ export const ChatView = memo(function ChatView({
   onRenameChat,
   onDeleteChat,
   onSendMessage,
+  onRetryIndex,
 }: {
   student: typeof STUDENT;
   activeRubric: Rubric | undefined;
+  /** Locked chat whose rubric was deleted — do not show the global active rubric. */
+  rubricRemoved?: boolean;
   session: Session | undefined;
   chats: DashboardChat[];
+  rubricsById: ReadonlyMap<string, Rubric>;
   activeChatId: string | null;
   messages: Message[];
   historyLoading: boolean;
@@ -1525,6 +1632,7 @@ export const ChatView = memo(function ChatView({
   onRenameChat: (chatId: string, title: string) => void;
   onDeleteChat: (chatId: string) => void;
   onSendMessage: (text: string, sessionId?: string | null) => boolean;
+  onRetryIndex?: (rubricId: string) => void;
 }) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [micOn, setMicOn] = useState(false);
@@ -1606,6 +1714,11 @@ export const ChatView = memo(function ChatView({
       ? 'Imported legacy chat'
       : 'Started in dashboard';
   const composerBusy = activeChatBusy || draftCreating;
+  // Parent resolves chat rubric; locked-null must never surface the global active rubric.
+  const lockedNull = rubricRemoved
+    || Boolean(activeChat?.rubric_context_locked && activeChat.rubric_id == null);
+  const effectiveRubric = lockedNull ? undefined : activeRubric;
+  const indexStatus = getRubricIndexStatus(effectiveRubric);
 
   return (
     <div className="ds-view ds-view-chat">
@@ -1627,6 +1740,7 @@ export const ChatView = memo(function ChatView({
                 key={chat.id}
                 chat={chat}
                 active={chat.id === activeChatId}
+                rubricTitle={chat.rubric_id ? rubricsById.get(chat.rubric_id)?.title : undefined}
                 onSelect={onSelectChat}
                 onRename={onRenameChat}
                 onDelete={onDeleteChat}
@@ -1643,11 +1757,31 @@ export const ChatView = memo(function ChatView({
             <span>{session.title}</span>
           </span>
         )}
-        {activeRubric && (
-          <span className="ds-context-chip">
+        {lockedNull ? (
+          <span className="ds-context-chip ds-chip-muted" data-testid="chat-rubric-chip">
             <BookOpen size={11} strokeWidth={1.8} />
-            <span>{activeRubric.title.replace(' Rubric', '')}</span>
+            <span>Rubric removed</span>
+            <span className="ds-chip-lock" title="Rubric context locked">locked</span>
           </span>
+        ) : effectiveRubric ? (
+          <span className="ds-context-chip" data-testid="chat-rubric-chip">
+            <BookOpen size={11} strokeWidth={1.8} />
+            <span>{effectiveRubric.title.replace(' Rubric', '')}</span>
+            {activeChat?.rubric_context_locked ? (
+              <span className="ds-chip-lock" title="Rubric context locked">locked</span>
+            ) : null}
+          </span>
+        ) : null}
+        {effectiveRubric && indexStatus !== 'not_indexed' && (
+          <FileSearchStatusBadge
+            status={indexStatus}
+            error={effectiveRubric.fileSearchError ?? effectiveRubric.file_search_error}
+            onRetry={
+              indexStatus === 'failed' && effectiveRubric.id && onRetryIndex
+                ? () => onRetryIndex(effectiveRubric.id)
+                : undefined
+            }
+          />
         )}
         <span className="ds-context-chip">
           {chatOrigin === 'extension'
@@ -1693,18 +1827,7 @@ export const ChatView = memo(function ChatView({
               key={p}
               type="button"
               className="ds-quick-prompt"
-              onClick={() => {
-                // For the rubric prompt, enrich with criteria so the AI has context
-                // even before the active-rubric DB query resolves.
-                if (p === 'Explain this rubric' && activeRubric) {
-                  const criteria = activeRubric.criteria?.map((c: any) =>
-                    `${c.name} (${c.score ?? 0}/${c.max ?? c.max_score ?? 4})`
-                  ).join(', ') || 'no criteria';
-                  send(`Explain this rubric to me: "${activeRubric.title}" (${activeRubric.course}). Criteria: ${criteria}.`);
-                } else {
-                  send(p);
-                }
-              }}
+              onClick={() => send(p)}
               disabled={composerDisabled}
             >
               <Sparkles size={11} strokeWidth={1.7} />
@@ -1778,12 +1901,14 @@ export const ChatView = memo(function ChatView({
 const ChatListRow = memo(function ChatListRow({
   chat,
   active,
+  rubricTitle,
   onSelect,
   onRename,
   onDelete,
 }: {
   chat: DashboardChat;
   active: boolean;
+  rubricTitle?: string;
   onSelect: (chatId: string) => void;
   onRename: (chatId: string, title: string) => void;
   onDelete: (chatId: string) => void;
@@ -1828,6 +1953,8 @@ const ChatListRow = memo(function ChatListRow({
         />
       ) : chat.session_id ? (
         <ScrollText className="ds-chat-session-glyph" size={13} strokeWidth={1.8} />
+      ) : chat.rubric_id ? (
+        <BookOpen className="ds-chat-session-glyph" size={13} strokeWidth={1.8} aria-label="Rubric chat" />
       ) : null}
       {editing ? (
         <input
@@ -1850,7 +1977,14 @@ const ChatListRow = memo(function ChatListRow({
           onBlur={commitRename}
         />
       ) : (
-        <span className="ds-chat-title">{chat.title}</span>
+        <span className="ds-chat-title">
+          {chat.title}
+          {chat.rubric_id ? (
+            <span className="ds-chat-rubric-badge" title={rubricTitle ?? 'Rubric chat'}>
+              Rubric
+            </span>
+          ) : null}
+        </span>
       )}
       {!editing && (
         <span className="ds-chat-actions">
@@ -1893,6 +2027,8 @@ const MessageBubble = memo(function MessageBubble({
   student: typeof STUDENT;
   thinking?: boolean;
 }) {
+  const citations = message.citations ?? [];
+
   return (
     <article className={`ds-msg ds-msg-${message.role}`}>
       <div className="ds-msg-avatar" aria-hidden="true">
@@ -1902,6 +2038,9 @@ const MessageBubble = memo(function MessageBubble({
         <div className="ds-msg-meta">
           <b>{message.role === 'ai' ? 'StudyPilot' : student.name}</b>
           <time>{message.time}</time>
+          {message.usedFileSearch ? (
+            <span className="ds-msg-rag-tag">Grounded</span>
+          ) : null}
         </div>
         {thinking ? (
           <div className="ds-typing" role="status" aria-label="StudyPilot is thinking">
@@ -1914,10 +2053,74 @@ const MessageBubble = memo(function MessageBubble({
             <p key={i}>{line || ' '}</p>
           ))
         )}
+        {!thinking && citations.length > 0 ? (
+          <ul className="ds-citations" aria-label="Sources">
+            {citations.map((citation, index) => (
+              <CitationItem key={`${citation.title}-${index}`} citation={citation} index={index} />
+            ))}
+          </ul>
+        ) : null}
       </div>
     </article>
   );
 });
+
+function CitationItem({ citation, index }: { citation: GroundingCitation; index: number }) {
+  const label = citation.title || `Source ${index + 1}`;
+  return (
+    <li className="ds-citation">
+      <span className="ds-citation-index">{index + 1}</span>
+      {citation.uri ? (
+        <a href={citation.uri} target="_blank" rel="noreferrer" className="ds-citation-link">
+          {label}
+        </a>
+      ) : (
+        <span className="ds-citation-title">{label}</span>
+      )}
+      {citation.snippet ? <span className="ds-citation-snippet">{citation.snippet}</span> : null}
+    </li>
+  );
+}
+
+function getRubricIndexStatus(rubric: Rubric | undefined): string {
+  if (!rubric) return 'not_indexed';
+  return normalizeIndexStatus(
+    rubric.fileSearchStatus ?? rubric.file_search_status,
+  );
+}
+
+function FileSearchStatusBadge({
+  status,
+  error,
+  onRetry,
+}: {
+  status: string;
+  error?: string | null;
+  onRetry?: () => void;
+}) {
+  const label =
+    status === 'indexed' ? 'Indexed'
+      : status === 'indexing' ? 'Indexing…'
+        : status === 'pending' ? 'Pending index'
+          : status === 'failed' ? 'Index failed'
+            : status === 'deleted' ? 'Index removed'
+              : 'Not indexed';
+
+  return (
+    <span
+      className={`ds-context-chip ds-index-chip is-${status}`}
+      data-testid="file-search-status"
+      title={error ?? undefined}
+    >
+      <span>{label}</span>
+      {status === 'failed' && onRetry ? (
+        <button type="button" className="ds-index-retry" onClick={onRetry}>
+          Retry
+        </button>
+      ) : null}
+    </span>
+  );
+}
 
 /* ============================================================================
    Sessions view
@@ -2244,6 +2447,7 @@ const RubricsView = memo(function RubricsView({
   query,
   onSetActive,
   onAskAbout,
+  onRetryIndex,
   onRubricUploaded,
 }: {
   rubrics: Rubric[];
@@ -2251,6 +2455,7 @@ const RubricsView = memo(function RubricsView({
   query: string;
   onSetActive: (id: string) => void;
   onAskAbout: (id: string) => void;
+  onRetryIndex?: (id: string) => void;
   onRubricUploaded: (rubric: any) => void;
 }) {
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -2303,6 +2508,7 @@ const RubricsView = memo(function RubricsView({
       <ul className="ds-rubric-list">
         {filtered.map((r) => {
           const isActive = r.id === activeRubricId;
+          const indexStatus = getRubricIndexStatus(r);
           return (
             <li key={r.id}>
               <article className={`ds-rubric-card ${isActive ? 'is-active' : ''}`}>
@@ -2311,14 +2517,25 @@ const RubricsView = memo(function RubricsView({
                     <FileText size={11} strokeWidth={1.8} />
                     <span>{r.course}</span>
                   </span>
-                  {isActive ? (
-                    <span className="ds-pill ds-pill-active">
-                      <span className="ds-dot ds-dot-mint" aria-hidden="true" />
-                      Active
-                    </span>
-                  ) : (
-                    <span className="ds-pill ds-pill-quiet">Uploaded {r.uploaded}</span>
-                  )}
+                  <span className="ds-rubric-status-row">
+                    <FileSearchStatusBadge
+                      status={indexStatus}
+                      error={r.fileSearchError ?? r.file_search_error}
+                      onRetry={
+                        indexStatus === 'failed' && onRetryIndex
+                          ? () => onRetryIndex(r.id)
+                          : undefined
+                      }
+                    />
+                    {isActive ? (
+                      <span className="ds-pill ds-pill-active">
+                        <span className="ds-dot ds-dot-mint" aria-hidden="true" />
+                        Active
+                      </span>
+                    ) : (
+                      <span className="ds-pill ds-pill-quiet">Uploaded {r.uploaded}</span>
+                    )}
+                  </span>
                 </div>
                 <h3 className="ds-card-title">{r.title}</h3>
 
@@ -2401,9 +2618,12 @@ const UploadRubricModal = memo(function UploadRubricModal({
         title: result.title,
         course: result.course,
         uploaded_at: new Date().toISOString(),
-        active: false,
+        active: result.active,
         sessions_count: 0,
-        file_search_status: 'not_indexed',
+        knowledgeDocumentId: result.knowledgeDocumentId,
+        knowledge_document_id: result.knowledgeDocumentId,
+        file_search_status: result.fileSearchStatus,
+        fileSearchStatus: result.fileSearchStatus,
         criteria: result.criteria.map((c) => ({ ...c, score: 0, max: c.max_score })),
       });
     } catch (err) {

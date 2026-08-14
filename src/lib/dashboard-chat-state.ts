@@ -1,8 +1,10 @@
 import type {
   DashboardChatMessage,
+  GroundingCitation,
   OriginSurface,
   SocraticCoachCommit,
 } from './studypilot-types';
+import { extractCitations } from './groundingCitations';
 
 export type PendingTurnStatus = 'thinking' | 'streaming' | 'complete' | 'error';
 
@@ -35,6 +37,8 @@ export interface ChatViewMessage {
   time: string;
   originSurface: OriginSurface;
   status: 'persisted' | PendingTurnStatus;
+  usedFileSearch?: boolean;
+  citations?: GroundingCitation[];
 }
 
 export type DashboardChatAction =
@@ -265,7 +269,15 @@ export function selectChatMessages(
       lines: row.text.split('\n'),
       time: displayTime(row.created_at),
       originSurface: row.origin_surface,
-      status: 'persisted',
+      status: 'persisted' as const,
+      usedFileSearch: Boolean(row.used_file_search),
+      citations: row.role === 'ai'
+        ? extractCitations({
+          citations: row.citations,
+          grounding_metadata: row.grounding_metadata,
+          used_file_search: row.used_file_search,
+        })
+        : undefined,
     }));
 
   const claimedLegacyRowIds = new Set<string>();

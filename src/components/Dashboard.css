@@ -1169,6 +1169,133 @@
 .app-dashboard .ds-msg-body p + p { margin-top: 6px; }
 .app-dashboard .ds-msg-body p:empty { height: 6px; }
 
+.app-dashboard .ds-msg-rag-tag {
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(91, 184, 255, 0.28);
+  background: rgba(91, 184, 255, 0.08);
+  color: var(--ds-accent);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.app-dashboard .ds-citations {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.app-dashboard .ds-citation {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 2px 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--ds-line-soft);
+  border-radius: 10px;
+  background: var(--ds-surface-2);
+  font-size: 12px;
+  color: var(--ds-muted);
+}
+
+.app-dashboard .ds-citation-index {
+  grid-row: 1 / span 2;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-line);
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ds-quiet);
+}
+
+.app-dashboard .ds-citation-link,
+.app-dashboard .ds-citation-title {
+  color: var(--ds-ink);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.app-dashboard .ds-citation-link:hover {
+  color: var(--ds-accent);
+}
+
+.app-dashboard .ds-citation-snippet {
+  grid-column: 2;
+  color: var(--ds-muted);
+  line-height: 1.45;
+}
+
+.app-dashboard .ds-chip-lock {
+  margin-left: 4px;
+  font-size: 10px;
+  color: var(--ds-quiet);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.app-dashboard .ds-index-chip {
+  gap: 8px;
+}
+
+.app-dashboard .ds-index-chip.is-indexed {
+  border-color: rgba(72, 187, 120, 0.35);
+  background: rgba(72, 187, 120, 0.08);
+}
+
+.app-dashboard .ds-index-chip.is-indexing,
+.app-dashboard .ds-index-chip.is-pending {
+  border-color: rgba(237, 180, 78, 0.35);
+  background: rgba(237, 180, 78, 0.08);
+}
+
+.app-dashboard .ds-index-chip.is-failed {
+  border-color: rgba(229, 92, 92, 0.35);
+  background: rgba(229, 92, 92, 0.08);
+}
+
+.app-dashboard .ds-index-retry {
+  border: 0;
+  background: transparent;
+  color: var(--ds-accent);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+}
+
+.app-dashboard .ds-index-retry:hover {
+  text-decoration: underline;
+}
+
+.app-dashboard .ds-chat-rubric-badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--ds-line);
+  background: var(--ds-surface-2);
+  color: var(--ds-quiet);
+  font-size: 10px;
+  font-weight: 500;
+  vertical-align: middle;
+}
+
+.app-dashboard .ds-rubric-status-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .app-dashboard .ds-typing {
   display: inline-flex;
   align-items: center;

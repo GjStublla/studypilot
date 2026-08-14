@@ -13,6 +13,8 @@ export interface Profile {
   ai_daily_limit?: number;
   gemini_file_search_store_name?: string | null;
   gemini_file_search_store_display_name?: string | null;
+  vertex_rag_corpus_name?: string | null;
+  vertex_rag_corpus_display_name?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -63,6 +65,8 @@ export interface KnowledgeDocument {
   gemini_file_search_store_name?: string | null;
   gemini_file_search_document_name?: string | null;
   gemini_file_search_display_name?: string | null;
+  vertex_rag_corpus_name?: string | null;
+  vertex_rag_file_name?: string | null;
   embedding_model?: string | null;
   index_status: 'pending' | 'uploading' | 'indexing' | 'indexed' | 'failed' | 'deleted';
   index_error?: string | null;
@@ -83,6 +87,8 @@ export interface Session {
   id: string;
   user_id: string;
   rubric_id?: string | null;
+  /** Canonical dashboard chat this session continues into (many sessions → one chat). */
+  chat_id?: string | null;
   title: string;
   source: string;
   mode: 'Essay Coach' | 'Presentation Coach' | 'Study Coach' | 'Lecture' | 'Research Reader';
@@ -111,6 +117,10 @@ export interface DashboardChat {
   id: string;
   user_id: string;
   session_id?: string | null;
+  rubric_id?: string | null;
+  rubric_context_locked?: boolean;
+  context_summary?: string | null;
+  summary_through_sequence?: number | null;
   title: string;
   origin_surface: OriginSurface;
   client_key?: string | null;
@@ -119,6 +129,34 @@ export interface DashboardChat {
 }
 
 export type OriginSurface = 'dashboard' | 'extension' | 'legacy';
+
+/** Normalized citation derived from Gemini File Search / grounding metadata. */
+export interface GroundingCitation {
+  title: string;
+  uri?: string | null;
+  snippet?: string | null;
+  sourceIndex?: number;
+}
+
+export interface GroundingChunk {
+  retrievedContext?: {
+    uri?: string | null;
+    title?: string | null;
+    text?: string | null;
+  } | null;
+  web?: {
+    uri?: string | null;
+    title?: string | null;
+  } | null;
+}
+
+export interface GroundingMetadata {
+  groundingChunks?: GroundingChunk[];
+  groundingSupports?: unknown[];
+  retrievalQueries?: string[];
+  searchEntryPoint?: unknown;
+  [key: string]: unknown;
+}
 
 export interface DashboardChatMessage {
   id: string;
@@ -132,7 +170,9 @@ export interface DashboardChatMessage {
   server_sequence: number;
   used_file_search?: boolean;
   file_search_store_name?: string | null;
-  grounding_metadata?: unknown;
+  grounding_metadata?: GroundingMetadata | null;
+  /** Pre-normalized citations when the edge function stores them alongside grounding. */
+  citations?: GroundingCitation[] | null;
   created_at: string;
 }
 
@@ -172,9 +212,10 @@ export interface IndexKnowledgeDocumentRequest {
 
 export interface IndexKnowledgeDocumentResponse {
   knowledgeDocumentId: string;
-  status: 'indexed' | 'failed';
-  fileSearchStoreName: string;
-  fileSearchDocumentName: string;
+  status: 'pending' | 'uploading' | 'indexing' | 'indexed' | 'failed' | 'deleted';
+  fileSearchStoreName?: string | null;
+  fileSearchDocumentName?: string | null;
+  operationName?: string;
   error?: string;
 }
 
@@ -229,6 +270,8 @@ export interface ExtractRubricResponse {
   rubricId: string;
   extractedText: string;
   criteria: Array<{ name: string; max_score: number }>;
+  knowledgeDocumentId?: string | null;
+  indexingStarted?: boolean;
 }
 
 export interface DeleteKnowledgeDocumentRequest {

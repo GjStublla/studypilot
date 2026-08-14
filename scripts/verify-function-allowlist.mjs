@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Verifies the hosted project exposes exactly the seven repository functions
+ * Verifies the hosted project exposes exactly the repository Edge Functions
  * with verify_jwt enabled. Treat any other slug (including ai-generate) as drift.
  *
  * Usage:
@@ -12,6 +12,9 @@ const TOKEN = process.env.SUPABASE_ACCESS_TOKEN
 
 const EXPECTED = {
   'live-token': true,
+  'live-rubric-search': true,
+  'live-turn': true,
+  'live-finish': true,
   'ensure-file-search-store': true,
   'extract-rubric': true,
   'index-knowledge-document': true,
@@ -71,4 +74,5 @@ if (errors.length) {
   process.exit(1)
 }
 
-console.log('Function allowlist OK: exactly seven JWT-verified functions.')
+const count = Object.keys(EXPECTED).length
+console.log(`Function allowlist OK: exactly ${count} JWT-verified functions.`)

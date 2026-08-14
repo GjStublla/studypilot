@@ -1,130 +1,154 @@
 /**
- * delete-knowledge-document — Supabase Edge Function
- *
- * Deletes a knowledge document from Supabase Storage, Supabase metadata,
- * and Gemini File Search (when implemented).
+ * delete-knowledge-document — Vertex RAG file delete, then Storage, then DB.
  *
  * Input:  { knowledgeDocumentId: string }
  * Output: { success: true, documentId: string }
+ *
+ * Storage deletion uses only ownership-validated paths under
+ * `{userId}/{rubricId}/...` in the `rubrics` bucket.
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4"
+import { verifyRequest } from "../shared/supabase-clients.ts"
+import { deleteRagFile, isOwnedVertexRagFileName } from "../shared/vertex-rag.ts"
+import { canUseGeminiInteractions } from "../shared/gemini-api.ts"
+import { getGoogleProjectId } from "../shared/oauth-helper.ts"
+import {
+  RUBRICS_STORAGE_BUCKET,
+  validateOwnedStoragePath,
+} from "../shared/storage-path.ts"
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 }
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
   })
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders })
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    const auth = await verifyRequest(req)
+    if (!auth) return jsonResponse({ error: "Unauthorized" }, 401)
+    const { user, db } = auth
 
-    // Auth: anon key + user JWT so auth.getUser() returns the actual user,
-    // not the service account.
-    const authHeader = req.headers.get('Authorization') ?? ''
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
-    if (!token) return jsonResponse({ error: 'Unauthorized' }, 401)
-
-    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    })
-    const { data: { user }, error: authError } = await authClient.auth.getUser(token)
-    if (authError || !user) return jsonResponse({ error: 'Unauthorized' }, 401)
-
-    // Service-role client for all subsequent DB + Storage operations
-    const db = createClient(supabaseUrl, supabaseServiceKey)
-
-    // ── Validate input ──────────────────────────────────────────────────────
-    const { knowledgeDocumentId } = await req.json()
+    const body = await req.json().catch(() => ({})) as Record<string, unknown>
+    const knowledgeDocumentId = typeof body.knowledgeDocumentId === "string"
+      ? body.knowledgeDocumentId.trim()
+      : ""
     if (!knowledgeDocumentId) {
-      return jsonResponse({ error: 'knowledgeDocumentId is required' }, 400)
+      return jsonResponse({ error: "knowledgeDocumentId is required" }, 400)
     }
 
-    // ── Fetch document and verify ownership ─────────────────────────────────
     const { data: doc, error: fetchError } = await db
-      .from('knowledge_documents')
-      .select('id, user_id, rubric_id, gemini_file_search_document_name, storage_path, storage_bucket')
-      .eq('id', knowledgeDocumentId)
-      .eq('user_id', user.id)
+      .from("knowledge_documents")
+      .select(
+        "id, user_id, rubric_id, vertex_rag_file_name, gemini_file_search_document_name, storage_path, storage_bucket",
+      )
+      .eq("id", knowledgeDocumentId)
+      .eq("user_id", user.id)
       .single()
 
     if (fetchError || !doc) {
-      return jsonResponse({ error: 'Document not found or access denied' }, 404)
+      return jsonResponse({ error: "Document not found or access denied" }, 404)
     }
 
-    // ── Delete from Gemini File Search (if indexed) ─────────────────────────
-    if (doc.gemini_file_search_document_name) {
-      // TODO: Call consumeAiRequest(db, user.id) before the real Gemini request
-      // below so File Search deletion shares the daily AI request pool.
-      // Replace with real Gemini File Search delete call:
-      //
-      // const { getAccessToken } = await import('../shared/oauth-helper.ts')
-      // const accessToken = await getAccessToken()
-      // await fetch(
-      //   `https://generativelanguage.googleapis.com/v1beta/${doc.gemini_file_search_document_name}`,
-      //   { method: 'DELETE', headers: { 'Authorization': `Bearer ${accessToken}` } }
-      // )
-      console.log(`[delete-knowledge-document] TODO: delete from Gemini — ${doc.gemini_file_search_document_name}`)
-    }
+    const { data: profile } = await db
+      .from("profiles")
+      .select("vertex_rag_corpus_name")
+      .eq("id", user.id)
+      .maybeSingle()
 
-    // ── Delete from Supabase Storage (if a file was uploaded) ───────────────
-    if (doc.storage_path && doc.storage_bucket) {
-      const { error: storageError } = await db.storage
-        .from(doc.storage_bucket)
-        .remove([doc.storage_path])
+    const ownedCorpus =
+      typeof profile?.vertex_rag_corpus_name === "string"
+        ? profile.vertex_rag_corpus_name
+        : null
+    const ragFileName = (doc.vertex_rag_file_name as string | null) || null
+    const projectId = getGoogleProjectId() ?? null
 
-      if (storageError) {
-        // Log but don't abort — the DB row deletion is the critical step
-        console.error('[delete-knowledge-document] Storage deletion failed:', storageError.message)
+    if (ragFileName) {
+      if (!isOwnedVertexRagFileName(ragFileName, ownedCorpus, projectId)) {
+        console.warn(
+          "[delete-knowledge-document] Skipping Vertex RAG delete; file is not under the user's corpus",
+        )
+      } else if (!canUseGeminiInteractions()) {
+        console.warn(
+          "[delete-knowledge-document] Vertex credentials missing; skipping RAG delete",
+        )
+      } else {
+        try {
+          await deleteRagFile(ragFileName)
+        } catch (error) {
+          console.error(
+            "[delete-knowledge-document] Vertex RAG delete failed:",
+            error,
+          )
+          return jsonResponse({
+            error: `Failed to delete from Vertex RAG: ${(error as Error).message}`,
+          }, 502)
+        }
       }
     }
 
-    // ── Delete the metadata row ─────────────────────────────────────────────
-    // Note: we delete the row directly rather than setting index_status='deleted'
-    // first — a pre-delete status update is pointless because if the delete
-    // succeeds, the row is gone, and if it fails, we haven't corrupted anything.
+    const validated = doc.rubric_id
+      ? validateOwnedStoragePath(doc.storage_path, user.id, doc.rubric_id)
+      : null
+
+    if (doc.storage_path && !validated) {
+      console.warn(
+        "[delete-knowledge-document] Skipping Storage delete for untrusted path",
+        doc.storage_path,
+      )
+    }
+
+    if (validated) {
+      const { error: storageError } = await db.storage
+        .from(RUBRICS_STORAGE_BUCKET)
+        .remove([validated.path])
+
+      if (storageError) {
+        console.error(
+          "[delete-knowledge-document] Storage deletion failed:",
+          storageError.message,
+        )
+      }
+    }
+
     const { error: deleteError } = await db
-      .from('knowledge_documents')
+      .from("knowledge_documents")
       .delete()
-      .eq('id', knowledgeDocumentId)
-      .eq('user_id', user.id)
+      .eq("id", knowledgeDocumentId)
+      .eq("user_id", user.id)
 
     if (deleteError) {
-      return jsonResponse({ error: 'Failed to delete document record' }, 500)
+      return jsonResponse({ error: "Failed to delete document record" }, 500)
     }
 
-    // ── Update related rubric status ────────────────────────────────────────
     if (doc.rubric_id) {
-      await db.from('rubrics')
-        .update({ file_search_status: 'deleted' })
-        .eq('id', doc.rubric_id)
+      await db.from("rubrics").update({
+        file_search_status: "deleted",
+        knowledge_document_id: null,
+      }).eq("id", doc.rubric_id)
     }
 
-    // ── Log activity ────────────────────────────────────────────────────────
-    await db.from('activity_logs').insert({
+    await db.from("activity_logs").insert({
       user_id: user.id,
-      event_type: 'document_deleted',
+      event_type: "document_deleted",
       details: { document_id: knowledgeDocumentId },
     })
 
     return jsonResponse({ success: true, documentId: knowledgeDocumentId })
-
   } catch (error) {
-    console.error('[delete-knowledge-document] Error:', error)
+    console.error("[delete-knowledge-document] Error:", error)
     return jsonResponse({ error: (error as Error).message }, 500)
   }
 })

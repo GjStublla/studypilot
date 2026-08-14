@@ -8,25 +8,50 @@ const mocks = vi.hoisted(() => ({
   fetchSessions: vi.fn(async () => []),
   fetchRubrics: vi.fn(async () => []),
   fetchActionItems: vi.fn(async () => []),
+  fetchSessionTranscript: vi.fn(async () => []),
+  setActionItemDone: vi.fn(),
+  activateRubric: vi.fn(async () => undefined),
   getDashboardChats: vi.fn(),
   getDashboardChatMessages: vi.fn(async () => []),
   getAiUsage: vi.fn(async () => ({ used: 0, limit: 50 })),
+  getOrCreateRubricChat: vi.fn(),
+  getOrCreateSessionChat: vi.fn(),
+  retryRubricIndexing: vi.fn(),
   sendCoachingMessage: vi.fn(),
 }));
 
+vi.mock('../lib/dashboardApi', () => ({
+  fetchSessions: mocks.fetchSessions,
+  fetchRubrics: mocks.fetchRubrics,
+  fetchActionItems: mocks.fetchActionItems,
+  fetchSessionTranscript: mocks.fetchSessionTranscript,
+  setActionItemDone: mocks.setActionItemDone,
+  activateRubric: mocks.activateRubric,
+}));
 vi.mock('../lib/studypilot-api', () => ({
-  ...mocks,
-  fetchSessionTranscript: vi.fn(async () => []),
+  getDashboardChats: mocks.getDashboardChats,
+  getDashboardChatMessages: mocks.getDashboardChatMessages,
+  getAiUsage: mocks.getAiUsage,
   createSessionCaptureSignedUrl: vi.fn(),
-  setActionItemDone: vi.fn(),
   createDashboardChat: vi.fn(),
-  getOrCreateSessionChat: vi.fn(),
+  getOrCreateSessionChat: mocks.getOrCreateSessionChat,
+  getOrCreateRubricChat: mocks.getOrCreateRubricChat,
+  retryRubricIndexing: mocks.retryRubricIndexing,
   updateDashboardChat: vi.fn(),
   deleteDashboardChat: vi.fn(),
+  uploadRubricFile: vi.fn(),
 }));
 vi.mock('../lib/socraticCoach', () => ({ sendCoachingMessage: mocks.sendCoachingMessage }));
 vi.mock('../lib/supabaseClient', () => ({
-  supabase: { auth: { getSession: vi.fn(async () => ({ data: { session: { user: { id: 'user-1' } } } })) } },
+  supabase: {
+    auth: { getSession: vi.fn(async () => ({ data: { session: { user: { id: 'user-1' } } } })) },
+    from: vi.fn(() => ({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+      update: vi.fn().mockReturnThis(),
+    })),
+  },
 }));
 vi.mock('../lib/api', () => ({
   clearAuth: vi.fn(),

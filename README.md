@@ -2,6 +2,11 @@
 
 An elegant, modern study assistant designed to elevate your learning experience. Built with React, TypeScript, and Vite.
 
+The Chrome extension that ships lives in the sibling repo
+[`../studypilot-extension`](../studypilot-extension). `extension/` in this repo
+is a non-production scaffold and is **not shipped**. `npm run extension:build`
+builds the canonical sibling, not the scaffold.
+
 ## Local full-stack development
 
 The explicit local mode uses the Supabase CLI stack, creates a disposable

@@ -6,6 +6,7 @@
 // never touches raw API payloads.
 
 import { apiFetch } from './api';
+import { setActiveRubric as setActiveRubricRpc } from './studypilot-api';
 
 // ─── Domain types (camelCase — what the UI uses) ──────────────────────────────
 
@@ -16,6 +17,14 @@ export type RubricCriterion = {
   max: number;
 };
 
+export type FileSearchStatus =
+  | 'not_indexed'
+  | 'pending'
+  | 'indexing'
+  | 'indexed'
+  | 'failed'
+  | 'deleted';
+
 export type Rubric = {
   id: string;
   title: string;
@@ -24,6 +33,10 @@ export type Rubric = {
   active: boolean;
   sessionsCount: number;
   criteria: RubricCriterion[];
+  knowledgeDocumentId?: string | null;
+  fileSearchStatus?: FileSearchStatus;
+  file_search_status?: FileSearchStatus;
+  fileSearchError?: string | null;
 };
 
 export type Session = {
@@ -34,6 +47,8 @@ export type Session = {
   duration: string; // pre-formatted by the backend, e.g. "24m"
   when: string; // pre-formatted by the backend, e.g. "Today · 2:38 PM"
   rubricId: string | null;
+  /** Canonical dashboard chat id when the session continues an existing chat. */
+  chatId: string | null;
   summary: string;
 };
 
@@ -62,7 +77,9 @@ type ApiRubric = {
   uploaded_at: string;
   active: boolean | null;
   sessions_count: number | null;
-  file_search_status: string;
+  knowledge_document_id?: string | null;
+  file_search_status?: string | null;
+  file_search_error?: string | null;
   criteria: ApiRubricCriterion[] | null;
 };
 type ApiSession = {
@@ -73,6 +90,7 @@ type ApiSession = {
   duration: string;
   when: string;
   rubric_id: string | null;
+  chat_id?: string | null;
   summary: string | null;
 };
 type ApiTranscriptMessage = { id: string; who: 'You' | 'StudyPilot'; text: string; t: string };
@@ -94,7 +112,24 @@ function formatUploaded(iso: string): string {
   return Number.isNaN(d.getTime()) ? '' : uploadedFormatter.format(d);
 }
 
+function mapFileSearchStatus(status: string | null | undefined): FileSearchStatus {
+  switch (status) {
+    case 'pending':
+    case 'indexing':
+    case 'indexed':
+    case 'failed':
+    case 'deleted':
+    case 'not_indexed':
+      return status;
+    case 'uploading':
+      return 'indexing';
+    default:
+      return 'not_indexed';
+  }
+}
+
 function mapRubric(r: ApiRubric): Rubric {
+  const fileSearchStatus = mapFileSearchStatus(r.file_search_status);
   return {
     id: r.id,
     title: r.title,
@@ -102,6 +137,11 @@ function mapRubric(r: ApiRubric): Rubric {
     uploaded: formatUploaded(r.uploaded_at),
     active: Boolean(r.active),
     sessionsCount: r.sessions_count ?? 0,
+    knowledgeDocumentId: r.knowledge_document_id ?? null,
+    fileSearchStatus,
+    // Keep snake_case alias for Dashboard realtime / upload payloads.
+    file_search_status: fileSearchStatus,
+    fileSearchError: r.file_search_error ?? null,
     criteria: (r.criteria ?? []).map((c) => ({
       id: c.id,
       name: c.name,
@@ -120,6 +160,7 @@ function mapSession(s: ApiSession): Session {
     duration: s.duration,
     when: s.when,
     rubricId: s.rubric_id ?? null,
+    chatId: s.chat_id ?? null,
     summary: s.summary ?? '',
   };
 }
@@ -185,6 +226,16 @@ export async function setActionItemDone(id: string, done: boolean): Promise<Acti
   return mapActionItem(data);
 }
 
+/**
+ * Prefer the atomic `set_active_rubric` RPC; fall back to FastAPI PATCH when
+ * the migration is not yet applied or Supabase auth is unavailable.
+ */
 export async function activateRubric(id: string): Promise<void> {
+  try {
+    await setActiveRubricRpc(id);
+    return;
+  } catch {
+    // Fall through to FastAPI.
+  }
   await getJson(`/rubrics/${id}/active`, { method: 'PATCH' });
 }
