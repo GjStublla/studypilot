@@ -40,6 +40,7 @@ export function adaptSession(session: Session): any {
   return {
     ...session,
     rubricId: session.rubric_id,
+    chatId: session.chat_id ?? null,
     screenshotPath: session.screenshot_path,
     when: formatWhen(session.when_timestamp),
     duration: formatDuration(session.duration_seconds),
@@ -50,6 +51,9 @@ export function adaptRubric(rubric: Rubric): any {
   return {
     ...rubric,
     sessionsCount: rubric.sessions_count,
+    knowledgeDocumentId: rubric.knowledge_document_id ?? null,
+    fileSearchStatus: rubric.file_search_status ?? 'not_indexed',
+    fileSearchError: rubric.file_search_error ?? null,
     uploaded: new Date(rubric.uploaded_at).toLocaleDateString(),
     criteria: rubric.criteria?.map((c: any) => ({
       ...c,
@@ -235,10 +239,19 @@ export async function getRubricById(rubricId: string): Promise<Rubric | null> {
 }
 
 export async function setActiveRubric(activeId: string): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+  await injectStoredToken();
 
-  // Clear all active flags first
+  // Prefer the atomic ownership-checked RPC when available.
+  const { error: rpcError } = await supabase.rpc('set_active_rubric', {
+    p_rubric_id: activeId,
+  });
+
+  if (!rpcError) return;
+
+  // Fallback for environments where the migration is not applied yet.
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error(rpcError.message || 'Not authenticated');
+
   const { error: clearActive } = await supabase
     .from('rubrics')
     .update({ active: false })
@@ -246,7 +259,6 @@ export async function setActiveRubric(activeId: string): Promise<void> {
 
   if (clearActive) throw clearActive;
 
-  // Set the new active rubric
   const { error: setActive } = await supabase
     .from('rubrics')
     .update({ active: true })
@@ -281,6 +293,9 @@ export type RubricUploadResult = {
   course: string;
   extractedText: string;
   criteria: Array<{ name: string; max_score: number }>;
+  knowledgeDocumentId: string | null;
+  fileSearchStatus: Rubric['file_search_status'];
+  active: boolean;
 };
 
 /**
@@ -288,6 +303,9 @@ export type RubricUploadResult = {
  *   1. Create the rubric DB row
  *   2. Upload the file to Supabase Storage (bucket: rubrics)
  *   3. Call the extract-rubric Edge Function so Gemini parses criteria
+ *      (extract starts File Search indexing server-side — do not call index here)
+ *   4. Link the knowledge document + reflect pending/indexing status for realtime polling
+ *   5. First rubric for the user becomes the server-side active default
  *
  * Accepts any file type — the extract-rubric function reads text content
  * from plain text files and PDFs directly.
@@ -301,6 +319,13 @@ export async function uploadRubricFile(
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
+
+  const { count: existingCount } = await supabase
+    .from('rubrics')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', user.id);
+
+  const isFirstRubric = (existingCount ?? 0) === 0;
 
   // 1. Create the rubric row to get an ID for the storage path.
   const { data: rubric, error: rubricError } = await supabase
@@ -334,8 +359,53 @@ export async function uploadRubricFile(
 
   await supabase.from('rubrics').update({ file_path: storagePath }).eq('id', rubric.id);
 
-  // 3. Extract criteria via the Edge Function.
+  // 3. Extract criteria via the Edge Function (also kicks off indexing).
   const extracted = await extractRubric(rubric.id, storagePath);
+
+  // 4. Ensure store exists (best-effort). Do NOT call indexKnowledgeDocument —
+  // extract-rubric already starts indexing; a second call double-charges quota.
+  try {
+    await ensureFileSearchStore();
+  } catch (error) {
+    console.warn('ensureFileSearchStore failed after rubric upload:', error);
+  }
+
+  let knowledgeDocumentId: string | null = extracted.knowledgeDocumentId ?? null;
+  if (!knowledgeDocumentId) {
+    const { data: doc } = await supabase
+      .from('knowledge_documents')
+      .select('id')
+      .eq('rubric_id', rubric.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    knowledgeDocumentId = doc?.id ?? null;
+  }
+
+  const fileSearchStatus: Rubric['file_search_status'] = knowledgeDocumentId
+    ? (extracted.indexingStarted ? 'indexing' : 'pending')
+    : 'not_indexed';
+
+  if (knowledgeDocumentId) {
+    await supabase
+      .from('rubrics')
+      .update({
+        knowledge_document_id: knowledgeDocumentId,
+        file_search_status: fileSearchStatus,
+      })
+      .eq('id', rubric.id);
+  }
+
+  // 5. First rubric becomes the global default via RPC.
+  let active = false;
+  if (isFirstRubric) {
+    try {
+      await setActiveRubric(rubric.id);
+      active = true;
+    } catch (error) {
+      console.warn('set_active_rubric failed for first rubric:', error);
+    }
+  }
 
   return {
     rubricId: rubric.id,
@@ -343,7 +413,23 @@ export async function uploadRubricFile(
     course: rubric.course,
     extractedText: extracted.extractedText,
     criteria: extracted.criteria,
+    knowledgeDocumentId,
+    fileSearchStatus,
+    active,
   };
+}
+
+/** Re-run File Search indexing for a knowledge document linked to a rubric. */
+export async function retryRubricIndexing(
+  knowledgeDocumentId: string,
+): Promise<IndexKnowledgeDocumentResponse> {
+  await injectStoredToken();
+  try {
+    await ensureFileSearchStore();
+  } catch (error) {
+    console.warn('ensureFileSearchStore failed before retry index:', error);
+  }
+  return indexKnowledgeDocument(knowledgeDocumentId);
 }
 
 // ─── Knowledge Document Operations ────────────────────────────────────────────────
@@ -464,7 +550,7 @@ export async function getSessions(): Promise<Session[]> {
   const { data, error } = await supabase
     .from('sessions')
     .select(`
-      id, title, source, mode, duration_seconds, summary, when_timestamp, rubric_id, screenshot_path,
+      id, title, source, mode, duration_seconds, summary, when_timestamp, rubric_id, chat_id, screenshot_path,
       action_items(id, done)
     `)
     .order('when_timestamp', { ascending: false });
@@ -609,11 +695,23 @@ export async function getDashboardChats(): Promise<DashboardChat[]> {
   await injectStoredToken();
   const { data, error } = await supabase
     .from('dashboard_chats')
-    .select('*')
+    .select(`
+      id, user_id, session_id, rubric_id, rubric_context_locked, context_summary,
+      summary_through_sequence, title, origin_surface, client_key, created_at, updated_at
+    `)
     .order('updated_at', { ascending: false })
     .order('id', { ascending: false });
 
-  if (error) throw error;
+  if (error) {
+    // Fallback when rubric columns are not migrated yet.
+    const { data: legacy, error: legacyError } = await supabase
+      .from('dashboard_chats')
+      .select('*')
+      .order('updated_at', { ascending: false })
+      .order('id', { ascending: false });
+    if (legacyError) throw error;
+    return legacy || [];
+  }
   return data || [];
 }
 
@@ -662,6 +760,23 @@ export async function getOrCreateSessionChat(
   return data as DashboardChat;
 }
 
+/**
+ * Return (or create) the durable rubric-scoped chat without changing the
+ * user's global active rubric. Response shape matches dashboard_chats row.
+ */
+export async function getOrCreateRubricChat(rubricId: string): Promise<DashboardChat> {
+  await injectStoredToken();
+  const { data, error } = await supabase.rpc('get_or_create_rubric_chat', {
+    p_rubric_id: rubricId,
+  });
+
+  if (error) throw error;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new Error('Rubric chat RPC returned an invalid response');
+  }
+  return data as DashboardChat;
+}
+
 export async function updateDashboardChat(
   chatId: string,
   updates: Pick<DashboardChat, 'title'>,
@@ -692,12 +807,26 @@ export async function getDashboardChatMessages(chatId: string): Promise<Dashboar
   await injectStoredToken();
   const { data, error } = await supabase
     .from('dashboard_chat_messages')
-    .select('*')
+    .select(`
+      id, user_id, chat_id, session_id, role, text, origin_surface, request_id,
+      server_sequence, used_file_search, file_search_store_name, grounding_metadata,
+      citations, created_at
+    `)
     .eq('chat_id', chatId)
     .order('server_sequence', { ascending: true })
     .order('id', { ascending: true });
 
-  if (error) throw error;
+  if (error) {
+    // Fallback when citations column is not present yet.
+    const { data: legacy, error: legacyError } = await supabase
+      .from('dashboard_chat_messages')
+      .select('*')
+      .eq('chat_id', chatId)
+      .order('server_sequence', { ascending: true })
+      .order('id', { ascending: true });
+    if (legacyError) throw error;
+    return legacy || [];
+  }
   return data || [];
 }
 

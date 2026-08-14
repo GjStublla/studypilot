@@ -11,6 +11,7 @@ function message(
   role: 'user' | 'ai',
   requestId: string | null,
   sequence: number,
+  extras: Partial<DashboardChatMessage> = {},
 ): DashboardChatMessage {
   return {
     id,
@@ -23,6 +24,7 @@ function message(
     request_id: requestId,
     server_sequence: sequence,
     created_at: '2026-08-04T10:00:00.000Z',
+    ...extras,
   };
 }
 
@@ -190,5 +192,35 @@ describe('dashboard chat state', () => {
 
     expect(selectChatMessages(state, 'chat-a')).toEqual([]);
     expect(state['chat-a'].loadStatus).toBe('loading');
+  });
+
+  it('maps grounding metadata into view citations for assistant messages', () => {
+    let state = dashboardChatReducer({}, { type: 'load-started', chatId: 'chat-a', version: 1 });
+    state = dashboardChatReducer(state, {
+      type: 'load-succeeded',
+      chatId: 'chat-a',
+      version: 1,
+      rows: [
+        message('ai-1', 'ai', 'request-a', 1, {
+          used_file_search: true,
+          grounding_metadata: {
+            groundingChunks: [
+              { retrievedContext: { title: 'Evidence', text: 'Cite sources' } },
+            ],
+          },
+        }),
+      ],
+    });
+
+    const [viewMessage] = selectChatMessages(state, 'chat-a');
+    expect(viewMessage.usedFileSearch).toBe(true);
+    expect(viewMessage.citations).toEqual([
+      {
+        title: 'Evidence',
+        uri: null,
+        snippet: 'Cite sources',
+        sourceIndex: 0,
+      },
+    ]);
   });
 });

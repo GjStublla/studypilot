@@ -13,9 +13,19 @@ import {
   createGeminiInteraction,
   describeGeminiError,
   getGeminiTextModel,
+  parseInteractionStreamEvent,
 } from "../shared/gemini.ts";
+import {
+  canUseGeminiInteractions,
+  getGeminiRagModel,
+} from "../shared/gemini-api.ts";
+import {
+  buildContextSnapshot,
+  turnsToGeminiContents,
+} from "../shared/context.ts";
+import { normalizeCitations } from "../shared/file-search-normalize.ts";
+import { retrieveRagContexts } from "../shared/vertex-rag.ts";
 
-const MAX_HISTORY_TURNS = 20;
 const MAX_IMAGES = 2;
 const MAX_IMAGE_BASE64_CHARS = 1_500_000;
 const ALLOWED_IMAGE_MIME_TYPES = new Set([
@@ -82,6 +92,7 @@ type ChatRow = {
   id: string;
   session_id: string | null;
   title: string;
+  rubric_id?: string | null;
 };
 
 type TurnIdentity = {
@@ -293,6 +304,7 @@ function asChatRow(value: unknown): ChatRow | null {
     id: row.id,
     session_id: row.session_id as string | null,
     title: row.title,
+    rubric_id: typeof row.rubric_id === "string" ? row.rubric_id : null,
   };
 }
 
@@ -447,7 +459,7 @@ serve(async (req) => {
   if (requestedChatId) {
     const { data, error } = await db
       .from("dashboard_chats")
-      .select("id, session_id, title")
+      .select("id, session_id, title, rubric_id")
       .eq("id", requestedChatId)
       .eq("user_id", user.id)
       .maybeSingle();
@@ -480,7 +492,6 @@ serve(async (req) => {
   }
 
   const chatId = chat.id;
-  const sessionId = chat.session_id ?? undefined;
   const hash = await requestHash({
     chatId,
     userMessage,
@@ -581,6 +592,11 @@ serve(async (req) => {
     assistantText: string | null,
     errorStatus: number | null,
     errorMessage: string | null,
+    grounding?: {
+      usedFileSearch?: boolean;
+      fileSearchStoreName?: string | null;
+      groundingMetadata?: Record<string, unknown> | null;
+    },
   ): Promise<TurnRpcResult | null> => {
     const { data, error } = await db.rpc("finish_ai_chat_turn", {
       p_user_id: user.id,
@@ -590,6 +606,9 @@ serve(async (req) => {
       p_assistant_text: assistantText,
       p_error_status: errorStatus,
       p_error_message: errorMessage,
+      p_used_file_search: grounding?.usedFileSearch ?? false,
+      p_file_search_store_name: grounding?.fileSearchStoreName ?? null,
+      p_grounding_metadata: grounding?.groundingMetadata ?? null,
     });
     const result = asTurnRpcResult(data);
     if (error || !result) {
@@ -602,176 +621,102 @@ serve(async (req) => {
     return result;
   };
 
-  const { data: profile } = await db
-    .from("profiles")
-    .select("name, default_coach_mode, gemini_file_search_store_name")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  let sessionContext = "";
-  let sessionTranscript: Array<{
-    id: string;
-    role: string;
-    message_text: string;
-    time_offset_seconds: number;
-    server_sequence: number | null;
-  }> = [];
-  let rubricContext = "";
-  if (sessionId) {
-    const { data: session } = await db
-      .from("sessions")
-      .select("title, mode, summary, rubric_id, when_timestamp")
-      .eq("id", sessionId)
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (session) {
-      sessionContext =
-        `SESSION: "${session.title}" (${session.mode})\nSUMMARY: ${
-          session.summary || "No summary yet."
-        }`;
-      const { data: transcript } = await db
-        .from("session_messages")
-        .select("id, role, message_text, time_offset_seconds, server_sequence")
-        .eq("session_id", sessionId)
-        .order("time_offset_seconds", { ascending: false })
-        .order("server_sequence", { ascending: false })
-        .limit(20);
-      sessionTranscript = transcript ?? [];
-
-      if (session.rubric_id) {
-        const { data: rubric } = await db
-          .from("rubrics")
-          .select(
-            "title, course, extracted_text, rubric_criteria(name, score, max_score)",
-          )
-          .eq("id", session.rubric_id)
-          .eq("user_id", user.id)
-          .maybeSingle();
-        if (rubric) {
-          const criteriaText = ((rubric.rubric_criteria as
-            | Array<Record<string, unknown>>
-            | null) ?? [])
-            .map((criterion) =>
-              `  - ${criterion.name}: ${criterion.score ?? 0}/${
-                criterion.max_score ?? 4
-              }`
-            )
-            .join("\n");
-          rubricContext =
-            `RUBRIC: "${rubric.title}" (${rubric.course})\nCRITERIA:\n${criteriaText}`;
-          if (rubric.extracted_text) {
-            const extractedText = String(rubric.extracted_text);
-            rubricContext += `\n\nRUBRIC TEXT:\n${
-              extractedText.slice(0, 2_000)
-            }${extractedText.length > 2_000 ? "... [truncated]" : ""}`;
-          }
-        }
-      }
+  // Lock effective rubric onto the chat when not yet locked (best-effort).
+  try {
+    const { error: lockError } = await db.rpc("ensure_chat_rubric_locked", {
+      p_chat_id: chatId,
+      p_user_id: user.id,
+    });
+    if (lockError) {
+      console.error("[socratic-coach] ensure_chat_rubric_locked failed:", lockError);
+      await finishTurn("failed", null, 503, "Unable to lock chat rubric context");
+      return jsonResponse({ error: "Unable to lock chat rubric context" }, 503);
     }
-  } else {
-    const { data: activeRubric } = await db
-      .from("rubrics")
-      .select(
-        "title, course, extracted_text, rubric_criteria(name, score, max_score)",
-      )
-      .eq("user_id", user.id)
-      .eq("active", true)
-      .maybeSingle();
-    if (activeRubric) {
-      const criteriaText = ((activeRubric.rubric_criteria as
-        | Array<Record<string, unknown>>
-        | null) ?? [])
-        .map((criterion) =>
-          `  - ${criterion.name}: ${criterion.score ?? 0}/${
-            criterion.max_score ?? 4
-          }`
-        )
-        .join("\n");
-      rubricContext =
-        `ACTIVE RUBRIC: "${activeRubric.title}" (${activeRubric.course})\nCRITERIA:\n${criteriaText}`;
-    }
+  } catch (error) {
+    console.error("[socratic-coach] ensure_chat_rubric_locked:", error);
+    await finishTurn("failed", null, 503, "Unable to lock chat rubric context");
+    return jsonResponse({ error: "Unable to lock chat rubric context" }, 503);
   }
 
-  const { data: recentHistory, error: historyError } = await db
-    .from("dashboard_chat_messages")
-    .select("id, role, text, server_sequence")
-    .eq("user_id", user.id)
-    .eq("chat_id", chatId)
-    .neq("id", activeTurn.userMessageId)
-    .order("server_sequence", { ascending: false })
-    .limit(MAX_HISTORY_TURNS);
-  if (historyError) {
-    console.error(
-      "[socratic-coach] Failed to load canonical chat history:",
-      historyError,
-    );
+  const formattedClientContext = formatClientContext(clientContext);
+  let contextSnapshot;
+  try {
+    contextSnapshot = await buildContextSnapshot(db, {
+      chatId,
+      userId: user.id,
+      excludeMessageId: activeTurn.userMessageId,
+      baseSystemPrompt: SYSTEM_PROMPT,
+      extraContextBlocks: formattedClientContext
+        ? [formattedClientContext]
+        : [],
+      maintainSummary: true,
+    });
+  } catch (error) {
+    console.error("[socratic-coach] Failed to build context:", error);
+    await finishTurn("failed", null, 503, "Unable to load chat context");
+    return jsonResponse({ error: "Unable to load chat context" }, 503);
+  }
+
+  if (!canUseGeminiInteractions()) {
     await finishTurn(
       "failed",
       null,
       503,
-      "Unable to load chat history",
+      "Vertex AI credentials are not configured",
     );
-    return jsonResponse({ error: "Unable to load chat history" }, 503);
+    return jsonResponse({
+      error:
+        "AI service is not configured. Set GOOGLE_PROJECT_ID + Vertex service-account credentials.",
+    }, 503);
   }
-  if (sessionTranscript.length) {
-    const canonicalMessageIds = new Set(
-      (recentHistory ?? []).map((message) => message.id),
-    );
-    canonicalMessageIds.add(activeTurn.userMessageId);
-    const transcriptText = [...sessionTranscript]
-      .reverse()
-      .filter((message) => !canonicalMessageIds.has(message.id))
-      .map((message) =>
-        `${
-          message.role === "user" ? "Student" : "StudyPilot"
-        }: ${message.message_text}`
-      )
-      .join("\n");
-    if (transcriptText) {
-      sessionContext += `\n\nRECENT TRANSCRIPT:\n${transcriptText}`;
+
+  const useRag = contextSnapshot.usedFileSearchEligible &&
+    Boolean(contextSnapshot.fileSearchStoreName);
+
+  let ragEvidence = "";
+  let ragCitations: ReturnType<typeof normalizeCitations> = [];
+  let ragGrounding: Record<string, unknown> | null = null;
+  if (useRag && contextSnapshot.fileSearchStoreName) {
+    try {
+      const retrieved = await retrieveRagContexts({
+        corpusName: contextSnapshot.fileSearchStoreName,
+        query: userMessage,
+        rubricId: contextSnapshot.rubric?.id ?? null,
+      });
+      ragEvidence = retrieved.text;
+      ragCitations = retrieved.citations;
+      ragGrounding = retrieved.groundingMetadata;
+    } catch (error) {
+      console.warn("[socratic-coach] Vertex RAG retrieve failed:", error);
     }
   }
-  const chatHistory = (recentHistory ?? []).reverse().map((message) => ({
-    role: message.role === "user"
-      ? "Student"
-      : message.role === "ai"
-      ? "StudyPilot"
-      : "System",
-    text: message.text,
-  }));
 
-  const contextParts: string[] = [];
-  if (rubricContext) contextParts.push(rubricContext);
-  if (sessionContext) contextParts.push(sessionContext);
-  const formattedClientContext = formatClientContext(clientContext);
-  if (formattedClientContext) contextParts.push(formattedClientContext);
-  if (profile?.name) contextParts.push(`STUDENT NAME: ${profile.name}`);
-  const systemWithContext = contextParts.length > 0
-    ? `${SYSTEM_PROMPT}\n\n---\nCONTEXT:\n${contextParts.join("\n\n")}\n---`
-    : SYSTEM_PROMPT;
-  const historyText = chatHistory.map((message) =>
-    `${message.role}: ${message.text}`
-  ).join("\n");
-  const interactionInput = historyText
-    ? `Recent chat history:\n${historyText}\n\nStudent: ${userMessage}`
-    : userMessage;
-  const parts: Array<
+  const historyContents = turnsToGeminiContents(contextSnapshot.turns);
+  const userParts: Array<
     { text: string } | { inlineData: { mimeType: string; data: string } }
   > = [
-    { text: interactionInput },
+    {
+      text: ragEvidence
+        ? `${userMessage}\n\n---\nRETRIEVED RUBRIC EVIDENCE (Vertex RAG):\n${ragEvidence}`
+        : userMessage,
+    },
     ...imageResult.images.map((image) => ({
       inlineData: { mimeType: image.mimeType, data: image.data },
     })),
   ];
+  const contents = [
+    ...historyContents,
+    { role: "user", parts: userParts },
+  ];
+
+  const model = useRag ? getGeminiRagModel() : getGeminiTextModel();
 
   let geminiResponse: Response;
   try {
     geminiResponse = await createGeminiInteraction({
-      model: getGeminiTextModel(),
-      system_instruction: systemWithContext,
-      input: interactionInput,
-      parts,
+      model,
+      system_instruction: contextSnapshot.systemInstruction,
+      contents,
       stream: true,
       generation_config: { temperature: 0.7, maxOutputTokens: 1024 },
     });
@@ -801,11 +746,16 @@ serve(async (req) => {
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
   const encoder = new TextEncoder();
+  const fileSearchStoreName = useRag
+    ? contextSnapshot.fileSearchStoreName
+    : null;
+  const useFileSearch = useRag;
   (async () => {
     const reader = geminiResponse.body!.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
     let fullResponse = "";
+    let lastGrounding: Record<string, unknown> | null = ragGrounding;
 
     const consumeLine = async (line: string) => {
       const clean = line.trim();
@@ -814,19 +764,13 @@ serve(async (req) => {
       if (!raw || raw === "[DONE]") return;
       try {
         const parsed = JSON.parse(raw);
-        const text = parsed?.candidates?.[0]?.content?.parts
-          ?.map((part: { text?: string }) => part.text ?? "")
-          .join("") ?? "";
+        const { text, grounding } = parseInteractionStreamEvent(parsed);
         if (text) {
           fullResponse += text;
           await writer.write(encoder.encode(sseChunk(text)));
         }
-        const finishReason = parsed?.candidates?.[0]?.finishReason;
-        if (
-          finishReason && finishReason !== "STOP" &&
-          finishReason !== "MAX_TOKENS"
-        ) {
-          console.error("[socratic-coach] Gemini finish reason:", finishReason);
+        if (grounding) {
+          lastGrounding = grounding;
         }
       } catch {
         // Ignore malformed upstream SSE records; complete records are newline-delimited.
@@ -848,11 +792,37 @@ serve(async (req) => {
       const finalText = fullResponse.trim();
       if (!finalText) throw new Error("AI service returned an empty response");
 
+      const streamCitations = normalizeCitations(lastGrounding);
+      const citations = streamCitations.length > 0
+        ? streamCitations
+        : ragCitations;
+      const usedFileSearch = useFileSearch &&
+        (citations.length > 0 || Boolean(lastGrounding) || Boolean(ragEvidence));
+      const groundingMetadata: Record<string, unknown> = lastGrounding
+        ? {
+          ...(lastGrounding as Record<string, unknown>),
+          citations,
+          usedFileSearch,
+          ungrounded: !usedFileSearch,
+        }
+        : useFileSearch
+        ? { usedFileSearch: false, ungrounded: true, citations }
+        : {
+          usedFileSearch: false,
+          ungrounded: true,
+          citations: [],
+          fallback: "criteria_summary",
+        };
       const completed = await finishTurn(
         "completed",
         finalText,
         null,
         null,
+        {
+          usedFileSearch,
+          fileSearchStoreName,
+          groundingMetadata,
+        },
       );
       if (!isCommittedTurn(completed)) {
         throw new Error(

@@ -1,0 +1,198 @@
+#studypilot-live-root {
+  all: initial;
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 2147483646;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 13px;
+  color: #e8eef7;
+  line-height: 1.4;
+}
+
+#studypilot-live-root.is-hidden {
+  display: none;
+}
+
+#studypilot-live-root .sp-panel {
+  width: 320px;
+  max-height: min(80vh, 640px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  background: linear-gradient(165deg, #121820 0%, #0b1016 100%);
+  border: 1px solid rgba(57, 215, 255, 0.28);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+#studypilot-live-root .sp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+#studypilot-live-root .sp-brand {
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: #39d7ff;
+}
+
+#studypilot-live-root .sp-icon {
+  background: transparent;
+  border: 0;
+  color: #9fb0c3;
+  font-size: 20px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+#studypilot-live-root .sp-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 11px;
+  color: #9fb0c3;
+}
+
+#studypilot-live-root .sp-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #5a6a7a;
+}
+
+#studypilot-live-root .sp-status[data-state="live"] .sp-dot {
+  background: #6cf0c0;
+  box-shadow: 0 0 0 3px rgba(108, 240, 192, 0.2);
+}
+
+#studypilot-live-root .sp-status[data-state="error"] .sp-dot {
+  background: #ff6b6b;
+}
+
+#studypilot-live-root .sp-status[data-state="paused"] .sp-dot,
+#studypilot-live-root .sp-status[data-state="connecting"] .sp-dot,
+#studypilot-live-root .sp-status[data-state="starting"] .sp-dot {
+  background: #39d7ff;
+}
+
+#studypilot-live-root .sp-fields {
+  display: grid;
+  gap: 8px;
+}
+
+#studypilot-live-root label {
+  display: grid;
+  gap: 4px;
+  color: #9fb0c3;
+  font-size: 11px;
+}
+
+#studypilot-live-root input,
+#studypilot-live-root textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 8px;
+  border: 1px solid #243041;
+  background: #0a0f15;
+  color: #e8eef7;
+  padding: 8px 10px;
+  font: inherit;
+}
+
+#studypilot-live-root input:disabled {
+  opacity: 0.55;
+}
+
+#studypilot-live-root .sp-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+#studypilot-live-root button[data-action] {
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  background: #1a2736;
+  color: #e8eef7;
+}
+
+#studypilot-live-root button[data-action="start"] {
+  background: #147a8a;
+  color: #041016;
+}
+
+#studypilot-live-root button[data-action="stop"] {
+  background: #3a1d24;
+  color: #ffb4b4;
+}
+
+#studypilot-live-root button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+#studypilot-live-root .sp-transcript {
+  flex: 1;
+  min-height: 120px;
+  max-height: 240px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+#studypilot-live-root .sp-line {
+  font-size: 12px;
+  color: #c9d5e3;
+}
+
+#studypilot-live-root .sp-line span {
+  display: inline-block;
+  min-width: 64px;
+  margin-right: 6px;
+  color: #39d7ff;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+#studypilot-live-root .sp-line.sp-assistant span {
+  color: #6cf0c0;
+}
+
+#studypilot-live-root .sp-error {
+  margin: 0;
+  color: #ff8f8f;
+  font-size: 12px;
+}
+
+#studypilot-live-root .sp-warn,
+#studypilot-live-root .sp-fallback {
+  margin: 0;
+  color: #f0d48a;
+  font-size: 12px;
+}
+
+#studypilot-live-root .sp-auth {
+  color: #9fb0c3;
+  font-size: 12px;
+}
+
+#studypilot-live-root .sp-auth button {
+  margin-top: 8px;
+  width: 100%;
+}

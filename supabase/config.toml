@@ -25,6 +25,15 @@ enable_confirmations = false
 [functions.live-token]
 verify_jwt = true
 
+[functions.live-rubric-search]
+verify_jwt = true
+
+[functions.live-turn]
+verify_jwt = true
+
+[functions.live-finish]
+verify_jwt = true
+
 [functions.ensure-file-search-store]
 verify_jwt = true
 
@@ -45,4 +54,3 @@ verify_jwt = true
 
 [analytics]
 enabled = false
-

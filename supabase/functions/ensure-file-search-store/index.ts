@@ -1,121 +1,115 @@
+/**
+ * ensure-file-search-store — create or return the user's Vertex RAG corpus.
+ *
+ * Function name kept for dashboard/extension allowlist compatibility.
+ *
+ * Input:  {}
+ * Output: { ragCorpusName, displayName, fileSearchStoreName (compat) }
+ */
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4"
+import { verifyRequest } from "../shared/supabase-clients.ts"
+import {
+  createRagCorpus,
+  ensureRagMetadataSchemas,
+} from "../shared/vertex-rag.ts"
+import { canUseGeminiInteractions } from "../shared/gemini-api.ts"
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+}
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  })
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders })
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    
-    // Auth: must use anon key + user JWT. The service-role client ignores the
-    // Authorization header for auth.getUser() and would return the service account.
-    const authHeader = req.headers.get('Authorization') ?? ''
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
-    if (!token) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
+    const auth = await verifyRequest(req)
+    if (!auth) return jsonResponse({ error: "Unauthorized" }, 401)
+    const { user, db } = auth
 
-    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    })
-    const { data: { user }, error: userError } = await authClient.auth.getUser(token)
-    if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Service-role client for all DB writes
-    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey)
-
-    // Fetch profile to check if file search store already exists
-    const { data: profile, error: profileError } = await supabaseClient
-      .from('profiles')
-      .select('gemini_file_search_store_name, gemini_file_search_store_display_name')
-      .eq('id', user.id)
+    const { data: profile, error: profileError } = await db
+      .from("profiles")
+      .select("vertex_rag_corpus_name, vertex_rag_corpus_display_name")
+      .eq("id", user.id)
       .single()
 
     if (profileError) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to fetch profile' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return jsonResponse({ error: "Failed to fetch profile" }, 500)
     }
 
-    // If store already exists, return it
-    if (profile.gemini_file_search_store_name) {
-      return new Response(
-        JSON.stringify({
-          fileSearchStoreName: profile.gemini_file_search_store_name,
-          displayName: profile.gemini_file_search_store_display_name || 'studypilot-user-store',
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Generate display name from the user's short ID
-    const userIdShort = user.id.slice(0, 8)
-    const displayName = `studypilot-user-${userIdShort}`
-
-    // TODO: Call consumeAiRequest(supabaseClient, user.id) before the real
-    // Gemini request below so File Search setup shares the daily AI request pool.
-    // Replace the stub below with the real Gemini File Search Stores
-    // create API once available:
-    //
-    // const accessToken = await getAccessToken()
-    // const geminiResponse = await fetch(
-    //   'https://generativelanguage.googleapis.com/v1beta/files/searchStores',
-    //   {
-    //     method: 'POST',
-    //     headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-    //     body: JSON.stringify({ displayName, embeddingModel: 'models/gemini-embedding-2' }),
-    //   }
-    // )
-    // const { name: fileSearchStoreName } = await geminiResponse.json()
-
-    // Stub: generate a placeholder store name
-    const fileSearchStoreName = `fileSearchStores/${crypto.randomUUID()}`
-
-    // Update profile with store name
-    const { error: updateError } = await supabaseClient
-      .from('profiles')
-      .update({
-        gemini_file_search_store_name: fileSearchStoreName,
-        gemini_file_search_store_display_name: displayName,
+    if (profile.vertex_rag_corpus_name) {
+      return jsonResponse({
+        ragCorpusName: profile.vertex_rag_corpus_name,
+        fileSearchStoreName: profile.vertex_rag_corpus_name,
+        displayName:
+          profile.vertex_rag_corpus_display_name || "studypilot-user-corpus",
       })
-      .eq('id', user.id)
+    }
+
+    if (!canUseGeminiInteractions()) {
+      return jsonResponse({
+        error:
+          "Vertex AI credentials are not configured for RAG corpus creation",
+      }, 503)
+    }
+
+    const displayName = `studypilot-user-${user.id.slice(0, 8)}`
+    const corpus = await createRagCorpus({ displayName })
+    await ensureRagMetadataSchemas(corpus.name)
+
+    const { error: updateError } = await db
+      .from("profiles")
+      .update({
+        vertex_rag_corpus_name: corpus.name,
+        vertex_rag_corpus_display_name: corpus.displayName || displayName,
+      })
+      .eq("id", user.id)
+      .is("vertex_rag_corpus_name", null)
 
     if (updateError) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to update profile' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      const { data: raced } = await db
+        .from("profiles")
+        .select("vertex_rag_corpus_name, vertex_rag_corpus_display_name")
+        .eq("id", user.id)
+        .single()
+      if (raced?.vertex_rag_corpus_name) {
+        return jsonResponse({
+          ragCorpusName: raced.vertex_rag_corpus_name,
+          fileSearchStoreName: raced.vertex_rag_corpus_name,
+          displayName:
+            raced.vertex_rag_corpus_display_name || displayName,
+        })
+      }
+      return jsonResponse({ error: "Failed to update profile" }, 500)
     }
 
-    return new Response(
-      JSON.stringify({
-        fileSearchStoreName,
+    const { data: saved } = await db
+      .from("profiles")
+      .select("vertex_rag_corpus_name, vertex_rag_corpus_display_name")
+      .eq("id", user.id)
+      .single()
+
+    const name = saved?.vertex_rag_corpus_name ?? corpus.name
+    return jsonResponse({
+      ragCorpusName: name,
+      fileSearchStoreName: name,
+      displayName:
+        saved?.vertex_rag_corpus_display_name || corpus.displayName ||
         displayName,
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    })
   } catch (error) {
-    return new Response(
-      JSON.stringify({ error: (error as Error).message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    console.error("[ensure-file-search-store]", error)
+    return jsonResponse({ error: (error as Error).message }, 500)
   }
 })

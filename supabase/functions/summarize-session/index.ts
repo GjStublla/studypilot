@@ -232,7 +232,7 @@ Rules:
     const geminiResponse = await createGeminiInteraction({
       model: getGeminiTextModel(),
       input: prompt,
-      store: false,
+      store: true,
       generation_config: {
         temperature: 0.3,
         maxOutputTokens: 1024,

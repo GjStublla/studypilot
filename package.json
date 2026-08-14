@@ -10,7 +10,7 @@
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:deno": "npx --yes deno@2.1.4 test supabase/functions/shared/ai-usage_test.ts",
+    "test:deno": "npx --yes deno@2.1.4 test --allow-env supabase/functions",
     "local:start": "supabase start",
     "local:stop": "supabase stop",
     "local:status": "supabase status -o env",
@@ -18,7 +18,8 @@
     "backend": "cd backend && python -m uvicorn main:app --reload",
     "docker:dev": "docker compose up --build",
     "docker:prod": "docker compose -f docker-compose.prod.yml up --build -d",
-    "verify:functions": "node scripts/verify-function-allowlist.mjs"
+    "verify:functions": "node scripts/verify-function-allowlist.mjs",
+    "extension:build": "npm run build --prefix ../studypilot-extension"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",

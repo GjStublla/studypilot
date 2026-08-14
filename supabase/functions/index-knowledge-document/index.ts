@@ -1,166 +1,455 @@
 /**
- * index-knowledge-document — Supabase Edge Function
+ * index-knowledge-document — upload + index into Vertex AI RAG Engine.
  *
- * Imports a knowledge document into Gemini File Search so it becomes
- * searchable by the Socratic coach.
- *
- * Currently stubs the Gemini File Search API call (commented out) and
- * generates placeholder metadata. Replace the stub when the Gemini
- * File Search API is available and credentials are configured.
+ * Consumes one AI quota unit per durable indexing claim. Vertex upload is
+ * synchronous (chunk + index in the upload call).
  *
  * Input:  { knowledgeDocumentId: string }
- * Output: { knowledgeDocumentId, status, fileSearchStoreName, fileSearchDocumentName }
+ * Output: { knowledgeDocumentId, status, ragCorpusName, ragFileName? }
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4"
+import { verifyRequest } from "../shared/supabase-clients.ts"
+import {
+  consumeAiRequest,
+  limitReachedMessage,
+  QUOTA_UNAVAILABLE_MESSAGE,
+} from "../shared/ai-usage.ts"
+import {
+  attachRagFileMetadata,
+  createRagCorpus,
+  ensureRagMetadataSchemas,
+  uploadRagFile,
+} from "../shared/vertex-rag.ts"
+import {
+  canUseGeminiInteractions,
+  getGeminiEmbeddingModel,
+} from "../shared/gemini-api.ts"
+import {
+  RUBRICS_STORAGE_BUCKET,
+  validateOwnedStoragePath,
+} from "../shared/storage-path.ts"
+import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.38.4"
+
+declare const EdgeRuntime: {
+  waitUntil(promise: Promise<unknown>): void
+}
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 }
+
+const DOC_SELECT =
+  "id, title, user_id, rubric_id, storage_path, storage_bucket, mime_type, extracted_text, index_status, index_error, vertex_rag_corpus_name, vertex_rag_file_name"
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
   })
 }
 
+async function markFailed(
+  db: SupabaseClient,
+  knowledgeDocumentId: string,
+  rubricId: string | null,
+  message: string,
+) {
+  await db.from("knowledge_documents").update({
+    index_status: "failed",
+    index_error: message.slice(0, 2000),
+  }).eq("id", knowledgeDocumentId)
+
+  if (rubricId) {
+    await db.from("rubrics").update({
+      file_search_status: "failed",
+      file_search_error: message.slice(0, 2000),
+    }).eq("id", rubricId)
+  }
+}
+
+async function markIndexed(
+  db: SupabaseClient,
+  input: {
+    knowledgeDocumentId: string
+    rubricId: string | null
+    userId: string
+    title: string
+    corpusName: string
+    ragFileName: string
+  },
+) {
+  await db.from("knowledge_documents").update({
+    vertex_rag_corpus_name: input.corpusName,
+    vertex_rag_file_name: input.ragFileName,
+    gemini_file_name: input.title,
+    embedding_model: getGeminiEmbeddingModel(),
+    index_status: "indexed",
+    index_error: null,
+    indexed_at: new Date().toISOString(),
+  }).eq("id", input.knowledgeDocumentId)
+
+  if (input.rubricId) {
+    await db.from("rubrics").update({
+      file_search_status: "indexed",
+      file_search_error: null,
+      knowledge_document_id: input.knowledgeDocumentId,
+    }).eq("id", input.rubricId)
+  }
+
+  await db.from("activity_logs").insert({
+    user_id: input.userId,
+    event_type: "document_indexed",
+    details: { document_title: input.title, backend: "vertex_rag" },
+  })
+}
+
+function statusPayload(
+  knowledgeDocumentId: string,
+  doc: {
+    index_status?: string | null
+    vertex_rag_corpus_name?: string | null
+    vertex_rag_file_name?: string | null
+    index_error?: string | null
+  },
+  extras?: Record<string, unknown>,
+) {
+  return {
+    knowledgeDocumentId,
+    status: doc.index_status ?? "indexing",
+    ragCorpusName: doc.vertex_rag_corpus_name ?? null,
+    ragFileName: doc.vertex_rag_file_name ?? null,
+    // Compat aliases for older dashboard clients
+    fileSearchStoreName: doc.vertex_rag_corpus_name ?? null,
+    fileSearchDocumentName: doc.vertex_rag_file_name ?? null,
+    ...extras,
+  }
+}
+
+/** Reclaim uploading/indexing rows left behind by Edge IDLE_TIMEOUT kills. */
+const STALE_INDEX_MS = 3 * 60 * 1000
+
+async function claimIndexingJob(
+  db: SupabaseClient,
+  knowledgeDocumentId: string,
+  userId: string,
+): Promise<
+  | { action: "claimed"; doc: Record<string, unknown> }
+  | { action: "replay"; doc: Record<string, unknown> }
+  | { action: "missing" }
+> {
+  const { data: claimed } = await db
+    .from("knowledge_documents")
+    .update({
+      index_status: "uploading",
+      index_error: null,
+    })
+    .eq("id", knowledgeDocumentId)
+    .eq("user_id", userId)
+    .in("index_status", ["pending", "failed"])
+    .select(DOC_SELECT)
+    .maybeSingle()
+
+  if (claimed) {
+    return { action: "claimed", doc: claimed as Record<string, unknown> }
+  }
+
+  const { data: current } = await db
+    .from("knowledge_documents")
+    .select(DOC_SELECT + ", updated_at")
+    .eq("id", knowledgeDocumentId)
+    .eq("user_id", userId)
+    .maybeSingle()
+
+  if (!current) return { action: "missing" }
+
+  const status = String(current.index_status ?? "")
+  const updatedAt = Date.parse(String((current as { updated_at?: string }).updated_at ?? ""))
+  const stale =
+    (status === "uploading" || status === "indexing") &&
+    Number.isFinite(updatedAt) &&
+    Date.now() - updatedAt > STALE_INDEX_MS
+
+  if (stale) {
+    const { data: reclaimed } = await db
+      .from("knowledge_documents")
+      .update({
+        index_status: "uploading",
+        index_error: null,
+      })
+      .eq("id", knowledgeDocumentId)
+      .eq("user_id", userId)
+      .in("index_status", ["uploading", "indexing"])
+      .select(DOC_SELECT)
+      .maybeSingle()
+    if (reclaimed) {
+      return { action: "claimed", doc: reclaimed as Record<string, unknown> }
+    }
+  }
+
+  return { action: "replay", doc: current as Record<string, unknown> }
+}
+
+async function runVertexIndex(
+  db: SupabaseClient,
+  input: {
+    knowledgeDocumentId: string
+    userId: string
+    claimedDoc: Record<string, unknown>
+    priorStatus: string | null
+  },
+): Promise<Response> {
+  const claimedDoc = input.claimedDoc
+  const rubricId = (claimedDoc.rubric_id as string | null) ?? null
+  const knowledgeDocumentId = input.knowledgeDocumentId
+
+  const aiUsage = await consumeAiRequest(db, input.userId)
+  if (aiUsage.status === "unavailable") {
+    await db.from("knowledge_documents").update({
+      index_status: input.priorStatus === "failed" ? "failed" : "pending",
+      index_error: QUOTA_UNAVAILABLE_MESSAGE.slice(0, 2000),
+    }).eq("id", knowledgeDocumentId)
+    return jsonResponse({ error: QUOTA_UNAVAILABLE_MESSAGE }, 503)
+  }
+  if (!aiUsage.usage.allowed) {
+    await db.from("knowledge_documents").update({
+      index_status: input.priorStatus === "failed" ? "failed" : "pending",
+      index_error: limitReachedMessage(aiUsage.usage).slice(0, 2000),
+    }).eq("id", knowledgeDocumentId)
+    return jsonResponse({ error: limitReachedMessage(aiUsage.usage) }, 429)
+  }
+
+  const { data: profile } = await db
+    .from("profiles")
+    .select("vertex_rag_corpus_name")
+    .eq("id", input.userId)
+    .single()
+
+  let corpusName = profile?.vertex_rag_corpus_name as string | undefined
+  if (!corpusName) {
+    const displayName = `studypilot-user-${input.userId.slice(0, 8)}`
+    const corpus = await createRagCorpus({ displayName })
+    corpusName = corpus.name
+    await ensureRagMetadataSchemas(corpusName)
+    await db.from("profiles").update({
+      vertex_rag_corpus_name: corpus.name,
+      vertex_rag_corpus_display_name: corpus.displayName || displayName,
+    }).eq("id", input.userId)
+  } else {
+    await ensureRagMetadataSchemas(corpusName)
+  }
+
+  await db.from("knowledge_documents").update({
+    vertex_rag_corpus_name: corpusName,
+  }).eq("id", knowledgeDocumentId)
+
+  if (rubricId) {
+    await db.from("rubrics").update({
+      file_search_status: "indexing",
+      file_search_error: null,
+    }).eq("id", rubricId)
+  }
+
+  let bytes: Uint8Array | null = null
+  let mimeType =
+    (typeof claimedDoc.mime_type === "string" && claimedDoc.mime_type) ||
+    "application/octet-stream"
+  let displayName =
+    (typeof claimedDoc.title === "string" && claimedDoc.title) || "document"
+
+  const validated = rubricId
+    ? validateOwnedStoragePath(
+      typeof claimedDoc.storage_path === "string"
+        ? claimedDoc.storage_path
+        : null,
+      input.userId,
+      rubricId,
+    )
+    : null
+
+  if (claimedDoc.storage_path && !validated) {
+    console.warn(
+      "[index-knowledge-document] Rejecting untrusted storage_path for",
+      knowledgeDocumentId,
+    )
+  }
+
+  if (validated) {
+    const { data: fileBlob, error: downloadError } = await db.storage
+      .from(RUBRICS_STORAGE_BUCKET)
+      .download(validated.path)
+
+    if (!downloadError && fileBlob) {
+      bytes = new Uint8Array(await fileBlob.arrayBuffer())
+      if (fileBlob.type) mimeType = fileBlob.type
+      const base = validated.path.split("/").pop()
+      if (base) displayName = base
+    }
+  }
+
+  if (!bytes || bytes.byteLength === 0) {
+    const extracted = typeof claimedDoc.extracted_text === "string"
+      ? claimedDoc.extracted_text
+      : ""
+    if (!extracted.trim()) {
+      await markFailed(
+        db,
+        knowledgeDocumentId,
+        rubricId,
+        validated
+          ? "No file bytes or extracted text available to index"
+          : "No trusted storage path or extracted text available to index",
+      )
+      return jsonResponse({ error: "No content available to index" }, 400)
+    }
+    bytes = new TextEncoder().encode(extracted)
+    mimeType = "text/plain"
+    displayName = `${displayName}.txt`
+  }
+
+  try {
+    const ragFile = await uploadRagFile({
+      corpusName,
+      displayName,
+      mimeType,
+      bytes,
+      description: `knowledge_document:${knowledgeDocumentId}`,
+    })
+
+    await attachRagFileMetadata({
+      ragFileName: ragFile.name,
+      rubricId,
+      knowledgeDocumentId,
+    })
+
+    await markIndexed(db, {
+      knowledgeDocumentId,
+      rubricId,
+      userId: input.userId,
+      title: String(claimedDoc.title ?? "document"),
+      corpusName,
+      ragFileName: ragFile.name,
+    })
+
+    return jsonResponse({
+      knowledgeDocumentId,
+      status: "indexed",
+      ragCorpusName: corpusName,
+      ragFileName: ragFile.name,
+      fileSearchStoreName: corpusName,
+      fileSearchDocumentName: ragFile.name,
+    })
+  } catch (error) {
+    console.error("[index-knowledge-document] Vertex RAG upload failed:", error)
+    await markFailed(
+      db,
+      knowledgeDocumentId,
+      rubricId,
+      (error as Error).message,
+    )
+    return jsonResponse({
+      error: (error as Error).message,
+      knowledgeDocumentId,
+      status: "failed",
+    }, 502)
+  }
+}
+
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders })
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    const auth = await verifyRequest(req)
+    if (!auth) return jsonResponse({ error: "Unauthorized" }, 401)
+    const { user, db } = auth
 
-    // Auth: use the anon key + user JWT so getUser() works correctly.
-    // The service-role client ignores the Authorization header for getUser()
-    // and would return the service account instead of the user.
-    const authHeader = req.headers.get('Authorization') ?? ''
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
-    if (!token) return jsonResponse({ error: 'Unauthorized' }, 401)
-
-    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    })
-    const { data: { user }, error: authError } = await authClient.auth.getUser(token)
-    if (authError || !user) return jsonResponse({ error: 'Unauthorized' }, 401)
-
-    // Service-role client for all subsequent DB operations
-    const db = createClient(supabaseUrl, supabaseServiceKey)
-
-    // ── Validate input ──────────────────────────────────────────────────────
-    const { knowledgeDocumentId } = await req.json()
+    const body = await req.json().catch(() => ({})) as Record<string, unknown>
+    const knowledgeDocumentId = typeof body.knowledgeDocumentId === "string"
+      ? body.knowledgeDocumentId.trim()
+      : ""
     if (!knowledgeDocumentId) {
-      return jsonResponse({ error: 'knowledgeDocumentId is required' }, 400)
+      return jsonResponse({ error: "knowledgeDocumentId is required" }, 400)
     }
 
-    // ── Fetch document and verify ownership ─────────────────────────────────
     const { data: doc, error: docError } = await db
-      .from('knowledge_documents')
-      .select('id, title, user_id, rubric_id, storage_path, storage_bucket, extracted_text')
-      .eq('id', knowledgeDocumentId)
-      .eq('user_id', user.id)
+      .from("knowledge_documents")
+      .select(DOC_SELECT)
+      .eq("id", knowledgeDocumentId)
+      .eq("user_id", user.id)
       .single()
 
     if (docError || !doc) {
-      return jsonResponse({ error: 'Document not found or access denied' }, 404)
+      return jsonResponse({ error: "Document not found or access denied" }, 404)
     }
 
-    // ── Ensure the user has a File Search store ─────────────────────────────
-    const { data: profile } = await db
-      .from('profiles')
-      .select('gemini_file_search_store_name')
-      .eq('id', user.id)
-      .single()
-
-    let fileSearchStoreName = profile?.gemini_file_search_store_name
-    if (!fileSearchStoreName) {
-      fileSearchStoreName = `fileSearchStores/${crypto.randomUUID()}`
-      await db.from('profiles').update({
-        gemini_file_search_store_name: fileSearchStoreName,
-        gemini_file_search_store_display_name: `studypilot-user-${user.id.slice(0, 8)}`,
-      }).eq('id', user.id)
+    if (doc.index_status === "indexed" && doc.vertex_rag_file_name) {
+      return jsonResponse(statusPayload(knowledgeDocumentId, doc))
     }
 
-    // ── Mark as uploading ───────────────────────────────────────────────────
-    await db.from('knowledge_documents')
-      .update({ index_status: 'uploading' })
-      .eq('id', knowledgeDocumentId)
-
-    // ── Download file from Storage (if available) ───────────────────────────
-    // File content is used when the real Gemini File Search API is wired up.
-    // For now it's fetched but not used in the stub below.
-    if (doc.storage_path) {
-      await db.storage
-        .from(doc.storage_bucket || 'rubrics')
-        .download(doc.storage_path)
-      // fileData would be passed to the Gemini API when implemented
+    if (!canUseGeminiInteractions()) {
+      return jsonResponse({
+        error:
+          "Vertex AI credentials are not configured for RAG indexing (GOOGLE_PROJECT_ID + service account)",
+      }, 503)
     }
 
-    // ── Mark as indexing ────────────────────────────────────────────────────
-    await db.from('knowledge_documents')
-      .update({ index_status: 'indexing' })
-      .eq('id', knowledgeDocumentId)
+    // In-flight uploading/indexing is handled inside claimIndexingJob (replay
+    // unless the row is stale after an Edge idle-timeout kill).
 
-    // TODO: Call consumeAiRequest(db, user.id) before the real Gemini request
-    // below so document indexing shares the daily AI request pool.
-    // Replace the stub below with the real Gemini File Search import:
-    //
-    // const { getAccessToken } = await import('../shared/oauth-helper.ts')
-    // const accessToken = await getAccessToken()
-    // const geminiRes = await fetch(
-    //   `https://generativelanguage.googleapis.com/v1beta/${fileSearchStoreName}/documents`,
-    //   {
-    //     method: 'POST',
-    //     headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-    //     body: JSON.stringify({ displayName: doc.title, content: doc.extracted_text }),
-    //   }
-    // )
-    // const { name: fileSearchDocumentName } = await geminiRes.json()
-
-    // Stub: generate a placeholder document name
-    const fileSearchDocumentName = `${fileSearchStoreName}/documents/${crypto.randomUUID()}`
-
-    // ── Save Gemini metadata and mark as indexed ────────────────────────────
-    const { error: updateError } = await db.from('knowledge_documents').update({
-      gemini_file_search_store_name: fileSearchStoreName,
-      gemini_file_search_document_name: fileSearchDocumentName,
-      gemini_file_name: doc.title,
-      index_status: 'indexed',
-      indexed_at: new Date().toISOString(),
-    }).eq('id', knowledgeDocumentId)
-
-    if (updateError) {
-      await db.from('knowledge_documents').update({
-        index_status: 'failed',
-        index_error: updateError.message,
-      }).eq('id', knowledgeDocumentId)
-      return jsonResponse({ error: 'Failed to save indexing metadata' }, 500)
+    const claim = await claimIndexingJob(db, knowledgeDocumentId, user.id)
+    if (claim.action === "missing") {
+      return jsonResponse({ error: "Document not found or access denied" }, 404)
+    }
+    if (claim.action === "replay") {
+      const replay = claim.doc
+      if (
+        replay.index_status === "indexed" &&
+        replay.vertex_rag_file_name
+      ) {
+        return jsonResponse(statusPayload(knowledgeDocumentId, {
+          index_status: String(replay.index_status),
+          vertex_rag_corpus_name: replay.vertex_rag_corpus_name as
+            | string
+            | null,
+          vertex_rag_file_name: replay.vertex_rag_file_name as string | null,
+          index_error: replay.index_error as string | null,
+        }))
+      }
+      return jsonResponse(statusPayload(knowledgeDocumentId, {
+        index_status: "indexing",
+        vertex_rag_corpus_name: replay.vertex_rag_corpus_name as string | null,
+        vertex_rag_file_name: replay.vertex_rag_file_name as string | null,
+        index_error: replay.index_error as string | null,
+      }))
     }
 
-    // ── Update related rubric status ────────────────────────────────────────
-    if (doc.rubric_id) {
-      await db.from('rubrics')
-        .update({ file_search_status: 'indexed' })
-        .eq('id', doc.rubric_id)
-    }
+    const priorStatus = typeof doc.index_status === "string"
+      ? doc.index_status
+      : null
 
-    // ── Log activity ────────────────────────────────────────────────────────
-    await db.from('activity_logs').insert({
-      user_id: user.id,
-      event_type: 'document_indexed',
-      details: { document_title: doc.title },
+    // Prefer waitUntil so extract-rubric kickoffs stay reliable under Edge.
+    const work = runVertexIndex(db, {
+      knowledgeDocumentId,
+      userId: user.id,
+      claimedDoc: claim.doc,
+      priorStatus,
     })
 
-    return jsonResponse({ knowledgeDocumentId, status: 'indexed', fileSearchStoreName, fileSearchDocumentName })
-
+    try {
+      if (typeof EdgeRuntime !== "undefined" && EdgeRuntime.waitUntil) {
+        // Still await — indexing is sync on Vertex and we need the response body.
+        return await work
+      }
+    } catch {
+      // fall through
+    }
+    return await work
   } catch (error) {
-    console.error('[index-knowledge-document] Error:', error)
+    console.error("[index-knowledge-document] Error:", error)
     return jsonResponse({ error: (error as Error).message }, 500)
   }
 })
