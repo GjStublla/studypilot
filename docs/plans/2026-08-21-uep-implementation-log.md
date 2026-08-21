@@ -282,6 +282,16 @@ Remaining finding (redacted): rule `private-key`, file `backend/service-account.
 
 Approved tracked env-related paths (contents not printed): `.env.docker.example`, `.env.example`, `.env.studypilot-local`, `backend/.env.example`, `supabase/functions/.env.local.example`. Also tracked: `src/vite-env.d.ts` (TypeScript types, not a secret file).
 
+### Follow-up commit
+
+Recheck web commit: `656b7b73918e327c95c1badd18959c612585298e`
+
+```
+656b7b7 fix: harden Phase 0 secret-scan CI so historical credentials fail closed for the right reason
+```
+
+No commit in `studypilot-extension`.
+
 ### Human gates (unchanged)
 
 1. Rotate the Google service-account key from `backend/service-account.json` if it was ever valid. Private incident record only.
