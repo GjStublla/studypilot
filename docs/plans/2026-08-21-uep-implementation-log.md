@@ -179,10 +179,10 @@ CI uses `gitleaks git` on the repository, not a dirty worktree directory scan.
 
 ### Commit
 
-Phase 0 is committed only in `studypilot` (web). Identify it with:
+Phase 0 web commit: `ea4489e888ab2fbe3ed6054d7862c1db3506586d`
 
 ```
-git log --oneline -1 -- SECURITY.md .gitleaks.toml .github/workflows/ci.yml
+ea4489e chore: add secret scanning, SECURITY.md, and gitleaks config so credential incidents fail CI without rewriting history
 ```
 
 No commit in `studypilot-extension`.
