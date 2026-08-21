@@ -135,3 +135,7 @@ docker compose down
 | Port 5173 / 8000 already in use | Stop the conflicting process, then retry |
 | First frontend load is slow / times out | Vite's initial startup — refresh after a few seconds |
 | CORS errors on the prod frontend (port 8080) | Set `CORS_ORIGINS=http://localhost:8080` in `backend/.env` |
+
+## Security
+
+Do not commit `.env` files, service-account JSON, or any `VITE_*` value that is not public. Report leaked credentials to **hello@studypilot.app** with path and commit only — never the secret. See [SECURITY.md](SECURITY.md) for permitted locations, rotation, and the Gitleaks CI gate.
