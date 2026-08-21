@@ -1,0 +1,20 @@
+# StudyPilot Gitleaks configuration
+#
+# Extend the default rule set. Allowlist by path only for known fake
+# local-development fixtures. Never allowlist a live token pattern, PEM
+# private key, hosted credential, or backend/service-account.json.
+#
+# backend/service-account.json previously contained a Google service-account
+# private key in git history. That finding must keep failing until an owner
+# rotates the key (if it was ever valid) and, if required, rewrites history.
+
+title = "StudyPilot"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Official Supabase CLI local demo anon JWT for npm run dev:local (not a hosted secret)"
+paths = [
+  '''(?:^|/)\.env\.studypilot-local$''',
+]
