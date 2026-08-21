@@ -97,8 +97,9 @@ git log --all --name-only -- backend/service-account.json
 ```
 
 - `1e0f6bb` (`2026-08-06`) — **created** `backend/service-account.json`
-- `adb9ac6` — merge that carried the file
 - `0cd0d99` (`2026-08-20`) — **removed** the tracked file (`chore: remove tracked service account credential`)
+
+`git log --all --name-only -- backend/service-account.json` lists only those two commits. Merges may have carried the blob without being a third path-changing commit.
 
 Metadata-only inspection of blob `1e0f6bb:backend/service-account.json`:
 
@@ -201,4 +202,89 @@ No commit in `studypilot-extension`.
 
 ### Deviations from the written verify line
 
-The plan’s “`gitleaks git` exits 0” line cannot be met without either rewriting history or allowlisting a real private key. Phase 0 chose **not** to hide the historical key. Everything else in Phase 0 was implemented.
+The plan originally said “`gitleaks git` exits 0”. That cannot be met without either rewriting history or allowlisting a real private key. Phase 0 chose **not** to hide the historical key. The plan verify line was corrected during the Phase 0 recheck (plan file remains untracked). Everything else in Phase 0 was implemented.
+
+---
+
+## Phase 0 recheck — 2026-08-21
+
+**Executor:** Grok 4.6 (defect-first review of Phase 0 only; Phase 1 not started)
+
+### Git state at recheck (before follow-up edits)
+
+#### `C:\Users\gjins\Desktop\studypilot`
+
+```
+git status --short
+?? docs/plans/2026-08-21-uep-judging-readiness.md
+?? output/
+
+git diff --stat
+(empty)
+
+git diff --cached --stat
+(empty)
+
+git log -1 --oneline
+175bbbe docs: record Phase 0 commit SHA in the implementation log
+```
+
+Untracked `output/` left untouched. Untracked plan file was edited in the worktree (Phase 0 checkboxes + honest verify line) and **not** staged.
+
+#### `C:\Users\gjins\Desktop\studypilot-extension`
+
+```
+git status --short
+(empty)
+
+git diff --stat / git diff --cached --stat
+(empty)
+
+git log -1 --oneline
+ff9f78b Merge remote-tracking branch origin/gresa into main
+```
+
+Five previously dirty files (`manifest.json`, `src/background/index.ts`, `src/shared/extensionMessages.ts`, `src/shared/studypilotSupabase.ts`, `src/shared/types.ts`): `git diff --raw` empty; `git ls-files -v` shows `H` (normal cached). No EOL normalization, checkout, or restage.
+
+### Defects found
+
+| Defect | Severity | Action |
+|---|---|---|
+| `ci.yml` used floating `actions/checkout@v4`, piped Gitleaks into `/usr/local/bin` with no checksum (install could fail for the wrong reason, or run a tampered binary) | High | Fixed: pin checkout SHA, checksum the upstream tarball, install into `$RUNNER_TEMP` |
+| CI missing concurrency, `persist-credentials: false`, timeout, and a teammate-facing “expected red until history rewrite” header | Medium | Fixed |
+| `SECURITY.md` implied Vertex keys might belong near FastAPI/`backend/`; the incident was a service-account JSON in `backend/`, while Edge Functions own Vertex | Medium | Fixed: table and runbook now match the repo |
+| Plan verify line claimed `gitleaks git` exits 0 | Medium | Corrected in the untracked plan; not committed |
+| Log listed merge `adb9ac6` as a `service-account.json` path commit; `git log --all --name-only -- backend/service-account.json` does not | Low | Corrected above |
+| README had no pointer to `SECURITY.md` | Low | Added a short Security section |
+
+Not defects: historical Gitleaks finding still present (expected); Gitleaks allowlist is path-only for `.env.studypilot-local`; human rotation / `filter-repo` were documented and not performed; Gitleaks assertions were not lowered.
+
+### Verification re-run (redacted)
+
+Gitleaks **8.30.1** at `%LOCALAPPDATA%\Programs\gitleaks\gitleaks.exe` (official windows_x64 zip SHA-256 `d29144deff3a68aa93ced33dddf84b7fdc26070add4aa0f4513094c8332afc4e` matches upstream `gitleaks_8.30.1_checksums.txt`).
+
+#### `gitleaks git --redact --no-banner --config .gitleaks.toml`
+
+```
+41 commits scanned.
+scanned ~1994843 bytes (1.99 MB)
+leaks found: 1
+exit code: 1
+```
+
+Remaining finding (redacted): rule `private-key`, file `backend/service-account.json`, commit `1e0f6bbe5cdf`. Extra check: `--log-opts=HEAD^..HEAD` scanned 1 commit, **no leaks, exit 0** — current tree is clean; only history still fails. CI must keep scanning full history.
+
+#### `git ls-files` filtered `service-account\|credentials\|\.env$`
+
+```
+(no filename matches)
+```
+
+Approved tracked env-related paths (contents not printed): `.env.docker.example`, `.env.example`, `.env.studypilot-local`, `backend/.env.example`, `supabase/functions/.env.local.example`. Also tracked: `src/vite-env.d.ts` (TypeScript types, not a secret file).
+
+### Human gates (unchanged)
+
+1. Rotate the Google service-account key from `backend/service-account.json` if it was ever valid. Private incident record only.
+2. Approve/coordinate `git filter-repo --path backend/service-account.json --invert-paths` plus protected-branch force-push if that key was valid.
+3. Confirm the five extension files were not meant to hold uncommitted work.
+4. Do not start Phase 1 until the owner accepts Phase 0.
