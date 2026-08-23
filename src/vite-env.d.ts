@@ -9,6 +9,12 @@ interface ImportMetaEnv {
 
   /** The public anonymous API key for your Supabase project */
   readonly VITE_SUPABASE_ANON_KEY: string;
+
+  /**
+   * Optional public Chrome Web Store listing.
+   * Must be an https://chromewebstore.google.com/ URL when set.
+   */
+  readonly VITE_CHROME_STORE_URL?: string;
 }
 
 interface ImportMeta {

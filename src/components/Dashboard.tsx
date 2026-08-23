@@ -36,6 +36,7 @@ import {
   type ChatViewMessage,
 } from '../lib/dashboard-chat-state';
 import { formatDashboardRoute, parseDashboardRoute } from '../lib/dashboard-route';
+import { BETA_ACCESS_MAILTO, getChromeWebStoreUrl } from '../lib/productLinks';
 import {
   normalizeIndexStatus,
   resolveChatRubricContext,
@@ -239,6 +240,7 @@ export default function Dashboard({
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [aiUsage, setAiUsage] = useState<AiUsage | null>(null);
+  const [extensionHelpOpen, setExtensionHelpOpen] = useState(false);
   const chatsRef = useRef<DashboardChat[]>([]);
   const activeChatIdRef = useRef<string | null>(null);
   const chatListVersionRef = useRef(0);
@@ -975,7 +977,7 @@ export default function Dashboard({
     }
   }, [rubrics]);
   const openExtension = useCallback(() => {
-    /* placeholder - would deep link the extension */
+    setExtensionHelpOpen(true);
   }, []);
   const changeCoachMode = useCallback((mode: CoachMode) => {
     setCoachMode((prev) => {
@@ -1015,6 +1017,7 @@ export default function Dashboard({
         openCount={openActionItems.length}
         sessionsCount={sessions.length}
         rubricsCount={rubrics.length}
+        onOpenExtension={openExtension}
       />
 
       <section className="ds-main">
@@ -1175,6 +1178,10 @@ export default function Dashboard({
         onContinueInChat={continueContextInChat}
         onOpenExtension={openExtension}
       />
+
+      {extensionHelpOpen && (
+        <ExtensionHelpModal onClose={() => setExtensionHelpOpen(false)} />
+      )}
     </main>
   );
 }
@@ -1190,6 +1197,7 @@ const Sidebar = memo(function Sidebar({
   openCount,
   sessionsCount,
   rubricsCount,
+  onOpenExtension,
 }: {
   student: typeof STUDENT;
   view: View;
@@ -1197,6 +1205,7 @@ const Sidebar = memo(function Sidebar({
   openCount: number;
   sessionsCount: number;
   rubricsCount: number;
+  onOpenExtension: () => void;
 }) {
   const metaValues = {
     sessions: String(sessionsCount),
@@ -1252,21 +1261,15 @@ const Sidebar = memo(function Sidebar({
       <div className="ds-side-spacer" />
 
       <div className="ds-side-foot">
-        <a
-          href="#install"
+        <button
+          type="button"
           className="ds-ext-pill"
-          onClick={(e) => {
-            // allow normal navigation away from dashboard hash
-            if (typeof window !== 'undefined') {
-              e.preventDefault();
-              window.location.hash = '#install';
-            }
-          }}
+          onClick={onOpenExtension}
         >
           <Chrome size={13} strokeWidth={1.6} />
           <span>Open extension</span>
           <ArrowUpRight size={12} strokeWidth={1.6} />
-        </a>
+        </button>
 
         <button type="button" className="ds-account">
           <span className="ds-account-avatar" aria-hidden="true">
@@ -3083,6 +3086,66 @@ const ContextPanel = memo(function ContextPanel({
     </aside>
   );
 });
+
+function ExtensionHelpModal({ onClose }: { onClose: () => void }) {
+  const storeUrl = getChromeWebStoreUrl();
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="ds-modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="extension-help-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="ds-modal">
+        <div className="ds-modal-head">
+          <h2 id="extension-help-title" className="ds-modal-title">
+            Open the StudyPilot extension
+          </h2>
+          <button type="button" className="ds-icon-btn" onClick={onClose} aria-label="Close">
+            <X size={14} strokeWidth={1.7} />
+          </button>
+        </div>
+        <div className="ds-modal-body">
+          <p className="ds-help-lead">
+            StudyPilot lives in Chrome. Install it, pin it, then click the toolbar icon on the page you are studying.
+          </p>
+          <ol className="ds-help-steps">
+            <li>
+              {storeUrl ? (
+                <>
+                  Install the extension from the{' '}
+                  <a href={storeUrl} target="_blank" rel="noopener noreferrer">
+                    Chrome Web Store
+                  </a>
+                  .
+                </>
+              ) : (
+                <>
+                  Install the Chrome extension. The public listing is not live yet — this beta is invite-only.{' '}
+                  <a href={BETA_ACCESS_MAILTO}>Request beta access</a>.
+                </>
+              )}
+            </li>
+            <li>Pin StudyPilot to the Chrome toolbar so the icon stays visible.</li>
+            <li>Open a study page and click the StudyPilot toolbar icon to start coaching.</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ============================================================================
    Small primitives

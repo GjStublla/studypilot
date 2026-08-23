@@ -1,0 +1,137 @@
+.legal-page {
+  min-height: 100svh;
+  background: var(--bg, #050610);
+  color: var(--ink, #f4f5fb);
+  font-family: var(--sans, ui-sans-serif, system-ui, sans-serif);
+}
+
+.legal-skip {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  z-index: 20;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #07080f;
+  font-size: 13px;
+  font-weight: 600;
+  transform: translateY(-200%);
+}
+
+.legal-skip:focus {
+  transform: none;
+  outline: 2px solid rgba(57, 215, 255, 0.9);
+  outline-offset: 3px;
+}
+
+.legal-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 28px;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 28px 24px 0;
+}
+
+.legal-brand {
+  font-family: var(--serif, Georgia, serif);
+  font-size: 22px;
+  color: var(--ink, #f4f5fb);
+}
+
+.legal-brand:focus-visible,
+.legal-nav a:focus-visible,
+.legal-main a:focus-visible {
+  outline: 2px solid rgba(57, 215, 255, 0.85);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+.legal-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+}
+
+.legal-nav a {
+  color: rgba(244, 245, 251, 0.55);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.legal-nav a:hover,
+.legal-nav a[aria-current='page'] {
+  color: var(--ink, #f4f5fb);
+}
+
+.legal-nav a[aria-current='page'] {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.legal-main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 48px 24px 96px;
+}
+
+.legal-kicker {
+  margin: 0 0 10px;
+  color: rgba(244, 245, 251, 0.55);
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.legal-main h1 {
+  margin: 0 0 28px;
+  font-family: var(--serif, Georgia, serif);
+  font-size: clamp(36px, 6vw, 56px);
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.legal-main h2 {
+  margin: 32px 0 10px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.legal-main p,
+.legal-main li {
+  color: rgba(244, 245, 251, 0.78);
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.legal-main p {
+  margin: 0 0 16px;
+}
+
+.legal-main ul {
+  margin: 0 0 16px;
+  padding-left: 20px;
+}
+
+.legal-main a {
+  color: #7dd8ff;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.legal-main a:hover {
+  color: #c9f2ff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .legal-skip {
+    transition: none;
+  }
+}
