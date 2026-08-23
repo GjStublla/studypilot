@@ -996,3 +996,58 @@ Human gates from Phase 0 remain: key rotation and history rewrite were **not** p
 ### Exit / next
 
 Phase 4 is done. Coordinator may run the Phase 4 checker. This executor did not start Phase 5.
+
+---
+
+## Phase 4 recheck — 2026-08-23
+
+**Executor:** Grok 4.6 (defect-first review of Phase 4 only; Phase 5 not started)
+
+### Git state at recheck (before follow-up)
+
+#### `C:\Users\gjins\Desktop\studypilot`
+
+```
+?? docs/plans/2026-08-21-uep-judging-readiness.md
+?? output/
+HEAD: dbdcbf65f8dd17076eba6ad5e25d71ac48da6266
+```
+
+Untracked `output/` left untouched. Untracked judging-readiness plan was not staged.
+
+#### `C:\Users\gjins\Desktop\studypilot-extension`
+
+```
+HEAD: 809b8d1d6cab18f3545781d7e7430b2b459d32c7
+worktree clean before checker edits
+```
+
+### Defects found
+
+| Defect | Severity | Action |
+|---|---|---|
+| Manifest validator had no self-test, so a regression that re-added `microphone` or loopback hosts would only fail after a full dist build | Medium | Fixed: `scripts/manifestPolicy.mjs` plus 9 unit tests that fail closed on microphone (named and optional), loopback hosts, missing `offscreen`, and missing `USER_MEDIA` |
+| README treated Playwright as if it clicked the Chrome toolbar and denied Live offscreen `getUserMedia` | Low | Fixed: documented that toolbar E2E sends `STUDYPILOT_TOGGLE_MODAL` from `src/offscreen.html`, and mic E2E covers the in-page voice fallback |
+
+Not defects: named `microphone` absent from source and `dist/manifest.json`; production `host_permissions` have no loopback; `scripting` absent and unused; `tabs` / `activeTab` used for `captureVisibleTab`, `tabs.sendMessage`, and `tabs.create`; content scripts still match `http://*/*` and `https://*/*` with the Chrome warning documented; Playwright 8/8 against unpacked `dist/`; `chrome://extensions` still not automated.
+
+### Residual risks (not silent passes)
+
+- Toolbar E2E does **not** fire `chrome.action.onClicked`. It sends the same toggle message the handler would send. A broken `onClicked` listener could still ship.
+- Microphone E2E uses a shape-only session with no chats, so the mic button takes the in-page SpeechRecognition path, not Live offscreen `getUserMedia`.
+- `chrome://extensions` UI remains a human gate.
+
+### Verification re-run (extension)
+
+- `npm run typecheck` — exit 0
+- `npm test` — 12 files, 58 passed, exit 0 (was 49; +9 validator tests)
+- `npm run build` — exit 0
+- `npm run validate:manifest` — `validate-manifest: ok`, exit 0
+- `npx playwright test` — 8 passed (20.7s), exit 0
+- `microphone` in `manifest.json` and `dist/manifest.json` — no matches
+
+### Follow-up commit
+
+Extension: `f161f8cddf690da3159ee8ada0309bf56d55e94a`
+
+Web: this log only. Phase 5 was not started.
