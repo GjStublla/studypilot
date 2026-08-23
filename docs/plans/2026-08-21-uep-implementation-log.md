@@ -647,3 +647,130 @@ Human gates from Phase 0 remain: key rotation and history rewrite were **not** p
 ### Exit / next
 
 Phase 2 public-claim alignment and automated checks are done. Human side-by-side read-through is awaiting the owner. Request approval to begin Phase 3.
+
+---
+
+## Phase 3 — Replace dead links and the no-op extension action
+
+**Date:** 2026-08-23  
+**Executor:** Grok 4.6 (Phase 3 only; did not start Phase 4)  
+**Repos:** `studypilot` (web). Extension was not modified.
+
+---
+
+### Baseline git state (before Phase 3 edits)
+
+#### `C:\Users\gjins\Desktop\studypilot`
+
+```
+git status --short
+(empty tracked work; untracked plan + output/)
+
+git diff --stat
+(empty)
+
+git diff --cached --stat
+(empty)
+
+git log -1 --oneline
+42377d9 Record Phase 2 commit SHAs in the implementation log.
+
+HEAD: 42377d9f952756f5acd24a88f16efd3bbcf2a861
+```
+
+Untracked `output/` was left untouched. Untracked `docs/plans/2026-08-21-uep-judging-readiness.md` was left untracked.
+
+#### `C:\Users\gjins\Desktop\studypilot-extension`
+
+```
+git status --short
+(empty)
+
+git log -1 --oneline
+2ce8dc7 Align manifest, README, and panel copy with the beta's microphone, rubric-citation, and account-connection claims.
+
+HEAD: 2ce8dc77969d858c40230061e4f949f3d4af6767
+```
+
+No extension files were edited.
+
+Phase 1 privacy defaults and Phase 2 claim language were left in place.
+
+---
+
+### What shipped
+
+- `.env.example` documents optional `VITE_CHROME_STORE_URL`. Invalid or empty values are treated as unconfigured. No store URL is present in local env files; production without a store URL shows invite-only UI rather than crashing.
+- `src/lib/productLinks.ts` accepts only `https://chromewebstore.google.com/` URLs (https, exact host, no credentials).
+- Landing, nav, install, and footer Chrome CTAs: valid store URL → “Add to Chrome”; otherwise disabled “Chrome beta — invite only” plus `mailto:hello@studypilot.app?subject=StudyPilot%20beta%20access`.
+- Dead `#chrome` / `#install` / `#privacy` / `#terms` / `#cookies` / `#changelog` fragment links removed. Legal routes are `#/privacy`, `#/terms`, `#/cookies`, `#/changelog`.
+- Dashboard “Open extension” opens a help modal: install, pin, click the toolbar icon; store link when configured, otherwise the beta mailto.
+- Auth card links to `#/privacy` and `#/terms`. Cookie page states essential auth/local-storage only, no advertising cookies, and repeats the Phase 1 cloud-processing disclosure with a link to Privacy Policy.
+- Hash routing uses the existing `hashchange` listener so browser Back returns to the previous view. No router library added.
+
+---
+
+### Verification
+
+#### `npx vitest run src/App.navigation.test.tsx`
+
+```
+Test Files  1 passed (1)
+     Tests  14 passed (14)
+exit code: 0
+```
+
+#### `npx vitest run src/App.claims.test.tsx`
+
+```
+Test Files  1 passed (1)
+     Tests  1 passed (1)
+exit code: 0
+```
+
+#### `npx vitest run` (full web suite)
+
+```
+Test Files  13 passed (13)
+     Tests  68 passed (68)
+exit code: 0
+```
+
+#### Dead fragment search
+
+`rg -n 'href="#(chrome|install|privacy|terms|cookies|changelog)"' src`
+
+```
+(no matches)
+rg exit: 1
+```
+
+Legal routes in source are `#/privacy` etc., not `#privacy`.
+
+Forbidden claim phrases (`tab audio`, `exact second`, `stay on your device`, `no account`) appear only as negative assertions in tests.
+
+#### Browser
+
+Cursor browser MCP could not open a tab (`No browser tab available` after `browser_tabs` list + `browser_navigate` with `newTab: true`). Same blocker as Phase 2. Vite was running at `http://127.0.0.1:5174/` (5173 already in use). Landing CTA, footer privacy → Back, and dashboard help modal were covered by unit tests, not a visual browser pass.
+
+---
+
+### Commits
+
+- Extension: unchanged (`2ce8dc77969d858c40230061e4f949f3d4af6767`)
+- Web: pending SHA-record after the Phase 3 work commit
+
+---
+
+### Deviations
+
+- Chrome Web Store URL is still unknown. UI is invite-only; no store listing URL was invented.
+- Dashboard help modal was not exercised in a real browser (MCP tab unavailable; dashboard also requires a signed-in session). Unit tests cover the modal.
+
+Human gates from Phase 0 remain: key rotation and history rewrite were **not** performed.
+
+---
+
+### Exit / next
+
+Phase 3 dead-link replacement, hash legal routes, and extension-help modal are done. Coordinator may start Phase 4. This executor did not start Phase 4.

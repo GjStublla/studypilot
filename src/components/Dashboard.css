@@ -406,20 +406,23 @@
   grid-template-columns: 14px 1fr auto;
   align-items: center;
   gap: 9px;
+  width: 100%;
   padding: 9px 11px;
   border: 1px solid var(--ds-line-strong);
   border-radius: 9px;
   background: var(--ds-surface);
   color: var(--ds-ink);
+  font: inherit;
   font-size: 12.5px;
   font-weight: 500;
+  text-align: left;
   text-decoration: none;
+  cursor: pointer;
   transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
 }
-.app-dashboard .ds-ext-pill:hover {
-  background: var(--ds-surface-2);
-  border-color: rgba(232, 234, 252, 0.28);
-  transform: translateY(-1px);
+.app-dashboard .ds-ext-pill:focus-visible {
+  outline: 2px solid rgba(57, 215, 255, 0.85);
+  outline-offset: 3px;
 }
 .app-dashboard .ds-ext-pill svg { color: var(--ds-muted); }
 .app-dashboard .ds-ext-pill:hover svg { color: var(--ds-ink); }
@@ -2308,6 +2311,36 @@
 
 .app-dashboard .ds-modal-foot {
   display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-top: 4px;
+}
+
+.app-dashboard .ds-help-lead {
+  margin: 0;
+  color: var(--ds-muted);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.app-dashboard .ds-help-steps {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ds-ink);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.app-dashboard .ds-help-steps li + li {
+  margin-top: 10px;
+}
+
+.app-dashboard .ds-help-steps a {
+  color: var(--ds-accent-cyan);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.app-dashboard .ds-help-steps a:focus-visible {
+  outline: 2px solid rgba(57, 215, 255, 0.85);
+  outline-offset: 3px;
 }
 
 /* ---------- Dropzone ---------- */

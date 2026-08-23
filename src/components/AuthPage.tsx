@@ -64,6 +64,11 @@ export default function AuthPage() {
         ) : (
           <SignupForm onSuccess={() => setMode('login')} />
         )}
+
+        <nav className="auth-legal-nav" aria-label="Legal">
+          <a href="#/privacy">Privacy Policy</a>
+          <a href="#/terms">Terms of Use</a>
+        </nav>
       </div>
     </div>
   );
@@ -462,8 +467,8 @@ function SignupForm({ onSuccess }: { onSuccess: () => void }) {
 
       <p className="auth-legal">
         By creating an account you agree to our{' '}
-        <a href="#terms">Terms of Use</a> and{' '}
-        <a href="#privacy">Privacy Policy</a>.
+        <a href="#/terms">Terms of Use</a> and{' '}
+        <a href="#/privacy">Privacy Policy</a>.
       </p>
     </form>
   );

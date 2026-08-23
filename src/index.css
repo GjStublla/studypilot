@@ -167,6 +167,20 @@ button { font: inherit; }
   transition-duration: 100ms;
 }
 
+.button:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .button:disabled:hover {
+    transform: none;
+    box-shadow: none;
+  }
+}
+
 .button:focus-visible,
 .login-button:focus-visible {
   outline: 2px solid rgba(57, 215, 255, 0.85);
@@ -410,6 +424,79 @@ button { font: inherit; }
   text-transform: uppercase;
   cursor: not-allowed;
   user-select: none;
+}
+
+.hero-nav-locale {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(255, 255, 255, 0.55);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.chrome-cta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+
+.chrome-cta-mail {
+  color: rgba(244, 245, 251, 0.72);
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.chrome-cta-mail:hover {
+  color: var(--ink);
+}
+
+.chrome-cta-mail:focus-visible {
+  outline: 2px solid rgba(57, 215, 255, 0.85);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+.chrome-cta-disabled {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: rgba(244, 245, 251, 0.38);
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0;
+  cursor: not-allowed;
+}
+
+.hero-nav .chrome-cta-disabled,
+.hero-nav .chrome-cta-mail {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.footer-directory .chrome-cta {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.footer-directory .chrome-cta-disabled,
+.footer-directory .chrome-cta-mail {
+  color: rgba(244, 245, 251, 0.44);
+  font-size: 12px;
+}
+
+.footer-directory .chrome-cta-mail:hover {
+  color: rgba(244, 245, 251, 0.86);
 }
 
 .hero-frame {

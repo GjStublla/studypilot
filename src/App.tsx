@@ -22,7 +22,13 @@ import {
 import { Button } from './components/ui/button';
 import GradientBlinds from './components/GradientBlinds';
 import AuthPage from './components/AuthPage';
+import LegalPage from './components/LegalPage';
 import { clearAuth, storeAuth, apiFetch, type AuthTokens } from './lib/api';
+import {
+  BETA_ACCESS_MAILTO,
+  getChromeWebStoreUrl,
+  parseLegalHash,
+} from './lib/productLinks';
 import { AUTH_REQUIRED } from './lib/authConfig';
 import { LOCAL_DEV_MODE } from './lib/localDev';
 import { ensureLocalDevAuth } from './lib/localDevAuth';
@@ -278,6 +284,11 @@ function App() {
     return <AuthPage />;
   }
 
+  const legalPage = parseLegalHash(hash);
+  if (legalPage) {
+    return <LegalPage page={legalPage} disclosure={PROCESSING_DISCLOSURE} />;
+  }
+
   return (
     <LazyMotion features={domAnimation}>
       <div className="site-shell">
@@ -300,6 +311,43 @@ function App() {
         <Footer />
       </div>
     </LazyMotion>
+  );
+}
+
+function ChromeInstallCta({
+  variant = 'button',
+}: {
+  variant?: 'button' | 'nav' | 'footer';
+}) {
+  const storeUrl = getChromeWebStoreUrl();
+
+  if (storeUrl) {
+    if (variant === 'button') {
+      return (
+        <Button href={storeUrl} target="_blank" rel="noopener noreferrer">
+          Add to Chrome <Chrome size={15} />
+        </Button>
+      );
+    }
+    return (
+      <a href={storeUrl} target="_blank" rel="noopener noreferrer">
+        Add to Chrome
+      </a>
+    );
+  }
+
+  const disabledClass =
+    variant === 'button' ? 'button button-primary chrome-cta-button' : 'chrome-cta-disabled';
+
+  return (
+    <span className={`chrome-cta chrome-cta-${variant}`}>
+      <button type="button" className={disabledClass} disabled>
+        Chrome beta — invite only
+      </button>
+      <a className="chrome-cta-mail" href={BETA_ACCESS_MAILTO}>
+        Request beta access
+      </a>
+    </span>
   );
 }
 
@@ -397,9 +445,7 @@ function Hero({ user, onLogout }: { user: ReturnType<typeof getStoredUser>; onLo
               variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
               transition={{ duration: 0.36, ease: [0.23, 1, 0.32, 1] }}
             >
-              <Button href="#install">
-                Install extension <ArrowRight size={15} />
-              </Button>
+              <ChromeInstallCta />
               <Button href="#workflow" variant="secondary">
                 See the flow <ArrowUpRight size={14} />
               </Button>
@@ -413,7 +459,7 @@ function Hero({ user, onLogout }: { user: ReturnType<typeof getStoredUser>; onLo
               <div>
                 <dt>Built by</dt>
                 <dd>
-                  <a href="#">Edion Islami</a>, <a href="#">Gjin Stublla</a>, <a href="#">Leona Selishta</a>
+                  <span>Edion Islami</span>, <span>Gjin Stublla</span>, <span>Leona Selishta</span>
                 </dd>
               </div>
             </m.dl>
@@ -462,9 +508,7 @@ function Hero({ user, onLogout }: { user: ReturnType<typeof getStoredUser>; onLo
                 <StudyPilotMark size={48} />
               </div>
               <p className="hero-installed-text">Pinned &amp; ready.</p>
-              <Button href="#install">
-                Add to Chrome <Chrome size={15} />
-              </Button>
+              <ChromeInstallCta />
             </m.div>
           </m.div>
         </div>
@@ -485,7 +529,7 @@ function HeroNav({ user, onLogout }: { user: ReturnType<typeof getStoredUser>; o
         <a className="active" href="#">Home</a>
         <a href="#capabilities">Features</a>
         <a href="#workflow">How it works</a>
-        <a href="#install">Install</a>
+        <ChromeInstallCta variant="nav" />
         {user ? (
           <a href="#dashboard" onMouseEnter={prefetchDashboard} onFocus={prefetchDashboard}>
             Dashboard
@@ -495,10 +539,10 @@ function HeroNav({ user, onLogout }: { user: ReturnType<typeof getStoredUser>; o
             Dashboard
           </span>
         )}
-        <a href="#privacy">
+        <span className="hero-nav-locale">
           <Globe2 size={13} />
           EN
-        </a>
+        </span>
       </nav>
 
       {user ? (
@@ -778,9 +822,7 @@ function Install() {
           Free during beta. Live microphone audio is processed by Google Vertex AI while a session is active. Screenshots and dashboard history stay off unless you turn them on.
         </p>
         <div className="install-actions">
-          <Button href="#chrome">
-            Get the extension <Chrome size={15} />
-          </Button>
+          <ChromeInstallCta />
         </div>
       </m.div>
     </m.section>
@@ -789,7 +831,7 @@ function Install() {
 
 function Footer() {
   return (
-    <footer id="privacy" className="footer">
+    <footer className="footer">
       <div className="footer-inner">
         <div className="footer-main">
           <div className="footer-brand-col">
@@ -810,27 +852,26 @@ function Footer() {
               <h2>Explore</h2>
               <a href="#capabilities">Modes</a>
               <a href="#workflow">Workflow</a>
-              <a href="#install">Install</a>
+              <ChromeInstallCta variant="footer" />
             </div>
             <div>
               <h2>Product</h2>
               <a href="#dashboard" onMouseEnter={prefetchDashboard} onFocus={prefetchDashboard}>
                 Dashboard
               </a>
-              <a href="#chrome">Chrome extension</a>
-              <a href="#privacy">Privacy</a>
+              <ChromeInstallCta variant="footer" />
+              <a href="#/privacy">Privacy</a>
             </div>
             <div>
               <h2>Company</h2>
-              <a href="#">About</a>
-              <a href="#changelog">Changelog</a>
+              <a href="#/changelog">Changelog</a>
               <a href="mailto:hello@studypilot.app">Contact</a>
             </div>
             <div>
               <h2>Legal</h2>
-              <a href="#privacy">Privacy Policy</a>
-              <a href="#terms">Terms of Use</a>
-              <a href="#cookies">Cookie Settings</a>
+              <a href="#/privacy">Privacy Policy</a>
+              <a href="#/terms">Terms of Use</a>
+              <a href="#/cookies">Cookies</a>
             </div>
           </nav>
         </div>
@@ -838,9 +879,9 @@ function Footer() {
         <div className="footer-bottom">
           <span>Built by three students who got tired of fourteen open tabs.</span>
           <nav aria-label="Legal">
-            <a href="#privacy">Privacy</a>
-            <a href="#terms">Terms</a>
-            <a href="#changelog">Changelog</a>
+            <a href="#/privacy">Privacy</a>
+            <a href="#/terms">Terms</a>
+            <a href="#/changelog">Changelog</a>
           </nav>
           <span>Beta · 2026</span>
         </div>
