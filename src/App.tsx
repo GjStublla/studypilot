@@ -94,8 +94,8 @@ const principles = [
     body: 'No notifications. No background tabs. The panel only speaks when you call it.',
   },
   {
-    label: 'Local',
-    body: 'Audio and transcripts stay on your device. Cloud sync is an opt-in toggle.',
+    label: 'Private',
+    body: 'Live microphone audio is processed by Google Vertex AI while a session is active. Screenshots are sent only when you enable them. Chat and session history save only when “Save to dashboard” is on.',
   },
   {
     label: 'Fast',
@@ -772,7 +772,7 @@ function Install() {
           Pin it once. <i>Use</i> it everywhere.
         </h2>
         <p>
-          Free during beta. Audio and transcripts stay on your device by default, and the web app keeps everything connected in one place.
+          Free during beta. Live microphone audio is processed by Google Vertex AI while a session is active. Screenshots and dashboard history stay off unless you turn them on.
         </p>
         <div className="install-actions">
           <Button href="#chrome">
