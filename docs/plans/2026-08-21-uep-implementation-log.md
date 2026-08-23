@@ -758,7 +758,7 @@ Cursor browser MCP could not open a tab (`No browser tab available` after `brows
 ### Commits
 
 - Extension: unchanged (`2ce8dc77969d858c40230061e4f949f3d4af6767`)
-- Web: pending SHA-record after the Phase 3 work commit
+- Web: `f7f80695907b21a0ee925c0621632ad1d5129be7`
 
 ---
 
