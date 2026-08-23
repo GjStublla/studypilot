@@ -632,7 +632,7 @@ Cursor browser MCP could not open a tab (`No browser tab available` after `brows
 ### Commits
 
 - Extension: `2ce8dc77969d858c40230061e4f949f3d4af6767`
-- Web: recorded after this commit (follow-up SHA line if needed)
+- Web: `e5375b3270a5728f2844198f8b4c51e65d397cf5`
 
 ---
 
