@@ -152,6 +152,14 @@ describe('Chrome store URL validation', () => {
     expect(
       parseChromeWebStoreUrl('https://chromewebstore.google.com.evil.example/'),
     ).toBeNull();
+    expect(parseChromeWebStoreUrl('javascript:alert(1)')).toBeNull();
+    expect(parseChromeWebStoreUrl('/detail/studypilot')).toBeNull();
+    expect(parseChromeWebStoreUrl('chromewebstore.google.com/detail/x')).toBeNull();
+    expect(
+      parseChromeWebStoreUrl(
+        'https://chromewebstore.google.com/detail/studypilot-test/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa#javascript:alert(1)',
+      ),
+    ).toBeNull();
   });
 });
 
@@ -270,6 +278,17 @@ describe('landing and legal navigation', () => {
         (link) => link.getAttribute('href') === '#/privacy',
       ),
     ).toBe(true);
+  });
+
+  it('keeps the legal route when skip to content is activated', async () => {
+    window.location.hash = '#/privacy';
+    const user = userEvent.setup();
+    render(<App />);
+    expect(screen.getByRole('heading', { level: 1, name: 'Privacy Policy' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('link', { name: /skip to content/i }));
+    expect(screen.getByRole('heading', { level: 1, name: 'Privacy Policy' })).toBeInTheDocument();
+    expect(window.location.hash).toBe('#/privacy');
   });
 
   it('opens a legal page from the footer and returns when the hash is cleared', async () => {
