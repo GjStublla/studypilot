@@ -40,12 +40,15 @@ const heroGradientColors = ['#39D7FF', '#5B8CFF', '#7C5CFF', '#FF4FD8'] as const
 const productSvg = '/assets/studypilot-modal-demo.svg';
 const footerLockupWebp = '/assets/01_main_horizontal_lockup_transparent.webp';
 
+export const PROCESSING_DISCLOSURE =
+  'Live microphone audio is processed by Google Vertex AI while a session is active. Screenshots are sent only when you enable them. Chat and session history save only when “Save to dashboard” is on.';
+
 const modes = [
   {
     icon: AudioLines,
     title: 'Listen',
     body:
-      'Picks up tab audio and your mic the moment the panel opens. No upload, no re-record.',
+      'Uses your microphone and the page context you choose to share.',
   },
   {
     icon: AlignLeft,
@@ -63,7 +66,7 @@ const modes = [
     icon: MessageSquareText,
     title: 'Ask',
     body:
-      'Type a follow-up. Answers cite the exact second of the lecture they came from.',
+      'Type a follow-up. Answers can cite retrieved rubric or uploaded-document evidence when grounding is available.',
   },
 ] as const;
 
@@ -95,11 +98,11 @@ const principles = [
   },
   {
     label: 'Private',
-    body: 'Live microphone audio is processed by Google Vertex AI while a session is active. Screenshots are sent only when you enable them. Chat and session history save only when “Save to dashboard” is on.',
+    body: PROCESSING_DISCLOSURE,
   },
   {
     label: 'Fast',
-    body: 'Opens in under a second. Closes the same way. Built for the in-between moments.',
+    body: 'Opens and closes on demand. Built for the in-between moments.',
   },
 ] as const;
 
@@ -664,7 +667,7 @@ function Capabilities() {
             Four moves. <i>Same</i> shortcut.
           </>
         }
-        body="Pinned to the tab you are already on. Nothing to upload, nothing to re-explain."
+        body="Pinned to the tab you are already on. Share the page context you choose."
       />
 
       <m.div className="mode-grid" variants={staggerParent}>
@@ -700,7 +703,7 @@ function Workflow() {
             Three steps. Then it <i>gets out</i> of the way.
           </>
         }
-        body="No accounts to wire up. No syllabi to upload. The shortcut works the first time you press it."
+        body="Sign in once to connect the extension and dashboard. Open a study page, share the context you choose, and keep coaching in one conversation."
       />
 
       <m.ol className="steps" variants={staggerParent}>
@@ -839,7 +842,7 @@ function Footer() {
             <a href="#terms">Terms</a>
             <a href="#changelog">Changelog</a>
           </nav>
-          <span>Privacy-first beta · 2026</span>
+          <span>Beta · 2026</span>
         </div>
       </div>
     </footer>

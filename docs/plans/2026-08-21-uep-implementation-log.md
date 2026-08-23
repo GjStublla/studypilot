@@ -456,3 +456,194 @@ Human gates from Phase 0 remain: key rotation and history rewrite were **not** p
 ### Exit / next
 
 Phase 1 code and automated checks are done. Manual unpacked-extension sessions are blocked. Request approval to begin Phase 2.
+
+---
+
+## Phase 2 — Align every public claim with the beta
+
+**Date:** 2026-08-23  
+**Executor:** Grok 4.6 (Phase 2 only; stopped for human review)  
+**Repos:** `studypilot` (web), `studypilot-extension` (canonical Chrome extension)
+
+Phase 3 and later were not started.
+
+Owner “Start phase 2” was interpreted as: align public claims only. Privacy defaults from Phase 1 were **not** reverted. No LegalPage, productLinks, Playwright, or dashboard extract.
+
+---
+
+### Baseline git state (before Phase 2 edits)
+
+#### `C:\Users\gjins\Desktop\studypilot`
+
+```
+git status --short
+?? docs/plans/2026-08-21-uep-judging-readiness.md
+?? output/
+
+git diff --stat / git diff --cached --stat
+(empty)
+
+git log -1 --oneline
+56de4a2 docs: record Phase 1 commit SHAs in the implementation log
+
+HEAD: 56de4a2cf7864a3b5d94c8b417eb59e216ceb777
+```
+
+Untracked `output/` was left untouched. Untracked judging-readiness plan was not committed.
+
+#### `C:\Users\gjins\Desktop\studypilot-extension`
+
+```
+git status --short
+(empty)
+
+git log -1 --oneline
+dcfe82d Make screenshot capture and dashboard save default off and honor the chosen privacy options in the live session path.
+
+HEAD: dcfe82ded53a08a7c25182a88cec8b24b54cc220
+```
+
+---
+
+### Pre-edit search (forbidden phrases)
+
+Web `src`, `README.md`, and `docs/submission` (path did not exist yet):
+
+- `src/App.tsx` Listen: “Picks up tab audio…”
+- `src/App.tsx` Ask: “cite the exact second…”
+- `src/App.tsx` workflow: “No accounts to wire up…”
+- `src/components/Dashboard.tsx` settings: “Audio and transcripts stay on your device…”
+
+Extension `src`, `README.md`, `manifest.json`: no `tab audio` / `exact second` / `stay on your device` / `no account` hits. Connect copy already asked users to sign in; it was rewritten to the locked phrase.
+
+---
+
+### What changed (user-visible replacements)
+
+| Before | After |
+|---|---|
+| “picks up tab audio” | “Uses your microphone and the page context you choose to share.” |
+| “answers cite the exact second” | “Answers can cite retrieved rubric or uploaded-document evidence when grounding is available.” |
+| “audio and transcripts stay on your device” (dashboard settings) | Phase 1 disclosure: live mic audio is processed by Google Vertex AI while a session is active; screenshots only when enabled; chat/session save only when “Save to dashboard” is on. |
+| “No accounts to wire up…” | “Sign in once to connect the extension and dashboard.” |
+| `index.html` description | “StudyPilot is a rubric-aware study coach across your browser and dashboard.” |
+| Extension manifest description | Same rubric-aware coach sentence. |
+| Extension connect panel / `STUDYPILOT_CONNECT_MESSAGE` | “Sign in once to connect the extension and dashboard.” |
+
+Related copy (same phase, so the landing would not contradict the replacements):
+
+- Capabilities intro no longer says “Nothing to upload”.
+- Fast principle no longer claims “under a second”.
+- Footer no longer says “Privacy-first”.
+- READMEs now use the locked product story and processing disclosure.
+
+`docs/submission/final-report-content.md` was started with Overview / Problem / Solution only. No unmeasured outcome claims. Later report sections were not written.
+
+---
+
+### Extra files beyond the listed set
+
+- `src/components/Dashboard.tsx` — required. The verify `rg` searches all of `src`; the settings privacy card was a public product claim.
+- `src/shared/config.ts` (extension) — user-visible connect error string in `src`, aligned to the same sign-in phrase.
+
+Not done: LegalPage, productLinks, Playwright, dashboard extract, deleting `studypilot/extension/`.
+
+---
+
+### Verification
+
+#### Web claims test
+
+`npm test -- --run src/App.claims.test.tsx`
+
+```
+Test Files  1 passed (1)
+      Tests  1 passed (1)
+exit code: 0
+```
+
+#### Web full unit suite
+
+`npm test`
+
+```
+Test Files  12 passed (12)
+      Tests  54 passed (54)
+exit code: 0
+```
+
+(Was 53 tests before this phase; +1 claims test.)
+
+#### Extension full unit suite (copy-only change)
+
+`npm test`
+
+```
+Test Files  11 passed (11)
+      Tests  49 passed (49)
+exit code: 0
+```
+
+#### Phrase search after edits
+
+Web (listed paths):
+
+`rg -ni "tab audio|exact second|stay on your device|no account" src README.md docs/submission`
+
+Hits (not product claims):
+
+```
+src/App.claims.test.tsx:50:    expect(lower).not.toContain('tab audio');
+src/App.claims.test.tsx:51:    expect(lower).not.toContain('exact second');
+src/App.claims.test.tsx:52:    expect(lower).not.toContain('stay on your device');
+src/App.claims.test.tsx:53:    expect(lower).not.toContain('no account');
+```
+
+Those lines exist only to assert the phrases are **absent** from the rendered landing page. They were not rewritten.
+
+Same command with test files excluded: no matches (rg exit 1).
+
+Web has no `manifest.json`. That path was omitted so rg would not fail on a missing file.
+
+Extension:
+
+`rg -ni "tab audio|exact second|stay on your device|no account" src README.md manifest.json`
+
+```
+(no matches)
+rg exit: 1
+```
+
+Outside search paths (left unchanged):
+
+- Extension `package.json` description still says “voice-first” (not in the listed Phase 2 files or the verify `rg` paths).
+- Web README local-dev note “No login form is required” does **not** match `no account`. It describes local developer auth, not product onboarding.
+
+#### Human read-through
+
+**Awaiting owner.** One teammate should read the website, extension disclosure, README, and report overview side by side. This agent did not mark that check as passed.
+
+#### Browser landing check
+
+Cursor browser MCP could not open a tab (`No browser tab available` after `browser_tabs` new + `browser_navigate`). The claims test rendered `<App />` in jsdom and asserted the replacement strings plus `PROCESSING_DISCLOSURE`. Vite was started at `http://127.0.0.1:5173/` for a manual look.
+
+---
+
+### Commits
+
+- Extension: `2ce8dc77969d858c40230061e4f949f3d4af6767`
+- Web: recorded after this commit (follow-up SHA line if needed)
+
+---
+
+### Deviations
+
+None from locked product decisions. Phase 1 privacy defaults were not reverted.
+
+Human gates from Phase 0 remain: key rotation and history rewrite were **not** performed.
+
+---
+
+### Exit / next
+
+Phase 2 public-claim alignment and automated checks are done. Human side-by-side read-through is awaiting the owner. Request approval to begin Phase 3.
