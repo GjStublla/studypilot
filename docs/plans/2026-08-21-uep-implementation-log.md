@@ -837,3 +837,162 @@ Not defects: invite-only CTA with no invented store URL; host `chromewebstore.go
 Web: `5e5bca55b2da98c6b783d39874575c53f259a0ea`
 
 No commit in `studypilot-extension`. Phase 4 was not started.
+
+---
+
+## Phase 4 — Store-valid MV3 package and unpacked E2E
+
+**Date:** 2026-08-23  
+**Executor:** Grok 4.6 (Phase 4 only; Phase 5 not started)  
+**Repos:** `studypilot` (web log), `studypilot-extension` (canonical Chrome extension)
+
+### Baseline git state (before Phase 4 commits)
+
+#### `C:\Users\gjins\Desktop\studypilot`
+
+```
+git status --short
+?? docs/plans/2026-08-21-uep-judging-readiness.md
+?? output/
+
+git diff --stat / git diff --cached --stat
+(empty)
+
+git log -1 --oneline
+7d21bda Record Phase 3 checker follow-up SHA in the implementation log.
+
+HEAD: 7d21bda54da91e182d1e64a415a0fbed82cd52d0
+```
+
+Untracked `output/` left untouched. Untracked judging-readiness plan was not staged.
+
+#### `C:\Users\gjins\Desktop\studypilot-extension`
+
+```
+git log -1 --oneline
+2ce8dc7 Align manifest, README, and panel copy with the beta's microphone, rubric-citation, and account-connection claims.
+
+HEAD before Phase 4: 2ce8dc77969d858c40230061e4f949f3d4af6767
+```
+
+Pre-existing Phase 3 privacy defaults and honest claims were left in place. No Chrome Web Store URL was invented.
+
+### What shipped
+
+- Named permission `microphone` removed from `manifest.json`. Remaining named permissions: `activeTab`, `storage`, `offscreen`, `tabs`.
+- Production Vite builds no longer inject loopback `host_permissions`. Only `npm run build:local` (`mode === 'studypilot-local'`) adds `http://127.0.0.1/*` and `http://localhost/*`.
+- `scripts/validate-manifest.mjs` fails on named `microphone`, loopback host permissions, missing `offscreen`, or missing `USER_MEDIA` in dist/src runtime code.
+- Persistent Chromium Playwright fixture loads unpacked `dist/` with `--disable-extensions-except` and `--load-extension`, waits for the MV3 service worker, and exposes the 32-character extension id.
+- E2E covers: service worker + id, host mounts once, toolbar-equivalent toggle, launcher toggle, privacy defaults (screenshot and save-to-dashboard off), independent page-URL toggle, microphone denial with a recoverable status message, dashboard handoff via `window.open` without production secrets.
+- Closed shadow root is still `mode: 'closed'`. E2E pierces it with CDP (`DOM.describeNode` + `Runtime.callFunctionOn`); product UI was not opened for testability.
+- README documents the expected Chrome all-sites content-script warning, why `tabs`/`activeTab` remain, Windows and CI commands, and that a Playwright pass is not a `chrome://extensions` UI pass.
+
+### Permissions kept and why
+
+`rg` / search of `src` for `chrome.(tabs|scripting|activeTab)`:
+
+- `chrome.tabs.query`, `chrome.tabs.sendMessage`, `chrome.tabs.captureVisibleTab` in `src/background/index.ts` and `src/background/liveRuntime.ts` → keep `tabs`.
+- `chrome.tabs.captureVisibleTab` after a user gesture on pages not covered by API `host_permissions` → keep `activeTab`. Content-script matches are not host permissions.
+- No `chrome.scripting` → do not request `scripting`.
+- `chrome.storage.local` / `onChanged` → keep `storage`.
+- `chrome.offscreen.createDocument` with reasons `USER_MEDIA` and `AUDIO_PLAYBACK` in `src/background/liveRuntime.ts` → keep `offscreen`. Mic capture stays getUserMedia in the offscreen document; there is no named `microphone` permission.
+- Dashboard handoff uses `window.open(DASHBOARD_URL)`, not `chrome.tabs.create`.
+
+Host permissions unchanged: Supabase, StudyPilot, Generative Language, Vertex AI. Content scripts still match `http://*/*` and `https://*/*`.
+
+### Unpacked load / console result
+
+Playwright Chromium (not the `chrome://extensions` page) loaded `dist/` successfully.
+
+- Playwright 1.55.1, Chromium channel, headless persistent context.
+- Service worker discovered; extension id matched `/^[a-p]{32}$/`.
+- Built `dist/manifest.json` permissions: `["activeTab","storage","offscreen","tabs"]`.
+- No named `microphone` permission. No loopback hosts in production `host_permissions`.
+- Install log from `chrome.runtime.onInstalled`: `[StudyPilot] Installed. Click the toolbar icon to toggle the panel on any http/https page.` (listener still present; Playwright did not scrape `chrome://extensions`).
+- `chrome://extensions` UI: **blocked** (not automated). Do not treat this phase as a manual Chrome Web Store / chrome://extensions pass.
+
+### Verification
+
+PowerShell in this environment does not accept `&&`, so the required chain was run as sequential commands that stop on nonzero exit.
+
+#### `npm run typecheck`
+
+```
+> tsc -b --pretty false
+exit code: 0
+```
+
+#### `npm test`
+
+```
+Test Files  11 passed (11)
+     Tests  49 passed (49)
+exit code: 0
+```
+
+#### `npm run build`
+
+```
+vite v6.4.3 building for production...
+✓ 1993 modules transformed.
+dist/manifest.json  1.70 kB
+exit code: 0
+```
+
+#### `npm run validate:manifest`
+
+```
+validate-manifest: ok
+  dist/manifest.json has no named microphone permission
+  offscreen permission present
+  no loopback host_permissions
+  USER_MEDIA offscreen reason found in runtime code
+  note: content_scripts still match http://*/* and https://*/* by design; Chrome will warn that the extension can read/change data on all websites
+exit code: 0
+```
+
+#### `npx playwright test` (`npm run test:e2e`)
+
+```
+Running 8 tests using 1 worker
+  ok 1 loads a service worker and assigns an extension id
+  ok 2 injects the panel host once on an https-equivalent study page
+  ok 3 toolbar-equivalent toggle opens and closes the panel
+  ok 4 launcher toggle also opens the on-page panel
+  ok 5 privacy defaults keep screenshot and dashboard save off
+  ok 6 page URL context can be toggled independently of capture defaults
+  ok 7 microphone denial shows a recoverable message
+  ok 8 dashboard handoff opens a tab without production secrets
+  8 passed (21.8s)
+exit code: 0
+```
+
+Chromium was installed locally with `npx playwright install chromium` (browser binaries not committed).
+
+#### Named `microphone` permission search
+
+`Select-String -Path manifest.json,dist\manifest.json -Pattern 'microphone'`
+
+```
+(no matches)
+```
+
+String mentions of microphone in README/docs describe capture behavior and the absence of a named permission; they are not a manifest key.
+
+### Deviations
+
+- `chrome://extensions` was not driven by automation. Unpacked-load proof is Playwright only.
+- E2E toolbar toggle sends `STUDYPILOT_TOGGLE_MODAL` from an extension page (`chrome-extension://<id>/src/offscreen.html`) because `serviceWorker.evaluate` did not expose `chrome.tabs` / `chrome.storage` in this Playwright version. That is the same message the real `chrome.action.onClicked` handler sends.
+- Fixture session seed writes a shape-only `studypilot_supabase_access_session` so settings/mic UI is visible. It is not a production credential.
+- Vitest excludes `e2e/**` so Playwright specs are not executed as unit tests.
+
+Human gates from Phase 0 remain: key rotation and history rewrite were **not** performed. No deploy, no Chrome Web Store publish.
+
+### Commits
+
+- Extension: `809b8d1d6cab18f3545781d7e7430b2b459d32c7`
+- Web: this log commit (SHA in executor report after it lands).
+
+### Exit / next
+
+Phase 4 is done. Coordinator may run the Phase 4 checker. This executor did not start Phase 5.
