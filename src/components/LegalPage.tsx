@@ -17,7 +17,14 @@ export default function LegalPage({
 }) {
   return (
     <div className="legal-page">
-      <a className="legal-skip" href="#legal-content">
+      <a
+        className="legal-skip"
+        href={LEGAL_HASHES[page]}
+        onClick={(event) => {
+          event.preventDefault();
+          document.getElementById('legal-content')?.focus();
+        }}
+      >
         Skip to content
       </a>
       <header className="legal-top">

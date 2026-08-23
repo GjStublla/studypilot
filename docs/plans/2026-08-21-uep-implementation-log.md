@@ -774,3 +774,66 @@ Human gates from Phase 0 remain: key rotation and history rewrite were **not** p
 ### Exit / next
 
 Phase 3 dead-link replacement, hash legal routes, and extension-help modal are done. Coordinator may start Phase 4. This executor did not start Phase 4.
+
+---
+
+## Phase 3 recheck — 2026-08-23
+
+**Executor:** Grok 4.6 (defect-first review of Phase 3 only; Phase 4 not started)
+
+### Git state at recheck (before follow-up edits)
+
+#### `C:\Users\gjins\Desktop\studypilot`
+
+```
+git status --short
+?? docs/plans/2026-08-21-uep-judging-readiness.md
+?? output/
+
+git diff --stat / git diff --cached --stat
+(empty)
+
+git log -3 --oneline
+0c708a7 Record Phase 3 commit SHAs in the implementation log.
+f7f8069 replace dead install/legal anchors with a validated Chrome CTA, hash legal routes, and an extension-help modal
+42377d9 Record Phase 2 commit SHAs in the implementation log.
+
+HEAD: 0c708a74d0bb7192d85d354c846955e480f2aa03
+```
+
+Untracked `output/` left untouched. Untracked judging-readiness plan was edited in the worktree (Phase 3 checkboxes) and **not** staged.
+
+#### `C:\Users\gjins\Desktop\studypilot-extension`
+
+```
+git status --short
+(empty)
+
+HEAD: 2ce8dc77969d858c40230061e4f949f3d4af6767
+```
+
+No extension files were edited.
+
+### Defects found
+
+| Defect | Severity | Action |
+|---|---|---|
+| Legal skip-to-content used `href="#legal-content"`, which in this hash-router unmounts the legal page | Medium | Fixed: preventDefault, focus `#legal-content`, keep `LEGAL_HASHES[page]` |
+| `parseChromeWebStoreUrl` hash `javascript:` check never matched because `url.hash` starts with `#` | Low | Fixed: `url.hash.slice(1)` |
+| Validation tests omitted `javascript:` and relative junk | Low | Added assertions; existing assertions were not lowered |
+
+Not defects: invite-only CTA with no invented store URL; host `chromewebstore.google.com` matches the plan and the official store; `openExtension` now opens the help modal; `#dashboard` view selection is React state and does not collide with `#/privacy` routes; no new `any` / `@ts-ignore` / eslint-disable in Phase 3 files.
+
+### Verification re-run
+
+- `npx vitest run src/App.navigation.test.tsx` — 15 passed, exit 0 (was 14; +1 skip-link regression)
+- `npx vitest run src/App.claims.test.tsx` — 1 passed, exit 0
+- `npx vitest run` — 13 files, 69 tests, exit 0 (was 68)
+- Dead `href="#chrome|#install|#privacy|#terms|#cookies|#changelog"` in `src`: no matches
+- Browser MCP: **blocked** (`No browser tab available` after `browser_tabs` list/new and `browser_navigate`). Not treated as a pass.
+
+### Follow-up commit
+
+Web follow-up SHA recorded in the next log commit. No commit in `studypilot-extension`.
+
+Phase 4 was not started.
