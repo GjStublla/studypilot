@@ -1,6 +1,12 @@
 # studypilot
 
-An elegant, modern study assistant designed to elevate your learning experience. Built with React, TypeScript, and Vite.
+StudyPilot is a rubric-aware coaching loop across the browser and dashboard: it uses the page, the student's question, and an uploaded rubric to coach the next improvement, then carries the conversation and action items into the dashboard.
+
+The beta uses your microphone and the page context you choose to share. Answers can cite retrieved rubric or uploaded-document evidence when grounding is available. Sign in once to connect the extension and dashboard.
+
+Live microphone audio is processed by Google Vertex AI while a session is active. Screenshots are sent only when you enable them. Chat and session history save only when “Save to dashboard” is on.
+
+Built with React, TypeScript, and Vite.
 
 The Chrome extension that ships lives in the sibling repo
 [`../studypilot-extension`](../studypilot-extension). `extension/` in this repo

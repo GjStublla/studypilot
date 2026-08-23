@@ -2945,8 +2945,9 @@ const SettingsView = memo(function SettingsView({
             <span>Privacy</span>
           </div>
           <p className="ds-prose">
-            Audio and transcripts stay on your device by default. Sessions only appear in this
-            dashboard when you choose to import them from the extension.
+            Live microphone audio is processed by Google Vertex AI while a session is active.
+            Screenshots are sent only when you enable them. Chat and session history save only
+            when “Save to dashboard” is on.
           </p>
           <p className="ds-prose ds-prose-quiet">
             Cloud sync is a single toggle, never a default.
