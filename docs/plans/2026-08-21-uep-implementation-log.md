@@ -298,3 +298,161 @@ No commit in `studypilot-extension`.
 2. Approve/coordinate `git filter-repo --path backend/service-account.json --invert-paths` plus protected-branch force-push if that key was valid.
 3. Confirm the five extension files were not meant to hold uncommitted work.
 4. Do not start Phase 1 until the owner accepts Phase 0.
+
+---
+
+## Phase 1 — Make privacy controls true end to end
+
+**Date:** 2026-08-23  
+**Executor:** Grok 4.6 (Phase 1 only; stopped for human review)  
+**Repos:** `studypilot` (web), `studypilot-extension` (canonical Chrome extension)
+
+Phase 2 and later were not started.
+
+Owner “go ahead” was interpreted as: start Phase 1; the five previously dirty extension files may be edited. Credentials were **not** rotated. Git history was **not** rewritten.
+
+---
+
+### Baseline git state (before Phase 1 edits)
+
+#### `C:\Users\gjins\Desktop\studypilot`
+
+```
+git status --short
+?? docs/plans/2026-08-21-uep-judging-readiness.md
+?? output/
+
+git diff --stat
+(empty)
+
+git diff --cached --stat
+(empty)
+
+git log -1 --oneline
+075b472 docs: record Phase 0 recheck commit SHA in the implementation log
+
+HEAD: 075b4725db8da45f59dbfd8b3f9bcd699da968ac
+```
+
+Untracked `output/` was left untouched. Untracked judging-readiness plan was not committed.
+
+#### `C:\Users\gjins\Desktop\studypilot-extension`
+
+```
+git status --short
+(empty)
+
+git diff --stat / git diff --cached --stat
+(empty)
+
+git log -1 --oneline
+ff9f78b Merge remote-tracking branch origin/gresa into main
+
+HEAD: ff9f78b38c1b0926f66725da4fd945f42bb2bc38
+```
+
+---
+
+### What changed
+
+Privacy capture and dashboard persistence now default **off**, travel as a required `SessionPrivacyOptions` payload on `STUDYPILOT_LIVE_START`, and are honored in page capture and the live-token request. Settings copy and the landing-page “Local” claim use the same cloud-processing vs storage distinction.
+
+Extension files:
+
+- `src/shared/types.ts` — `SessionPrivacyOptions`, `DEFAULT_SESSION_PRIVACY` (both `false`), `DEFAULT_CONTEXT_SHARE_SETTINGS`, `isSessionPrivacyOptions`, `sessionPrivacyFromContext`
+- `src/shared/extensionMessages.ts` — `STUDYPILOT_LIVE_START` requires `privacy`; `parseLiveStartPayload` rejects malformed payloads
+- `src/background/index.ts` — validates live-start privacy; typed `{ ok: false, error }` on malformation
+- `src/background/liveRuntime.ts` — `privacy.captureScreenshot` gates tab capture; `privacy.saveToDashboard` is sent to `fetchLiveToken`; reconnect uses stored privacy (no hardcoded `true` on the token path)
+- `src/content/FloatingStudyPilot.tsx` — settings default off; independent page-context vs capture/save groups; Vertex / screenshot / dashboard disclosure
+- `src/live/messages.ts` — live-start payload aligned
+- `src/styles/tailwind.css` — settings group/disclosure styles
+- `src/content/privacyDefaults.test.tsx` (new)
+- `src/background/liveRuntime.privacy.test.ts` (new)
+
+Web files:
+
+- `src/App.tsx` — replaced the “Local” / stay-on-device claim with the same processing vs storage disclosure. The install blurb on that same landing page was updated so it would not contradict the replacement. Tab-audio / exact-second / no-account copy was left for Phase 2.
+
+---
+
+### Verification
+
+#### Extension focused tests
+
+`npm test -- --run src/content/privacyDefaults.test.tsx src/background/liveRuntime.privacy.test.ts`
+
+```
+Test Files  2 passed (2)
+      Tests  11 passed (11)
+exit code: 0
+```
+
+#### Extension full suite
+
+`npm test`
+
+```
+Test Files  11 passed (11)
+      Tests  49 passed (49)
+exit code: 0
+```
+
+#### Extension typecheck
+
+`npm run typecheck` — exit 0
+
+#### Hardcoded live-start `true` search
+
+`rg -n "captureScreenshot:\s*true|saveToDashboard:\s*true" src`
+
+Matches only tests that assert a user-enabled `true`, plus the existing coaching fixture `src/shared/studypilotSupabase.chat.test.ts` (`saveToDashboard: true` is not a live-start default or token-request call).
+
+No live-start default or `fetchLiveToken` call hardcodes `true`.
+
+#### Web tests
+
+No `App` unit test file exists. Did not add Phase 2 `App.claims.test.tsx`. Ran the existing web suite after the landing copy change:
+
+`npm test`
+
+```
+Test Files  11 passed (11)
+      Tests  53 passed (53)
+exit code: 0
+```
+
+#### Manual sessions
+
+**Blocked.** Prerequisites missing: a loaded unpacked extension build and a signed-in dashboard user. This agent did not load Chrome or run a live mic session. Do not treat this as a pass.
+
+Required later:
+
+1. Both controls off → no screenshot, no persisted dashboard session after Live stops.
+2. Save-only → persist text/session, no screenshot.
+
+---
+
+### Commits
+
+- Extension: `dcfe82ded53a08a7c25182a88cec8b24b54cc220`
+- Web: *(recorded after commit)*
+
+---
+
+### Deviations
+
+None from locked product decisions.
+
+Related notes (not deviations):
+
+- Live reconnect now sends the session’s stored `saveToDashboard` instead of a hardcoded `true`, so a later token request cannot silently persist after the user started with save off.
+- The landing install paragraph was updated with the Local-claim replacement so that one surface would not still say audio stays on-device.
+- `const seed = true` in `startLive` still means “seed chat history on a fresh LIVE_START”, not screenshot/save defaults.
+
+Human gates from Phase 0 remain: key rotation and history rewrite were **not** performed.
+
+---
+
+### Exit / next
+
+Phase 1 code and automated checks are done. Manual unpacked-extension sessions are blocked. Request approval to begin Phase 2.
