@@ -991,7 +991,7 @@ Human gates from Phase 0 remain: key rotation and history rewrite were **not** p
 ### Commits
 
 - Extension: `809b8d1d6cab18f3545781d7e7430b2b459d32c7`
-- Web: this log commit (SHA in executor report after it lands).
+- Web: `d81cdf3bdd589ec2e01f12bf4672f801d8b75ac2`
 
 ### Exit / next
 
