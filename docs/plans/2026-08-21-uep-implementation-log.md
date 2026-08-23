@@ -834,6 +834,6 @@ Not defects: invite-only CTA with no invented store URL; host `chromewebstore.go
 
 ### Follow-up commit
 
-Web follow-up SHA recorded in the next log commit. No commit in `studypilot-extension`.
+Web: `5e5bca55b2da98c6b783d39874575c53f259a0ea`
 
-Phase 4 was not started.
+No commit in `studypilot-extension`. Phase 4 was not started.
