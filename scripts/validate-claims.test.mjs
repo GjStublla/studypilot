@@ -4,7 +4,9 @@ import test from 'node:test';
 
 import {
   CLAIM_RULES,
+  DEMO_DOCUMENT,
   FORBIDDEN_CLAIMS,
+  loadClaimDocuments,
   parseCliArgs,
   validateClaimDocuments,
 } from './validate-claims.mjs';
@@ -64,4 +66,30 @@ test('parses the optional sibling-repository requirement', () => {
     options.extensionRoot,
     path.resolve('C:/workspace/studypilot', '../canonical-extension'),
   );
+});
+
+test('parses the required demo-script check', () => {
+  const options = parseCliArgs(
+    ['--include-demo-script', '--require-demo-script'],
+    'C:/workspace/studypilot',
+  );
+  assert.equal(options.includeDemoScript, true);
+  assert.equal(options.requireDemoScript, true);
+});
+
+test('checks retired claims in human-owned demo copy without requiring every disclosure', () => {
+  const result = validateClaimDocuments([
+    { label: DEMO_DOCUMENT.label, text: 'The demo captures tab audio.', claimRules: [] },
+  ]);
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.failures.map(failure => failure.rule), ['tab-audio']);
+});
+
+test('loads the checked-in demo script when requested', () => {
+  const documents = loadClaimDocuments(process.cwd(), {
+    includeDemoScript: true,
+    requireDemoScript: true,
+    extensionRoot: path.resolve(process.cwd(), '..', 'studypilot-extension'),
+  });
+  assert.equal(documents.at(-1)?.label, DEMO_DOCUMENT.label);
 });
