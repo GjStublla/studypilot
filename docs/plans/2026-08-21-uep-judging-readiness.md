@@ -645,7 +645,8 @@ The extension has one live implementation, one dashboard integration path, and n
 - [x] Populate the technical-stack table with React 19, TypeScript, Vite, FastAPI, Python, Supabase Auth/Postgres/Realtime/Storage/Edge Functions, Deno, Vertex AI/Gemini, Chrome MV3/offscreen documents, Docker, GitHub Actions, Vitest, pgTAP, and Playwright only when each appears in the final code. The current draft lists only technologies present in the repositories.
 - [x] Use three evidence-backed challenges: cross-surface chat synchronization, privacy-safe live context/persistence controls, and grounded rubric retrieval with secure model brokering. The current draft ties each to implementation boundaries and tests without claiming measured outcomes.
 - [ ] Obtain each member's approved role/contribution text; do not infer contribution percentages from Git commit counts.
-- [ ] Add repository links, deployed web URL, Chrome Store or beta-access state, video link, environment prerequisites, and exact setup/test commands to `submission-checklist.md`.
+- [x] Add repository links, environment prerequisites, and exact setup/test commands to `submission-checklist.md`; the links are explicitly labeled as local/unpushed until the team publishes the evidence commits.
+- [ ] Add the deployed web URL, Chrome Store or beta-access state, and final video/backup links to `submission-checklist.md`.
 - [ ] Create the deterministic hosted demo account with one existing chat and one empty action-item slot; store credentials outside Git. The credential-free rubric/paragraph/prompt fixture is prepared in `docs/submission/demo-fixture.md`.
 - [ ] Record this golden path: `0:00-0:12` problem and promise; `0:12-0:28` rubric upload/selection; `0:28-0:48` weak paragraph in browser; `0:48-1:13` grounded coaching and Socratic follow-up; `1:13-1:31` create action item; `1:31-1:47` open same chat/session in dashboard; `1:47-1:58` measured pilot result and closing differentiator.
 - [ ] Edit out loading pauses, notifications, unrelated tabs, credentials, personal data, and browser debug UI; keep the final video under 1:58 to leave upload/transcode margin below two minutes.
@@ -719,7 +720,7 @@ These are not decisions Grok may make alone:
 
 ### UEP submission checklist
 
-- [ ] Final report contains every required section and a readable architecture diagram.
+- [x] Final report draft contains every required section in PDF order and links the readable architecture diagram; approved team contribution text remains a human input.
 - [ ] GitHub links point to the exact submitted commits; all required code is committed and pushed.
 - [ ] Demo video shows all key features end to end, is clearly edited, and is no longer than two minutes.
 - [x] An explicit “not deployed in this workspace” statement is included in `docs/submission/submission-checklist.md`; a verified deployed URL remains the preferred human-owned submission state.
