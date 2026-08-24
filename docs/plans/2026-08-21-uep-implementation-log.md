@@ -1186,3 +1186,9 @@ Web: this log only. Phase 5 was not started.
 - Commit `f19a8ec` extracted auth, shared-chat reconciliation, session continuation, in-flight tracking, and dashboard bridging into `useDashboardWorkspace.ts`; it also hardens the no-runtime Live fallback to text/speech coaching.
 - The extension now has 10 unpacked Playwright checks: rapid open/close host stability plus settled geometry assertions at 360×640 and 390×700. Typecheck, 14 Vitest files / 66 tests, production build, manifest validation, and the targeted repeated microphone fallback check passed. One full-suite run still exposed a timing-sensitive microphone assertion that reported the stale `Mic muted` label; rerun that case before treating the browser gate as green.
 - Remaining Phase 9A: focused `ExtensionPanel`/context composition, direct workspace-hook characterization, save-queue coverage, and a browser-backed connected-chat golden flow.
+
+### Phase 9A panel-shell composition — 2026-08-24
+
+- Commit `da2dfb0` extracted the animated panel shell, header controls, menu, personality picker, and drag-handler wiring into `src/content/ExtensionPanel.tsx`.
+- `FloatingStudyPilot.tsx` is now approximately 2,159 lines; the body still owns study/live/chat rendering and is the next composition boundary.
+- Extension verification after the extraction: typecheck, 14 Vitest files / 66 tests, production build, manifest validation, and 10/10 unpacked Playwright checks passed, including narrow viewport and rapid-toggle coverage.
