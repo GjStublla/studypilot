@@ -1284,3 +1284,9 @@ Web: this log only. Phase 5 was not started.
 - Canonical web commit `431533f` added per-rubric request-state tracking and request versions for retry indexing. Both `RubricsView` and `ChatView` now suppress duplicate Retry controls while indexing and surface the request error without allowing stale responses to overwrite newer state.
 - Added a deferred-request regression test for the in-flight indexing state. Full web Vitest passed 16 files / 93 tests; `npm run verify:release` with approved public HTTPS placeholders passed tests, production build, and `verify-built-env`. Hosted function allowlist remained explicitly skipped because no token was present.
 - Remaining dashboard lifecycle work: explicit send-state/unmount characterization, CSS splitting, and the deterministic web Playwright golden flow.
+
+### Phase 8B chat-stream unmount cleanup — 2026-08-24
+
+- Canonical web commit `a667fff` guards chat creation, stream token/commit/failure dispatches, chat refreshes, rename/delete rollback, and AI-usage cleanup after the dashboard unmounts. The in-flight ref is still cleared, but late UI work is ignored.
+- Added a regression test that unmounts the dashboard while a stream is pending, then delivers a late token and rejection without logging a stale stream error.
+- Full web Vitest passed 16 files / 94 tests and the production build passed. Remaining dashboard lifecycle work is CSS splitting and the deterministic web Playwright golden flow; explicit request state for chat sends is already represented by `DashboardChatState` pending-turn statuses.
