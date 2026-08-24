@@ -1,60 +1,120 @@
-# Runbook
+# StudyPilot Operations & Deployment Runbook
 
-## Local Commands
+## 1. Local Development & Testing
 
-Install dependencies:
-
+### Web Frontend & Dashboard
 ```bash
+# Install dependencies
 npm install
-```
 
-Start dev server:
-
-```bash
+# Start local dev server (default port 5173)
 npm run dev
-```
 
-Build production assets:
+# Start in explicit local mode (uses local Supabase fixtures)
+npm run dev:local
 
-```bash
+# Run web test suite
+npm test
+
+# Run TypeScript check & production build
 npm run build
-```
 
-Preview the production build:
-
-```bash
+# Preview built production bundle
 npm run preview
 ```
 
-## Vite HTML Behavior
+### Backend (FastAPI)
+```bash
+# Activate virtual environment
+# Windows:
+backend\.venv\Scripts\activate
+# Linux/macOS:
+source backend/.venv/bin/activate
 
-In development, `index.html` contains:
+# Install runtime & dev requirements
+pip install -r backend/requirements.txt
+pip install -r backend/requirements-dev.txt
 
-```html
-<script type="module" src="/src/main.tsx"></script>
+# Run FastAPI test suite
+pytest backend/tests -v
+
+# Start FastAPI dev server
+uvicorn backend.main:app --reload --port 8000
 ```
 
-That is normal for Vite. The browser requests `/src/main.tsx`, and Vite serves transformed JavaScript. In production, `vite build` rewrites `dist/index.html` to hashed JS and CSS assets.
+### Supabase Edge Functions & Database
+```bash
+# Run Deno Edge Function tests
+npm run test:deno
 
-If a production deployment serves the root source `index.html` without running `vite build`, the app may fail or behave inconsistently. A normal Vite deployment should serve the `dist/` output.
+# Start local Supabase containers (requires Docker)
+npm run local:start
 
-## Known Current Build Note
+# Run pgTAP database & RLS tests
+npx supabase test db
 
-At the time this context folder was created, `npm run build` may be blocked by TypeScript errors in `src/components/Dashboard.tsx`. That file is under active dashboard work by another agent/person. Do not "fix" those errors from unrelated tasks without coordinating first.
+# Verify hosted Edge Function allowlist (requires Supabase Access Token)
+SUPABASE_ACCESS_TOKEN=sbp_... SUPABASE_PROJECT_REF=rqszloxxegvxaedptcqj npm run verify:functions
+```
 
-## Local Server Note
+---
 
-During the performance scan, local servers were started on:
+## 2. Production Deployment Workflow
 
-- `http://127.0.0.1:4173/` for production preview.
-- `http://127.0.0.1:5174/` for Vite dev after `5173` was occupied.
+### Prerequisites
+- Build arguments for public HTTPS endpoints:
+  - `VITE_API_BASE_URL`: `https://api.studypilot.app`
+  - `VITE_SUPABASE_URL`: `https://auth.studypilot.app` (or Supabase project URL)
+  - `VITE_SUPABASE_ANON_KEY`: Public JWT anon key
+- Do NOT provide private service role keys or Google Cloud credentials to frontend builds.
 
-If ports are busy, either stop those processes or let Vite choose another port.
+### Release Verification Gate
+```bash
+# Runs tests, builds bundle, scans for loopback hosts and leaked secrets
+npm run verify:release
+```
 
-## Before Changing Code
+### Docker Production Deployment
+```bash
+# Build and run the single-worker production stack
+docker compose -f docker-compose.prod.yml up --build -d
+```
 
-1. Read `context/README.md`.
-2. Check whether work overlaps with `src/components/Dashboard.tsx`.
-3. Prefer narrowly scoped changes.
-4. Run the cheapest relevant verification.
-5. If build failures are only in dashboard while dashboard work is active, report them rather than editing dashboard.
+---
+
+## 3. Hosted Function Allowlist & Drift Prevention
+
+StudyPilot enforces an exact inventory of 10 JWT-verified Edge Functions:
+1. `live-token`
+2. `live-rubric-search`
+3. `live-turn`
+4. `live-finish`
+5. `ensure-file-search-store`
+6. `extract-rubric`
+7. `index-knowledge-document`
+8. `socratic-coach`
+9. `summarize-session`
+10. `delete-knowledge-document`
+
+Deploy individual functions with JWT verification:
+```bash
+npx supabase functions deploy <function-slug> --project-ref rqszloxxegvxaedptcqj
+```
+
+---
+
+## 4. Rollback & Emergency Procedures
+
+### Web Application Rollback
+- Re-deploy the previously verified container image tag or static bundle.
+- Previous release builds are tracked in Git history with discrete commit SHAs per phase.
+
+### Edge Function Rollback
+- Re-deploy the function from the previous release commit.
+- Never disable `verify_jwt` on deployed functions.
+
+### Secret Compromise / Rotation
+- In the event of any credential exposure:
+  1. Revoke the key immediately in the Google Cloud Console or Supabase Dashboard.
+  2. Issue a replacement credential and update production environment variables.
+  3. Log the rotation date and key ID in a private incident record outside Git (see `SECURITY.md`).
