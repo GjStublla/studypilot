@@ -11,17 +11,26 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Supabase JS validates the URL during module construction. Keep the browser
+// app importable when a fresh clone has no `.env` yet; production builds still
+// fail closed in vite.config.ts before this fallback can be shipped as a live
+// endpoint. Any attempted request with the fallback fails as an ordinary
+// network error rather than crashing every route at module load time.
+const FALLBACK_SUPABASE_URL = 'https://missing-supabase.invalid';
+const FALLBACK_SUPABASE_ANON_KEY = 'missing-public-anon-key';
+const configuredSupabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
+const configuredSupabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
+const supabaseUrl = configuredSupabaseUrl || FALLBACK_SUPABASE_URL;
+const supabaseAnonKey = configuredSupabaseAnonKey || FALLBACK_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
+if (!configuredSupabaseUrl || !configuredSupabaseAnonKey) {
   console.warn(
     '[StudyPilot] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY.\n' +
     'Copy .env.example to .env at the project root and fill in the values.',
   );
 }
 
-export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     // Persist the Supabase session so OAuth users stay logged in across page reloads.
     // Email/password users don't have a Supabase session — we use injectStoredToken()
