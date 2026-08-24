@@ -18,7 +18,13 @@ import type {
   IndexKnowledgeDocumentResponse,
   SummarizeSessionResponse,
   ExtractRubricResponse,
+  TranscriptMessage,
 } from './studypilot-types';
+import type {
+  ActionItem as DashboardActionItem,
+  Rubric as DashboardRubric,
+  Session as DashboardSession,
+} from './dashboardApi';
 
 // Re-export types for convenience
 export type {
@@ -35,38 +41,75 @@ export type {
 
 // ─── Type Adapters for Dashboard Compatibility ─────────────────────────────────────
 
+type SessionMessageRow = {
+  id: string;
+  role: TranscriptMessage['role'];
+  message_text: string;
+  time_offset_seconds: number;
+};
+
+export type SessionListRow = Pick<
+  Session,
+  | 'id'
+  | 'title'
+  | 'source'
+  | 'mode'
+  | 'duration_seconds'
+  | 'summary'
+  | 'when_timestamp'
+  | 'rubric_id'
+  | 'chat_id'
+  | 'screenshot_path'
+> & {
+  action_items?: Array<Pick<ActionItem, 'done'>> | null;
+};
+
+export type SessionWithRelations = Session & {
+  messages?: TranscriptMessage[] | null;
+  action_items?: ActionItem[] | null;
+};
+
+export type SessionDetails = {
+  session: SessionWithRelations;
+  actionItems: ActionItem[];
+  rubric: Rubric | null;
+};
+
 // Dashboard expects camelCase, Supabase uses snake_case
-export function adaptSession(session: Session): any {
+export function adaptSession(session: SessionListRow): DashboardSession {
   return {
     ...session,
-    rubricId: session.rubric_id,
+    rubricId: session.rubric_id ?? null,
     chatId: session.chat_id ?? null,
-    screenshotPath: session.screenshot_path,
+    screenshotPath: session.screenshot_path ?? null,
     when: formatWhen(session.when_timestamp),
     duration: formatDuration(session.duration_seconds),
+    summary: session.summary ?? '',
   };
 }
 
-export function adaptRubric(rubric: Rubric): any {
+export function adaptRubric(rubric: Rubric): DashboardRubric {
   return {
     ...rubric,
-    sessionsCount: rubric.sessions_count,
+    sessionsCount: rubric.sessions_count ?? 0,
     knowledgeDocumentId: rubric.knowledge_document_id ?? null,
     fileSearchStatus: rubric.file_search_status ?? 'not_indexed',
     fileSearchError: rubric.file_search_error ?? null,
     uploaded: new Date(rubric.uploaded_at).toLocaleDateString(),
-    criteria: rubric.criteria?.map((c: any) => ({
-      ...c,
-      max: c.max_score,
-    })) || [],
+    criteria: (rubric.criteria ?? []).map((criterion, index) => ({
+      id: criterion.id ?? `${rubric.id}-criterion-${index}`,
+      name: criterion.name,
+      score: criterion.score ?? 0,
+      max: criterion.max_score,
+    })),
   };
 }
 
-export function adaptActionItem(item: ActionItem): any {
+export function adaptActionItem(item: ActionItem): DashboardActionItem {
   return {
     ...item,
-    sessionId: item.session_id,
-    rubricId: item.rubric_id,
+    sessionId: item.session_id ?? null,
+    rubricId: item.rubric_id ?? null,
   };
 }
 
@@ -124,7 +167,7 @@ export async function fetchSessionTranscript(sessionId: string): Promise<Transcr
 
   if (error) throw error;
 
-  return (data || []).map((m: any) => ({
+  return (data || []).map((m: SessionMessageRow) => ({
     id: m.id,
     who: m.role === 'user' ? 'Student' : 'StudyPilot',
     text: m.message_text,
@@ -147,17 +190,17 @@ export async function createSessionCaptureSignedUrl(path: string): Promise<strin
 
 // ─── Dashboard-compatible wrappers ─────────────────────────────────────────────────
 
-export async function fetchSessions(): Promise<any[]> {
+export async function fetchSessions(): Promise<DashboardSession[]> {
   const sessions = await getSessions();
   return sessions.map(adaptSession);
 }
 
-export async function fetchRubrics(): Promise<any[]> {
+export async function fetchRubrics(): Promise<DashboardRubric[]> {
   const rubrics = await getRubrics();
   return rubrics.map(adaptRubric);
 }
 
-export async function fetchActionItems(): Promise<any[]> {
+export async function fetchActionItems(): Promise<DashboardActionItem[]> {
   const items = await getActionItems();
   return items.map(adaptActionItem);
 }
@@ -545,7 +588,7 @@ export async function indexKnowledgeDocument(
 
 // ─── Session Operations ───────────────────────────────────────────────────────────
 
-export async function getSessions(): Promise<Session[]> {
+export async function getSessions(): Promise<SessionListRow[]> {
   await injectStoredToken();
   const { data, error } = await supabase
     .from('sessions')
@@ -557,14 +600,14 @@ export async function getSessions(): Promise<Session[]> {
 
   if (error) throw error;
 
-  return (data || []).map((s: any) => {
-    const actions = s.action_items || [];
-    const openCount = actions.filter((a: any) => !a.done).length;
+  return (data || []).map((s: SessionListRow) => {
+    const actions = s.action_items ?? [];
+    const openCount = actions.filter((action) => !action.done).length;
     return { ...s, openCount };
   });
 }
 
-export async function getSessionById(sessionId: string): Promise<Session | null> {
+export async function getSessionById(sessionId: string): Promise<SessionWithRelations | null> {
   const { data: session, error: sesError } = await supabase
     .from('sessions')
     .select('*, messages:session_messages(*), action_items(*)')
@@ -576,10 +619,10 @@ export async function getSessionById(sessionId: string): Promise<Session | null>
     throw sesError;
   }
 
-  return session;
+  return session as SessionWithRelations;
 }
 
-export async function getSessionDetails(sessionId: string) {
+export async function getSessionDetails(sessionId: string): Promise<SessionDetails> {
   const { data: session, error: sesError } = await supabase
     .from('sessions')
     .select('*, messages:session_messages(*), action_items(*)')
@@ -588,9 +631,10 @@ export async function getSessionDetails(sessionId: string) {
 
   if (sesError) throw sesError;
 
-  let rubric = null;
+  const sessionWithRelations = session as SessionWithRelations;
+  let rubric: Rubric | null = null;
 
-  if (session.rubric_id) {
+  if (sessionWithRelations.rubric_id) {
     const { data, error: rubError } = await supabase
       .from('rubrics')
       .select('*, criteria:rubric_criteria(*)')
@@ -601,8 +645,8 @@ export async function getSessionDetails(sessionId: string) {
   }
 
   return {
-    session,
-    actionItems: session.action_items || [],
+    session: sessionWithRelations,
+    actionItems: sessionWithRelations.action_items || [],
     rubric,
   };
 }
