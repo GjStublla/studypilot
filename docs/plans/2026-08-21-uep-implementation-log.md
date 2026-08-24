@@ -1210,6 +1210,8 @@ Web: this log only. Phase 5 was not started.
 - The existing `Promise.allSettled` partial-load behavior and retry UI are preserved; fatal error remains limited to the authenticated case where sessions, rubrics, and action items all fail.
 - Targeted dashboard chat/rubric tests (12 tests) and the production build passed. The pre-existing whitespace-only dashboard change remains unstaged and preserved.
 - Follow-up full web verification: 15 Vitest files / 87 tests passed.
+- `npm run verify:release` was rerun with approved public HTTPS placeholders: tests (15 files / 87), production build, and `verify-built-env` passed. The hosted function allowlist was explicitly **SKIPPED** because `SUPABASE_ACCESS_TOKEN` is not set; this remains a human/CI environment gate, not a pass.
+- `python -m pytest backend/tests -q` passed 25 tests with 8 dependency deprecation warnings.
 
 ### Phase 9A context-settings boundary — 2026-08-24
 

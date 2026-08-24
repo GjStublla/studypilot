@@ -27,6 +27,7 @@ Web:
 - Production build with approved public HTTPS placeholders: passed.
 - `node scripts/verify-built-env.mjs dist`: passed.
 - Supabase local lint: exit 0; one pre-existing unused-local warning remains.
+- `npm run verify:release` with approved public placeholders: web tests/build/built-env passed; hosted allowlist explicitly skipped because `SUPABASE_ACCESS_TOKEN` is absent.
 
 Extension:
 
