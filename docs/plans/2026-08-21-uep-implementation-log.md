@@ -1107,3 +1107,33 @@ Web: this log only. Phase 5 was not started.
 - `Dashboard.tsx` is now 2,461 lines (down from 3,249) and the extracted files range from 60 to 203 lines.
 - `npx tsc --noEmit`, full Vitest (14 files / 85 tests), approved-environment production build, and `verify-built-env` all passed after extraction.
 - The remaining 2,461-line shell still owns chat/session/rubric orchestration and views; Phase 8B is the next refactor slice.
+
+### Phase 8B vertical-slice extraction — 2026-08-24
+
+- Commit `23ab897` extracted chat rendering/composer, sessions and session detail, rubrics/upload/indexing, rubric status, and the right-side context panel into `src/components/dashboard/`.
+- `Dashboard.tsx` is now 1,161 lines and retains data fetching, mutations, routing, and orchestration; no extracted component exceeds 800 lines.
+- The extraction preserved the existing dashboard API boundary and typed rubric/session criteria instead of retaining the former `any` callback maps.
+- `npx tsc --noEmit`, full Vitest (14 files / 85 tests), approved-environment production build, and `node scripts/verify-built-env.mjs dist` all passed after the extraction.
+- Remaining Phase 8 work: split dashboard styles, replace boolean request flags with explicit state unions, and reduce the orchestration shell below the plan's 1,000-line target without changing behavior.
+
+### Phase 9C dead-code and browser-AI cleanup — 2026-08-24
+
+- Canonical extension commit `d9f9fb1` removed the unreferenced `VoiceSession.tsx`, `useVoiceSession.ts`, `mockDashboard.ts`, and browser-side `geminiService.ts` implementations after repository-wide import searches found no runtime consumers.
+- Removed `@google/generative-ai` from `package.json` and `package-lock.json`; `npm prune --ignore-scripts` left `npm ls @google/generative-ai --depth=0` empty.
+- Extension `npm run typecheck`, `npm test` (12 files / 58 tests), `npm run build`, and `npm run validate:manifest` all passed. Source/dist scans found no `VITE_GEMINI_API_KEY`, `GoogleGenerativeAI`, or `@google/generative-ai` references.
+- Phase 9A/9B remain open: the large content-panel orchestration and Supabase facade still need characterization-first extraction.
+
+### Phase 9B Supabase facade extraction — 2026-08-24
+
+- Canonical extension commit `e281450` split the 1,100-line `studypilotSupabase.ts` into a two-line public facade plus `studypilotSupabase.auth.ts` (authentication/session transport) and `studypilotSupabase.chat.ts` (chat, coaching, session sync, and mapping).
+- The facade re-exports the stable public API, so background and tests retain their existing imports. Auth and chat modules share the same authenticated REST/Edge transport helpers; no UI state was introduced.
+- Targeted chat/local/sync tests passed (3 files / 9 tests), followed by the full extension suite (12 files / 58 tests), typecheck, production build, and manifest validation.
+- Phase 9A remains open: `FloatingStudyPilot.tsx` still owns live/workspace orchestration and needs characterization-first hooks/panel extraction.
+
+### Phase 9A safe panel-component extraction — 2026-08-24
+
+- Canonical extension commit `279e91f` moved the pure panel/view components (`FlashcardViewer`, `QuizViewer`, `Orb`, controls, settings sheet, and quick-action glyphs) into `src/content/PanelComponents.tsx` while preserving the `SettingsSheet` export used by its privacy tests.
+- `FloatingStudyPilot.tsx` fell from 3,218 to 2,748 lines; the remaining shell still owns live/workspace state and was intentionally not split without characterization coverage.
+- Full extension Vitest (12 files / 58 tests), typecheck, and production build passed after extraction.
+- Remaining Phase 9A work: extract the live and dashboard-workspace state machines, then compose the panel from focused `ExtensionPanel`, `ContextSettings`, and `QuickActions` components with narrow-width E2E coverage.
+- The unpacked extension Playwright suite was re-run after the extraction: 8/8 tests passed, including panel injection, toolbar-equivalent toggle, privacy defaults, independent page-URL context, microphone denial recovery, and dashboard handoff.
