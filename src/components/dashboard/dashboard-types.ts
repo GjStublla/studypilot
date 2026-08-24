@@ -19,11 +19,13 @@ export type DashboardStudent = {
   email: string;
 };
 
-export type DashboardBootstrapState =
+export type DashboardRequestState =
   | { status: 'idle' }
   | { status: 'loading' }
   | { status: 'success' }
   | { status: 'error'; message?: string };
+
+export type DashboardBootstrapState = DashboardRequestState;
 
 export type LucideIcon = ComponentType<SVGProps<SVGSVGElement> & { size?: number | string }>;
 

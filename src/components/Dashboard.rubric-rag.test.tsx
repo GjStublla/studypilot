@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Session } from '../lib/dashboardApi';
 import type { DashboardChat, DashboardChatMessage } from '../lib/studypilot-types';
 
 const mocks = vi.hoisted(() => ({
@@ -119,6 +120,22 @@ function makeAssistantMessage(): DashboardChatMessage {
       ],
     },
     created_at: '2026-08-04T10:01:00.000Z',
+  };
+}
+
+function makeSession(overrides: Partial<Session> = {}): Session {
+  return {
+    id: 'session-1',
+    title: 'Thesis rehearsal',
+    source: 'Chrome Extension',
+    mode: 'Essay Coach',
+    duration: '3m',
+    when: 'Today · 10:00 AM',
+    rubricId: null,
+    chatId: null,
+    screenshotPath: null,
+    summary: 'Practice session',
+    ...overrides,
   };
 }
 
@@ -278,6 +295,27 @@ describe('Dashboard rubric RAG behaviors', () => {
     expect(prompts).toHaveTextContent(/What should I revise first/i);
     expect(prompts).not.toHaveTextContent(/Thesis Clarity/i);
     expect(prompts).not.toHaveTextContent(/Evidence Quality/i);
+  });
+
+  it('shows a transcript error and retries only the selected session request', async () => {
+    const user = userEvent.setup();
+    mocks.fetchSessions.mockResolvedValue([makeSession()]);
+    mocks.fetchSessionTranscript
+      .mockRejectedValueOnce(new Error('Transcript service unavailable'))
+      .mockResolvedValueOnce([
+        { id: 'line-1', who: 'You', text: 'Clarify the thesis', t: '0:01' },
+      ]);
+
+    render(<Dashboard />);
+    await user.click(await screen.findByRole('button', { name: /Sessions/i }));
+    await user.click(await screen.findByRole('button', { name: 'View transcript' }));
+
+    expect(await screen.findByText('Transcript unavailable.')).toBeInTheDocument();
+    expect(screen.getByText('Transcript service unavailable')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByText('Clarify the thesis')).toBeInTheDocument();
+    expect(mocks.fetchSessionTranscript).toHaveBeenCalledTimes(2);
   });
 
   it('continues a session via sessions.chatId when present', async () => {

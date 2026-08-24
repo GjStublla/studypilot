@@ -69,11 +69,24 @@ export const TodoRow = memo(function TodoRow({
   );
 });
 
-export const EmptyState = memo(function EmptyState({ title, body }: { title: string; body: string }) {
+export const EmptyState = memo(function EmptyState({
+  title,
+  body,
+  action,
+}: {
+  title: string;
+  body: string;
+  action?: { label: string; onClick: () => void };
+}) {
   return (
     <div className="ds-empty">
       <p className="ds-empty-title">{title}</p>
       <p className="ds-empty-body">{body}</p>
+      {action ? (
+        <DsButton variant="secondary" onClick={action.onClick}>
+          {action.label}
+        </DsButton>
+      ) : null}
     </div>
   );
 });
