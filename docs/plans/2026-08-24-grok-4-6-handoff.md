@@ -14,14 +14,14 @@ The implementation objective is therefore: make the product demonstrably reliabl
 - Web/dashboard/API/Supabase: `C:\Users\gjins\Desktop\studypilot`
 - Canonical Chrome extension: `C:\Users\gjins\Desktop\studypilot-extension`
 - Preserve the untracked web `output/` directory and the existing formal plan.
-- Web remediation commits include `23ab897` (dashboard chat/session/rubric/context extraction), `60fdd2b` (shell and low-coupling view extraction), `7529dd3` (release/database verification repair), `2ce5667` (implementation log), `281dafa` (explicit dashboard bootstrap request state), `078cb9b` (typed Supabase adapters and realtime payload boundaries), `9dd63b2` (centralized idle/loading/success/error bootstrap state), `d2cf801` (per-session transcript request state and retry UI), `a989db6` (stale transcript response guards), and `6814cc5` (chat-list request state and dashboard async lifecycle guards).
+- Web remediation commits include `23ab897` (dashboard chat/session/rubric/context extraction), `60fdd2b` (shell and low-coupling view extraction), `7529dd3` (release/database verification repair), `2ce5667` (implementation log), `281dafa` (explicit dashboard bootstrap request state), `078cb9b` (typed Supabase adapters and realtime payload boundaries), `9dd63b2` (centralized idle/loading/success/error bootstrap state), `d2cf801` (per-session transcript request state and retry UI), `a989db6` (stale transcript response guards), `6814cc5` (chat-list request state and dashboard async lifecycle guards), and `431533f` (versioned rubric-index retry state).
 - Extension remediation commits include `d9f9fb1` (remove unreachable browser AI/mock/voice paths), `e281450` (split Supabase facade), `279e91f` (extract pure panel components), `c295320` (live-state derivation and listener cleanup), `5ea85a0` (history secret-scan CI), `818a500` (live coaching hook), `d9ff60d` (pure chat selection/presentation state), `1b33f60` (quick-actions component), `7a7051c` (invalid idle pause prevention), `f19a8ec` (dashboard workspace hook, fallback hardening, rapid-toggle and narrow-viewport E2E), `da2dfb0` (panel shell/header composition), `53a3715` (typed shared-chat switcher), `a5d6687` (isolated context/privacy settings), `dfd0e14` (save-queue concurrency/error characterization), `206da8d` (study-mode panel composition), `31dbe0d` (isolated workspace auth parsing), `7283a69` (answer-card panel composition), and `29d5731` (mounted/latest-response guards for workspace async work). The extension worktree is clean at this handoff.
 
 ## Verified evidence
 
 Web:
 
-- Vitest: 16 files / 92 tests.
+- Vitest: 16 files / 93 tests.
 - FastAPI pytest: 25 tests.
 - Supabase local pgTAP: 5 files / 287 tests after a clean reset.
 - Production build with approved public HTTPS placeholders: passed.
@@ -50,7 +50,7 @@ Extension:
 ### P1 — dashboard maintainability and release confidence
 
 1. Keep `Dashboard.tsx` orchestration-only and reduce it below the plan's 1,000-line target. It is currently about 1,161 lines.
-2. Add explicit request-state unions for the remaining dashboard fetches and add stale-promise/unmount cleanup tests; `DashboardBootstrapState` now centralizes `idle | loading | success | error` in `9dd63b2`, `d2cf801` applies the same state boundary to per-session transcript loading/error/retry, `a989db6` ignores superseded/unmounted transcript responses, and `6814cc5` applies the boundary to chat-list refreshes and common realtime/session fallbacks. Rubric indexing, chat-send, and full unmount characterization remain open.
+2. Add explicit request-state unions for the remaining dashboard fetches and add stale-promise/unmount cleanup tests; `DashboardBootstrapState` now centralizes `idle | loading | success | error` in `9dd63b2`, `d2cf801` applies the same state boundary to per-session transcript loading/error/retry, `a989db6` ignores superseded/unmounted transcript responses, `6814cc5` applies the boundary to chat-list refreshes and common realtime/session fallbacks, and `431533f` versions rubric-index retries. Chat-send and full unmount characterization remain open.
 3. Split `Dashboard.css` into shell, chat, and content-view styles without changing selector scope or visual behavior.
 4. Add the deterministic web Playwright golden flow: upload/select rubric, grounded prompt, Socratic follow-up, action item, reload, and verify the same chat.
 5. Finish explicit named prop interfaces in `dashboard-types.ts`; do not add `any`, `@ts-ignore`, or lint suppressions.
