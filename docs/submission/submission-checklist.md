@@ -28,17 +28,17 @@ This section records what is reproducible in the workspace; it is not a deployme
 
 ## Reproducibility
 
-- [ ] Node 22+ and Python prerequisites documented.
-- [ ] Public build variables documented without secrets.
+- [x] Node 22+ and Python prerequisites documented in `README.md` (Python 3.13 is also pinned by `backend/Dockerfile`).
+- [x] Public build variables documented without secrets in `README.md`, `.env.example`, and the release workflow placeholders.
 - [ ] Backend and local Supabase setup tested from a clean clone.
-- [ ] Web Vitest, Deno, pytest, pgTAP, build, and built-environment scan recorded.
-- [ ] Extension typecheck, Vitest, build, manifest validation, and unpacked Playwright recorded.
-- [ ] Hosted allowlist and production smoke checks recorded, or visibly marked skipped because protected secrets are unavailable.
+- [x] Web Vitest, Deno, pytest, pgTAP, build, and built-environment scan recorded in the implementation log and CI workflow.
+- [x] Extension typecheck, Vitest, build, manifest validation, and unpacked Playwright recorded above.
+- [x] Hosted allowlist is visibly marked skipped because protected Supabase secrets are unavailable; production smoke checks remain an external gate.
 
 ## Safety and sign-off
 
 - [ ] Historical service-account credential rotation approved and recorded privately.
-- [ ] No `.env`, service-account JSON, access token, refresh token, or service-role key is committed.
+- [x] No secret-bearing `.env`, service-account JSON, access token, refresh token, or service-role key is present in the current tracked tree; historical service-account rotation remains a human gate.
 - [ ] Website, extension, README, report, and pitch use the same capability/privacy claims.
 - [ ] Team members approve their contribution text.
 - [ ] Mentor/team owner signs off the report, video, deployed URL, and final checklist.
