@@ -32,10 +32,10 @@ Web:
 Extension:
 
 - Typecheck: passed.
-- Vitest: 14 files / 66 tests.
+- Vitest: 14 files / 68 tests.
 - Production build: passed.
 - Manifest validator: passed; no named microphone permission, no loopback production hosts, offscreen `USER_MEDIA` reason present.
-- Unpacked Playwright: 10/10 passed after the workspace extraction, including rapid open/close and settled 360×640 / 390×700 viewport checks. The microphone-denial test has passed in repeated isolated runs; rerun the full suite if a browser timing flake appears.
+- Unpacked Playwright: 10/10 passed after the workspace extraction, including rapid open/close with page-error/console-error assertions and settled 360×640 / 390×700 viewport checks for quick-action labels and horizontal overflow. The microphone-denial test has passed in repeated isolated and full-suite runs.
 - `npm ls @google/generative-ai --depth=0`: empty; source and built bundle contain no `VITE_GEMINI_API_KEY`, `GoogleGenerativeAI`, or `@google/generative-ai`.
 
 ## Highest-priority remaining work
