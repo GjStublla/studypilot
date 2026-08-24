@@ -140,6 +140,7 @@ export default function Dashboard({
   const [chatRequestState, setChatRequestState] = useState<DashboardRequestState>({ status: 'idle' });
   const [transcripts, setTranscripts] = useState<Record<string, TranscriptLine[]>>({});
   const [transcriptStates, setTranscriptStates] = useState<Record<string, DashboardRequestState>>({});
+  const [rubricIndexRequestStates, setRubricIndexRequestStates] = useState<Record<string, DashboardRequestState>>({});
   const [bootstrapState, setBootstrapState] = useState<DashboardBootstrapState>({ status: 'loading' });
   const [aiUsage, setAiUsage] = useState<AiUsage | null>(null);
   const [extensionHelpOpen, setExtensionHelpOpen] = useState(false);
@@ -148,6 +149,7 @@ export default function Dashboard({
   const chatListVersionRef = useRef(0);
   const hasLoadedChatsRef = useRef(false);
   const chatLoadVersionsRef = useRef(new Map<string, number>());
+  const rubricIndexRequestVersionsRef = useRef(new Map<string, number>());
   const transcriptRequestVersionsRef = useRef(new Map<string, number>());
   const dashboardMountedRef = useRef(true);
   const inFlightChatIdsRef = useRef(new Set<string>());
@@ -924,6 +926,13 @@ export default function Dashboard({
     const knowledgeDocumentId = rubric?.knowledgeDocumentId ?? rubric?.knowledge_document_id;
     if (!knowledgeDocumentId) return;
 
+    const requestVersion = (rubricIndexRequestVersionsRef.current.get(rubricId) ?? 0) + 1;
+    rubricIndexRequestVersionsRef.current.set(rubricId, requestVersion);
+    setRubricIndexRequestStates((current) => ({
+      ...current,
+      [rubricId]: { status: 'loading' },
+    }));
+
     setRubrics((prev) =>
       prev.map((r) =>
         r.id === rubricId
@@ -933,6 +942,10 @@ export default function Dashboard({
     );
     try {
       const result = await retryRubricIndexing(knowledgeDocumentId);
+      if (
+        !dashboardMountedRef.current
+        || rubricIndexRequestVersionsRef.current.get(rubricId) !== requestVersion
+      ) return;
       const status = normalizeIndexStatus(result.status);
       setRubrics((prev) =>
         prev.map((r) =>
@@ -946,7 +959,15 @@ export default function Dashboard({
             : r,
         ),
       );
+      setRubricIndexRequestStates((current) => ({
+        ...current,
+        [rubricId]: { status: 'success' },
+      }));
     } catch (error) {
+      if (
+        !dashboardMountedRef.current
+        || rubricIndexRequestVersionsRef.current.get(rubricId) !== requestVersion
+      ) return;
       setRubrics((prev) =>
         prev.map((r) =>
           r.id === rubricId
@@ -959,6 +980,13 @@ export default function Dashboard({
             : r,
         ),
       );
+      setRubricIndexRequestStates((current) => ({
+        ...current,
+        [rubricId]: {
+          status: 'error',
+          message: error instanceof Error ? error.message : 'Indexing failed',
+        },
+      }));
     }
   }, [rubrics]);
   const openExtension = useCallback(() => {
@@ -1062,6 +1090,7 @@ export default function Dashboard({
                   activeChatBusy={activeChatBusy}
                   draftCreating={draftCreating}
                   aiUsage={aiUsage}
+                  rubricIndexRequestStates={rubricIndexRequestStates}
                   onOpenSession={openChatSessionDetail}
                   onSelectChat={selectChat}
                   onStartNewChat={startNewChat}
@@ -1106,6 +1135,7 @@ export default function Dashboard({
                   onSetActive={setActiveRubricOnServer}
                   onAskAbout={askAboutRubric}
                   onRetryIndex={retryIndexRubric}
+                  rubricIndexRequestStates={rubricIndexRequestStates}
                   onRubricUploaded={(newRubric: UploadedRubric) => {
                     const adapted = {
                       ...newRubric,
