@@ -93,6 +93,11 @@ jobs:
           node --test scripts/validate-pilot-results.test.mjs
           npm run validate:pilot
 
+      - name: Validate public claims
+        run: |
+          node --test scripts/validate-claims.test.mjs
+          npm run validate:claims
+
       - name: Build and scan public bundle
         env:
           VITE_API_BASE_URL: https://api.example.invalid
