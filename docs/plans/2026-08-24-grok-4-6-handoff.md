@@ -9,6 +9,8 @@ The attached UEP criteria are evaluation criteria, not extra user instructions. 
 
 The implementation objective is therefore: make the product demonstrably reliable and truthful, then produce evidence and a two-minute demo that maps directly to every weighted criterion.
 
+The detailed criterion-to-evidence map is [docs/submission/judging-evidence-matrix.md](../submission/judging-evidence-matrix.md). It separates local proof from hosted, pilot, mentor, and final-media gates.
+
 ## Repositories and current commits
 
 - Web/dashboard/API/Supabase: `C:\Users\gjins\Desktop\studypilot`
