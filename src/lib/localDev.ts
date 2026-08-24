@@ -4,6 +4,11 @@ export const LOCAL_DEV_EMAIL = 'dev@studypilot.local';
 export const LOCAL_DEV_PASSWORD = 'StudyPilot-local-dev-only-2026!';
 
 export function isLoopbackUrl(value: string | undefined): boolean {
+  if (!import.meta.env.DEV) return false;
+  return isDevLoopbackUrl(value);
+}
+
+function isDevLoopbackUrl(value: string | undefined): boolean {
   if (!value) return false;
 
   try {
@@ -30,6 +35,6 @@ export const LOCAL_DEV_MODE = localModeRequested && localSupabaseConfigured;
 
 if (localModeRequested && !localSupabaseConfigured) {
   console.error(
-    '[StudyPilot] Local development mode requires VITE_SUPABASE_URL to use localhost or a loopback IP.',
+    '[StudyPilot] Local development mode requires VITE_SUPABASE_URL to use a loopback host.',
   );
 }

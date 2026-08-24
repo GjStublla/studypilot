@@ -16,6 +16,27 @@ WORKDIR /app
 ARG VITE_API_BASE_URL
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_ANON_KEY
+
+# Fail closed before npm ci / npm run build when public args are absent or loopback.
+# Full URL/key-shape validation still runs in vite build via deploymentConfig.ts.
+# Error messages name variables only — never values.
+RUN node -e "\
+const required=['VITE_API_BASE_URL','VITE_SUPABASE_URL','VITE_SUPABASE_ANON_KEY'];\
+for (const name of required) {\
+  if (!String(process.env[name]||'').trim()) {\
+    console.error('Production Docker build is missing a required public environment variable.');\
+    process.exit(1);\
+  }\
+}\
+for (const name of ['VITE_API_BASE_URL','VITE_SUPABASE_URL']) {\
+  const value=String(process.env[name]||'').trim().toLowerCase();\
+  if (!value.startsWith('https://') || value.includes('localhost') || value.includes('127.0.0.1')) {\
+    console.error(name + ' must be a public HTTPS URL for production Docker builds.');\
+    process.exit(1);\
+  }\
+}\
+"
+
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL \
     VITE_SUPABASE_URL=$VITE_SUPABASE_URL \
     VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY

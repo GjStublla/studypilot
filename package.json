@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "dev:local": "vite --host 127.0.0.1 --mode studypilot-local",
-    "build": "tsc -b && vite build",
+    "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -19,6 +19,8 @@
     "docker:dev": "docker compose up --build",
     "docker:prod": "docker compose -f docker-compose.prod.yml up --build -d",
     "verify:functions": "node scripts/verify-function-allowlist.mjs",
+    "verify:built-env": "node scripts/verify-built-env.mjs dist",
+    "verify:release": "node scripts/verify-release.mjs",
     "extension:build": "npm run build --prefix ../studypilot-extension"
   },
   "dependencies": {
@@ -36,6 +38,7 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^26.2.0",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
     "jsdom": "^29.1.1",
