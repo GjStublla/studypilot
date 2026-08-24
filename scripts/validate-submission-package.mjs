@@ -44,6 +44,15 @@ export const HOSTED_FLOW_MARKERS = Object.freeze([
   'no hosted run',
 ]);
 
+export const CONTRIBUTION_TEMPLATE_MARKERS = Object.freeze([
+  'not approved',
+  'approved role',
+  'member approval',
+  'do not infer percentages',
+  'mentor or team owner',
+  'no credentials',
+]);
+
 const HUMAN_OWNED_CHECKLIST_ITEM = /(?:Historical|Chrome|Demo|Backup|Pilot|Team members|Mentor|Deployed)/i;
 
 function seconds(timestamp) {
@@ -133,6 +142,15 @@ export function validateHostedGoldenFlow(text) {
   return { ok: failures.length === 0, failures };
 }
 
+export function validateContributionTemplate(text) {
+  const source = String(text).toLowerCase();
+  const failures = CONTRIBUTION_TEMPLATE_MARKERS
+    .filter(marker => !source.includes(marker))
+    .map(marker => `team-contributions template is missing "${marker}"`);
+
+  return { ok: failures.length === 0, failures };
+}
+
 export function findPendingFinalInputs({ report, checklist }) {
   const pending = [];
   const reportSource = String(report);
@@ -151,18 +169,20 @@ export function findPendingFinalInputs({ report, checklist }) {
   return pending;
 }
 
-export function validateSubmissionArtifacts({ report, demo, checklist, hostedFlow }) {
+export function validateSubmissionArtifacts({ report, demo, checklist, hostedFlow, contributionTemplate }) {
   const reportResult = validateReportSections(report);
   const demoResult = validateDemoTimeline(demo);
   const checklistResult = validateChecklistMarkers(checklist);
   const ownershipResult = validateChecklistOwnership(checklist);
   const hostedFlowResult = validateHostedGoldenFlow(hostedFlow);
+  const contributionTemplateResult = validateContributionTemplate(contributionTemplate);
   const failures = [
     ...reportResult.failures,
     ...demoResult.failures,
     ...checklistResult.failures,
     ...ownershipResult.failures,
     ...hostedFlowResult.failures,
+    ...contributionTemplateResult.failures,
   ];
 
   return {
@@ -174,6 +194,7 @@ export function validateSubmissionArtifacts({ report, demo, checklist, hostedFlo
     checklist: checklistResult,
     ownership: ownershipResult,
     hostedFlow: hostedFlowResult,
+    contributionTemplate: contributionTemplateResult,
   };
 }
 
@@ -197,7 +218,7 @@ function readArtifact(root, relativePath) {
 
 function printHelp() {
   console.log('Usage: node scripts/validate-submission-package.mjs [--require-final-inputs]');
-  console.log('Checks report section order, demo timing/fallback structure, hosted-flow preparation, and checklist markers.');
+  console.log('Checks report section order, demo timing/fallback structure, hosted-flow preparation, contribution-template safety, and checklist markers.');
   console.log('--require-final-inputs also fails while human-owned links, pilot, contribution, or approval inputs remain.');
 }
 
@@ -213,6 +234,7 @@ export function run(argv = process.argv.slice(2), root = process.cwd()) {
     demo: readArtifact(root, 'docs/submission/demo-script.md'),
     checklist: readArtifact(root, 'docs/submission/submission-checklist.md'),
     hostedFlow: readArtifact(root, 'docs/submission/hosted-golden-flow-checklist.md'),
+    contributionTemplate: readArtifact(root, 'docs/submission/team-contributions-template.md'),
   });
 
   if (!result.ok) {
@@ -222,7 +244,7 @@ export function run(argv = process.argv.slice(2), root = process.cwd()) {
     return 1;
   }
 
-  console.log('validate:submission: report sections, demo timeline, hosted-flow preparation, and checklist markers passed');
+  console.log('validate:submission: report sections, demo timeline, hosted-flow preparation, contribution-template safety, and checklist markers passed');
   if (result.pendingInputs.length > 0) {
     if (options.requireFinalInputs) {
       for (const pending of result.pendingInputs) {

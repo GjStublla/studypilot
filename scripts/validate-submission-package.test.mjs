@@ -4,11 +4,13 @@ import path from 'node:path';
 import test from 'node:test';
 
 import {
+  CONTRIBUTION_TEMPLATE_MARKERS,
   EXPECTED_DEMO_RANGES,
   HOSTED_FLOW_MARKERS,
   REQUIRED_REPORT_SECTIONS,
   findPendingFinalInputs,
   parseCliArgs,
+  validateContributionTemplate,
   validateDemoTimeline,
   validateChecklistOwnership,
   validateHostedGoldenFlow,
@@ -21,6 +23,7 @@ const report = fs.readFileSync(path.join(ROOT, 'docs/submission/final-report-con
 const demo = fs.readFileSync(path.join(ROOT, 'docs/submission/demo-script.md'), 'utf8');
 const checklist = fs.readFileSync(path.join(ROOT, 'docs/submission/submission-checklist.md'), 'utf8');
 const hostedFlow = fs.readFileSync(path.join(ROOT, 'docs/submission/hosted-golden-flow-checklist.md'), 'utf8');
+const contributionTemplate = fs.readFileSync(path.join(ROOT, 'docs/submission/team-contributions-template.md'), 'utf8');
 
 test('accepts the checked-in report section order', () => {
   const result = validateReportSections(report);
@@ -62,13 +65,21 @@ test('requires the hosted golden-flow checklist structure', () => {
   assert.equal(validateHostedGoldenFlow('Run A only').ok, false);
 });
 
+test('requires a safe, human-owned contribution template', () => {
+  const result = validateContributionTemplate(contributionTemplate);
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.failures, []);
+  assert.ok(CONTRIBUTION_TEMPLATE_MARKERS.length >= 5);
+  assert.equal(validateContributionTemplate('approved role only').ok, false);
+});
+
 test('reports human-owned final inputs without treating them as structural failures', () => {
   const pending = findPendingFinalInputs({
     report: '## 1. Project Overview\n- [Member name]',
     checklist: '- [ ] Demo video: [link]',
   });
   assert.equal(pending.length, 2);
-  const result = validateSubmissionArtifacts({ report, demo, checklist, hostedFlow });
+  const result = validateSubmissionArtifacts({ report, demo, checklist, hostedFlow, contributionTemplate });
   assert.equal(result.ok, true);
   assert.ok(result.pendingInputs.length > 0);
 });

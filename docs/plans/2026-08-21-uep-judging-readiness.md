@@ -638,7 +638,7 @@ The extension has one live implementation, one dashboard integration path, and n
 
 ## Phase 14: Build the Final Submission and Two-Minute Demo [external gate]
 
-**Files:** `docs/submission/final-report-content.md`, `docs/submission/demo-script.md`, `docs/submission/submission-checklist.md`, `docs/architecture/system.png`, `README.md`, extension `README.md`, `context/runbook.md`  
+**Files:** `docs/submission/final-report-content.md`, `docs/submission/demo-script.md`, `docs/submission/submission-checklist.md`, `docs/submission/team-contributions-template.md`, `docs/architecture/system.png`, `README.md`, extension `README.md`, `context/runbook.md`  
 **Estimate:** 1-2 days plus recording time
 
 ### Tasks
@@ -648,6 +648,7 @@ The extension has one live implementation, one dashboard integration path, and n
 - [x] Use three evidence-backed challenges: cross-surface chat synchronization, privacy-safe live context/persistence controls, and grounded rubric retrieval with secure model brokering. The current draft ties each to implementation boundaries and tests without claiming measured outcomes.
 - [x] Add a credential-free public-claim validator for the web README, landing/legal copy, final report, and optional canonical extension README; reject retired claims such as tab-audio, exact-second citations, and device-only processing. The pitch remains a human-owned artifact.
 - [x] Add a structural submission-artifact validator for the nine report sections, seven-segment 1:58 demo timeline, fallback instructions, and checklist markers; keep `--require-final-inputs` red until human-owned links, pilot, media, contribution, and sign-off inputs exist.
+- [x] Add `docs/submission/team-contributions-template.md` and validate its human-approval, no-inferred-percentages, mentor/team sign-off, and credential-safe markers; the template remains preparation only.
 - [ ] Obtain each member's approved role/contribution text; do not infer contribution percentages from Git commit counts.
 - [x] Add repository links, environment prerequisites, and exact setup/test commands to `submission-checklist.md`; the links are explicitly labeled as local/unpushed until the team publishes the evidence commits.
 - [ ] Add the deployed web URL, Chrome Store or beta-access state, and final video/backup links to `submission-checklist.md`.
