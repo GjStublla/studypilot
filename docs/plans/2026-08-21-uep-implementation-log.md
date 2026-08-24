@@ -1324,3 +1324,8 @@ Web: this log only. Phase 5 was not started.
 
 - `npm run verify:release` passed with approved public HTTPS placeholders: Vitest (17 files / 96 tests), production build, and `verify-built-env` all passed after `0cf07d5`.
 - Hosted Supabase function allowlist was explicitly **SKIPPED** because `SUPABASE_ACCESS_TOKEN` was not set. This is an external credential/CI gate, not a hosted verification pass.
+
+### Phase 9A connected extension chat evidence — 2026-08-24
+
+- Canonical extension commit `ea76936` adds an e2e-only Supabase fixture origin, an explicit `build:e2e` mode, and a connected shared-chat browser flow. The test selects a rubric-scoped chat, commits an SSE coaching response, refreshes canonical history, minimizes/reopens the panel, and reloads the study page before asserting the same response remains available.
+- Extension verification after the slice: typecheck passed; Vitest passed with 16 files / 74 tests; production build and manifest validation passed; unpacked Playwright passed 11/11. The fixture is deterministic and contains no hosted credentials; a real hosted run remains an external release gate.
