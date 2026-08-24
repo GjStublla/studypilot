@@ -1265,3 +1265,9 @@ Web: this log only. Phase 5 was not started.
 - `FloatingStudyPilot.tsx` is now approximately 1,952 lines; the parent still owns the main study/live/chat orchestration and remains above the 1,000-line maintainability target.
 - Extension verification after the extraction: typecheck, 15 Vitest files / 71 tests, production build, manifest validation, and 10/10 unpacked Playwright checks passed.
 - The connected-chat golden flow and direct workspace-hook characterization remain open; no new product capability or deployment claim is implied by this composition-only change.
+
+### Phase 9A workspace async-response guard — 2026-08-24
+
+- Canonical extension commit `29d5731` added a mounted/latest-request predicate and applied it to auth refresh, shared-chat refresh, canonical message loading, selection, session continuation, and dashboard bridging. Late responses no longer update unmounted UI or replace a newer active-chat selection.
+- Added `useDashboardWorkspace.test.ts` characterization coverage for accepted current requests, unmounted/superseded/inactive-chat rejection, and context refreshes without a target chat.
+- Extension verification: typecheck, 16 Vitest files / 74 tests, production build, manifest validation, and 10/10 unpacked Playwright checks passed. The connected-chat golden flow remains open.
