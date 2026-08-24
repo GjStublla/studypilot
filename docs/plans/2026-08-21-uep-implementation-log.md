@@ -1339,7 +1339,7 @@ Web: this log only. Phase 5 was not started.
 
 - Web commit `2b47d6c` adds a deterministic Playwright fixture and `npm run test:e2e`. The browser path uploads a rubric, exercises extraction/indexing status, opens the rubric-scoped chat, streams and commits a grounded coaching response, verifies the refreshed action item, reloads, and verifies the persisted chat and rubric context again.
 - The fixture mocks the FastAPI bootstrap endpoints and Supabase REST/Storage/Edge Function responses with public placeholders only; no hosted credentials are stored. Vitest explicitly excludes `e2e/**` so the unit gate and browser gate remain separate.
-- Verification: web Playwright 1/1 passed in 8.7s; full Vitest 17 files / 96 tests passed; `npx tsc --noEmit` and production build passed. Hosted Supabase allowlist verification is still skipped without a process-scoped `SUPABASE_ACCESS_TOKEN`.
+- Verification: web Playwright 1/1 passed (latest full run 18.7s including axe); full Vitest 17 files / 96 tests passed; `npx tsc --noEmit` and production build passed. Hosted Supabase allowlist verification is still skipped without a process-scoped `SUPABASE_ACCESS_TOKEN`.
 
 ### Phase 4 accessibility and performance evidence — 2026-08-24
 
