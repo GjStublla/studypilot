@@ -48,6 +48,7 @@ test('calculates protocol metrics with explicit denominators', () => {
     approvedQuoteCount: 1,
   });
   assert.match(formatPilotResult(result), /grounding_precision: 0.75 \(3\/4\)/);
+  assert.match(formatPilotResult(result), /sample_target: outside target \(10–15\); report limitation/);
   assert.match(formatPilotResult(result), /not causal evidence/);
 });
 

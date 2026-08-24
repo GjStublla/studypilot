@@ -16,7 +16,7 @@ screenshots, transcripts, credentials, or rubric text here.
 
 ## Sample
 
-- Participants: [n, target-audience description]
+- Participants: [n, target-audience description; validator target is 10–15]
 - Collection dates: [dates]
 - Protocol version: [commit or date]
 
