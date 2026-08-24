@@ -1,7 +1,7 @@
 import { memo, useMemo, useState } from 'react';
 import { BookOpen, Check, ScrollText } from 'lucide-react';
-import type { ActionItem, Rubric, Session } from '../../lib/dashboardApi';
 import { EmptyState } from './DashboardPrimitives';
+import type { ActionItemsViewProps } from './dashboard-types';
 
 export const ActionItemsView = memo(function ActionItemsView({
   open,
@@ -11,15 +11,7 @@ export const ActionItemsView = memo(function ActionItemsView({
   query,
   onToggle,
   onOpenSession,
-}: {
-  open: ActionItem[];
-  done: ActionItem[];
-  sessionsById: ReadonlyMap<string, Session>;
-  rubricsById: ReadonlyMap<string, Rubric>;
-  query: string;
-  onToggle: (id: string) => void;
-  onOpenSession: (id: string) => void;
-}) {
+}: ActionItemsViewProps) {
   const [tab, setTab] = useState<'open' | 'done'>('open');
   const q = query.trim().toLowerCase();
   const items = useMemo(() => {

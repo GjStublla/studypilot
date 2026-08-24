@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
+  DashboardProps,
   View,
   Theme,
   CoachMode,
@@ -11,7 +12,8 @@ import { HomeView } from './dashboard/HomeView';
 import { SettingsView } from './dashboard/SettingsView';
 import { StudyPilotMark } from './dashboard/DashboardPrimitives';
 import { SessionsView } from './dashboard/SessionsView';
-import { RubricsView, type UploadedRubric } from './dashboard/RubricsView';
+import { RubricsView } from './dashboard/RubricsView';
+import type { UploadedRubric } from './dashboard/dashboard-types';
 import { ChatView } from './dashboard/ChatView';
 import { ContextPanel } from './dashboard/ContextPanel';
 import { SessionDetailView } from './dashboard/SessionDetailView';
@@ -111,9 +113,7 @@ function replaceDashboardHash(chatId?: string | null): void {
 
 export default function Dashboard({
   routeHash = typeof window === 'undefined' ? '#dashboard' : window.location.hash,
-}: {
-  routeHash?: string;
-}) {
+}: DashboardProps) {
   const [view, setView] = useState<View>(() => (
     parseDashboardRoute(routeHash).chatId ? 'chat' : 'home'
   ));

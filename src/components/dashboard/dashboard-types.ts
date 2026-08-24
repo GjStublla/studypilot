@@ -1,6 +1,14 @@
-import type { ComponentType, SVGProps } from 'react';
+import type { ComponentType, MouseEvent, ReactNode, SVGProps } from 'react';
 import { BookOpen, Home, ListTodo, MessageCircle, ScrollText, Settings as SettingsIcon } from 'lucide-react';
-import type { ActionItem, Rubric, Session } from '../../lib/dashboardApi';
+import type {
+  ActionItem,
+  FileSearchStatus,
+  Rubric,
+  Session,
+  TranscriptLine,
+} from '../../lib/dashboardApi';
+import type { ChatViewMessage } from '../../lib/dashboard-chat-state';
+import type { DashboardChat, GroundingCitation } from '../../lib/studypilot-types';
 
 export type View =
   | 'home'
@@ -17,6 +25,11 @@ export type DashboardStudent = {
   name: string;
   initials: string;
   email: string;
+};
+
+export type DashboardAiUsage = {
+  used: number;
+  limit: number;
 };
 
 export type DashboardRequestState =
@@ -72,3 +85,206 @@ export type SessionRow = {
   rubric?: Rubric;
   openCount: number;
 };
+
+export interface SidebarProps {
+  student: DashboardStudent;
+  view: View;
+  setView: (view: View) => void;
+  openCount: number;
+  sessionsCount: number;
+  rubricsCount: number;
+  onOpenExtension: () => void;
+}
+
+export interface TopBarProps {
+  view: View;
+  theme: Theme;
+  contextOpen: boolean;
+  query: string;
+  onQueryChange: (value: string) => void;
+  onToggleSidebar: () => void;
+  onToggleContext: () => void;
+  onToggleTheme: () => void;
+}
+
+export interface HomeViewProps {
+  student: DashboardStudent;
+  activeRubric: Rubric | undefined;
+  latestSession: Session | undefined;
+  latestSessionOpenCount: number;
+  openActionItems: ActionItem[];
+  sessionsById: Map<string, Session>;
+  recentActivity: Array<{ id: string; time: string; title: string }>;
+  onContinueInChat: () => void;
+  onOpenSession: (id: string) => void;
+  onToggleAction: (id: string) => void;
+  onGoTo: (view: View) => void;
+}
+
+export interface ActionItemsViewProps {
+  open: ActionItem[];
+  done: ActionItem[];
+  sessionsById: ReadonlyMap<string, Session>;
+  rubricsById: ReadonlyMap<string, Rubric>;
+  query: string;
+  onToggle: (id: string) => void;
+  onOpenSession: (id: string) => void;
+}
+
+export interface SettingsViewProps {
+  student: DashboardStudent;
+  theme: Theme;
+  coachMode: CoachMode;
+  aiUsage: DashboardAiUsage | null;
+  onSetCoachMode: (mode: CoachMode) => void;
+  onSignOut: () => void;
+  onSetTheme: (theme: Theme) => void;
+}
+
+export interface SessionsViewProps {
+  rows: SessionRow[];
+  query: string;
+  onOpenSession: (id: string) => void;
+  onContinueInChat: (id: string) => void;
+}
+
+export interface ContextPanelProps {
+  view: View;
+  activeRubric: Rubric | undefined;
+  chatSession: Session | undefined;
+  selectedSession: Session | undefined;
+  openActionItemCount: number;
+  aiUsage: DashboardAiUsage | null;
+  onGoTo: (view: View) => void;
+  onContinueInChat: () => void;
+  onOpenExtension: () => void;
+}
+
+export interface SessionDetailViewProps {
+  session: Session | undefined;
+  rubric: Rubric | undefined;
+  actionItems: ActionItem[];
+  transcript: TranscriptLine[];
+  transcriptLoading: boolean;
+  transcriptError?: string | null;
+  onToggleAction: (id: string) => void;
+  onBack: () => void;
+  onContinueInChat: () => void;
+  onRetryTranscript?: () => void;
+}
+
+export interface FileSearchStatusBadgeProps {
+  status: string;
+  error?: string | null;
+  onRetry?: () => void;
+}
+
+export interface DsButtonProps {
+  children: ReactNode;
+  variant?: 'primary' | 'secondary' | 'ghost';
+  onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
+  disabled?: boolean;
+  type?: 'button' | 'submit';
+}
+
+export interface ScoreDotsProps {
+  score: number;
+  max: number;
+}
+
+export interface TodoRowProps {
+  item: ActionItem;
+  onToggle: () => void;
+  sessionTitle?: string;
+}
+
+export interface EmptyStateProps {
+  title: string;
+  body: string;
+  action?: { label: string; onClick: () => void };
+}
+
+export interface StudyPilotMarkProps {
+  size?: number;
+}
+
+export interface RubricsViewProps {
+  rubrics: Rubric[];
+  activeRubricId: string;
+  query: string;
+  rubricIndexRequestStates?: Readonly<Record<string, DashboardRequestState>>;
+  onSetActive: (id: string) => void;
+  onAskAbout: (id: string) => void;
+  onRetryIndex?: (id: string) => void;
+  onRubricUploaded: (rubric: UploadedRubric) => void;
+}
+
+export type UploadedRubric = {
+  id: string;
+  title: string;
+  course: string;
+  uploaded_at: string;
+  active: boolean;
+  sessions_count: number;
+  knowledgeDocumentId: string | null;
+  knowledge_document_id: string | null;
+  file_search_status?: FileSearchStatus;
+  fileSearchStatus?: FileSearchStatus;
+  criteria: Array<{ name: string; score: number; max_score: number; max: number }>;
+};
+
+export interface UploadRubricModalProps {
+  onClose: () => void;
+  onUploaded: (rubric: UploadedRubric) => void;
+}
+
+export interface ChatViewProps {
+  student: DashboardStudent;
+  activeRubric: Rubric | undefined;
+  rubricRemoved?: boolean;
+  session: Session | undefined;
+  chats: DashboardChat[];
+  rubricsById: ReadonlyMap<string, Rubric>;
+  activeChatId: string | null;
+  messages: ChatViewMessage[];
+  historyLoading: boolean;
+  activeChatBusy: boolean;
+  draftCreating: boolean;
+  aiUsage: DashboardAiUsage | null;
+  rubricIndexRequestStates?: Readonly<Record<string, DashboardRequestState>>;
+  onOpenSession: () => void;
+  onSelectChat: (chatId: string) => void;
+  onStartNewChat: () => void;
+  onRenameChat: (chatId: string, title: string) => void;
+  onDeleteChat: (chatId: string) => void;
+  onSendMessage: (text: string, sessionId?: string | null) => boolean;
+  onRetryIndex?: (rubricId: string) => void;
+}
+
+export interface ChatListRowProps {
+  chat: DashboardChat;
+  active: boolean;
+  rubricTitle?: string;
+  onSelect: (chatId: string) => void;
+  onRename: (chatId: string, title: string) => void;
+  onDelete: (chatId: string) => void;
+}
+
+export interface MessageBubbleProps {
+  message: ChatViewMessage;
+  student: DashboardStudent;
+  thinking?: boolean;
+}
+
+export interface CitationItemProps {
+  citation: GroundingCitation;
+  index: number;
+}
+
+export interface ExtensionHelpModalProps {
+  onClose: () => void;
+}
+
+export interface DashboardProps {
+  routeHash?: string;
+}

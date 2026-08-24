@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
 import { X } from 'lucide-react';
 import { BETA_ACCESS_MAILTO, getChromeWebStoreUrl } from '../../lib/productLinks';
+import type { ExtensionHelpModalProps } from './dashboard-types';
 
-export function ExtensionHelpModal({ onClose }: { onClose: () => void }) {
+export function ExtensionHelpModal({ onClose }: ExtensionHelpModalProps) {
   const storeUrl = getChromeWebStoreUrl();
 
   useEffect(() => {

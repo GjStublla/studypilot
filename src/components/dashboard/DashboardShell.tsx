@@ -1,6 +1,11 @@
 import { memo, useEffect, useRef } from 'react';
 import { ArrowUpRight, Chrome, MoreHorizontal, Moon, PanelLeft, PanelRight, Search, Sun } from 'lucide-react';
-import { SIDEBAR_NAV_ITEMS, VIEW_TITLES, type DashboardStudent, type Theme, type View } from './dashboard-types';
+import {
+  SIDEBAR_NAV_ITEMS,
+  VIEW_TITLES,
+  type SidebarProps,
+  type TopBarProps,
+} from './dashboard-types';
 
 export const Sidebar = memo(function Sidebar({
   student,
@@ -10,15 +15,7 @@ export const Sidebar = memo(function Sidebar({
   sessionsCount,
   rubricsCount,
   onOpenExtension,
-}: {
-  student: DashboardStudent;
-  view: View;
-  setView: (v: View) => void;
-  openCount: number;
-  sessionsCount: number;
-  rubricsCount: number;
-  onOpenExtension: () => void;
-}) {
+}: SidebarProps) {
   const metaValues = {
     sessions: String(sessionsCount),
     rubrics: String(rubricsCount),
@@ -111,16 +108,7 @@ export const TopBar = memo(function TopBar({
   onToggleSidebar,
   onToggleContext,
   onToggleTheme,
-}: {
-  view: View;
-  theme: Theme;
-  contextOpen: boolean;
-  query: string;
-  onQueryChange: (value: string) => void;
-  onToggleSidebar: () => void;
-  onToggleContext: () => void;
-  onToggleTheme: () => void;
-}) {
+}: TopBarProps) {
   const t = VIEW_TITLES[view];
   const isLight = theme === 'light';
   const searchRef = useRef<HTMLInputElement>(null);

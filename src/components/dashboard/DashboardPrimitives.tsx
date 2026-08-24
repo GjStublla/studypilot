@@ -1,7 +1,13 @@
-import { memo, type MouseEvent, type ReactNode } from 'react';
+import { memo } from 'react';
 import { Check } from 'lucide-react';
-import type { ActionItem } from '../../lib/dashboardApi';
-import { SCORE_DOT_INDEXES } from './dashboard-types';
+import {
+  SCORE_DOT_INDEXES,
+  type DsButtonProps,
+  type EmptyStateProps,
+  type ScoreDotsProps,
+  type StudyPilotMarkProps,
+  type TodoRowProps,
+} from './dashboard-types';
 
 export function DsButton({
   children,
@@ -9,13 +15,7 @@ export function DsButton({
   onClick,
   disabled,
   type = 'button',
-}: {
-  children: ReactNode;
-  variant?: 'primary' | 'secondary' | 'ghost';
-  onClick?: (e: MouseEvent<HTMLButtonElement>) => void;
-  disabled?: boolean;
-  type?: 'button' | 'submit';
-}) {
+}: DsButtonProps) {
   return (
     <button
       type={type}
@@ -28,7 +28,7 @@ export function DsButton({
   );
 }
 
-export const ScoreDots = memo(function ScoreDots({ score, max }: { score: number; max: number }) {
+export const ScoreDots = memo(function ScoreDots({ score, max }: ScoreDotsProps) {
   const dotIndexes =
     max <= SCORE_DOT_INDEXES.length
       ? SCORE_DOT_INDEXES.slice(0, max)
@@ -47,11 +47,7 @@ export const TodoRow = memo(function TodoRow({
   item,
   onToggle,
   sessionTitle,
-}: {
-  item: ActionItem;
-  onToggle: () => void;
-  sessionTitle?: string;
-}) {
+}: TodoRowProps) {
   return (
     <li className={item.done ? 'is-done' : ''}>
       <button
@@ -73,11 +69,7 @@ export const EmptyState = memo(function EmptyState({
   title,
   body,
   action,
-}: {
-  title: string;
-  body: string;
-  action?: { label: string; onClick: () => void };
-}) {
+}: EmptyStateProps) {
   return (
     <div className="ds-empty">
       <p className="ds-empty-title">{title}</p>
@@ -91,7 +83,7 @@ export const EmptyState = memo(function EmptyState({
   );
 });
 
-export const StudyPilotMark = memo(function StudyPilotMark({ size = 18 }: { size?: number }) {
+export const StudyPilotMark = memo(function StudyPilotMark({ size = 18 }: StudyPilotMarkProps) {
   return (
     <svg
       width={size}

@@ -1,7 +1,6 @@
 import { memo } from 'react';
-import type { AiUsage } from '../../lib/studypilot-api';
 import { DsButton } from './DashboardPrimitives';
-import { SETTINGS_COACH_MODES, type CoachMode, type DashboardStudent, type Theme } from './dashboard-types';
+import { SETTINGS_COACH_MODES, type SettingsViewProps } from './dashboard-types';
 
 export const SettingsView = memo(function SettingsView({
   student,
@@ -11,15 +10,7 @@ export const SettingsView = memo(function SettingsView({
   onSetCoachMode,
   onSignOut,
   onSetTheme,
-}: {
-  student: DashboardStudent;
-  theme: Theme;
-  coachMode: CoachMode;
-  aiUsage: AiUsage | null;
-  onSetCoachMode: (mode: CoachMode) => void;
-  onSignOut: () => void;
-  onSetTheme: (theme: Theme) => void;
-}) {
+}: SettingsViewProps) {
   return (
     <div className="ds-view ds-view-settings">
       <header className="ds-view-head">
