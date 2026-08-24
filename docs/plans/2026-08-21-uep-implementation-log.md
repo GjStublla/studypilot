@@ -1144,3 +1144,11 @@ Web: this log only. Phase 5 was not started.
 - Fixed cleanup leaks in the extension shell: `voiceschanged` and dashboard `visibilitychange` listeners now remove the exact callback, and unmount cleanup stops speech recognition, cancels speech synthesis, and clears the notice timer.
 - Extension verification after the slice: 13 Vitest files / 60 tests, typecheck, production build, manifest validation, and 8/8 unpacked Playwright tests passed.
 - The full `useLiveCoaching` and `useDashboardWorkspace` extraction remains open; this slice deliberately reduces risk before moving those closures.
+
+### Phase 12 architecture/documentation slice — 2026-08-24
+
+- Added `docs/adr/0001-runtime-boundaries.md` documenting the FastAPI versus Supabase ownership decision, alternatives, consequences, and review trigger.
+- Added `docs/architecture/system.mmd`, a left-to-right browser/dashboard → FastAPI/Supabase → Postgres/Storage/Vertex data-flow source.
+- Rewrote `context/backend.md`, `context/dashboard.md`, and `context/app-map.md` to describe the current typed adapters, extracted dashboard views, canonical sibling extension, and verified commands instead of mock-only behavior.
+- Updated README wording to identify the sibling extension as canonical and added the SEO artifact slice separately in commit `1e630dc`.
+- Mermaid CLI is not installed in the environment, so the rendered `system.png` remains an explicit open artifact; do not mark it complete until the source is rendered and visually inspected.

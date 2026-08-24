@@ -8,10 +8,10 @@ Live microphone audio is processed by Google Vertex AI while a session is active
 
 Built with React, TypeScript, and Vite.
 
-The Chrome extension that ships lives in the sibling repo
-[`../studypilot-extension`](../studypilot-extension). `extension/` in this repo
-is a non-production scaffold and is **not shipped**. `npm run extension:build`
-builds the canonical sibling, not the scaffold.
+The canonical Chrome extension lives in the sibling repo
+[`../studypilot-extension`](../studypilot-extension). The repository-local
+legacy scaffold is not part of releases. `npm run extension:build` builds the
+canonical sibling.
 
 ## Local full-stack development
 

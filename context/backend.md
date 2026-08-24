@@ -481,21 +481,22 @@ The service-role client (`supabase_admin`) is used **only** in:
 
 ---
 
-## 8. What the Frontend Still Needs to Wire Up
+## 8. Current frontend integration
 
-`Dashboard.tsx` currently uses hardcoded mock constants. Replace each with a
-real API call using the pattern in section 5:
+The dashboard is backed by live typed adapters. The current adapters are:
 
-| Mock constant | Replace with |
-|---------------|-------------|
-| `SESSIONS` | `GET /sessions` |
-| Session detail | `GET /sessions/{id}` |
-| `RUBRICS` | `GET /rubrics` |
-| `ACTION_ITEMS_INITIAL` | `GET /action-items` |
-| `toggleAction` (local state only) | `PATCH /action-items/{id}` then update local state |
-| Settings save | `PATCH /users/me` |
+| Responsibility | Current owner |
+|---|---|
+| Profile, session, rubric, transcript, and action-item CRUD | src/lib/dashboardApi.ts -> FastAPI |
+| Chat, rubric grounding/indexing, usage, signed captures, and session/chat continuation | src/lib/studypilot-api.ts -> Supabase/Edge |
+| Realtime reconciliation | src/lib/useRealtime.ts and src/lib/dashboard-chat-state.ts |
+| Dashboard view composition | src/components/dashboard/ plus Dashboard.tsx orchestration |
 
----
+When changing a data path, preserve the typed adapter boundary and add a route/component test in the same phase. Do not reintroduce static seed data or direct model calls from the browser.
+
+The dashboard currently verifies 14 Vitest files / 85 tests, while backend pytest verifies 25 tests. A clean local Supabase reset runs 287 pgTAP assertions across five test files.
+
+## 9. Production checklist
 
 ## 9. Production Checklist
 
