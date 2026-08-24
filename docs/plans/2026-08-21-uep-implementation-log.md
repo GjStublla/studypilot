@@ -1302,3 +1302,8 @@ Web: this log only. Phase 5 was not started.
 - Canonical extension commit `e68730a` extracted the microphone, read-aloud, pause/resume, and session-settings controls into `src/content/VoiceDock.tsx`, preserving the existing live-state labels and disabled-state rules.
 - `FloatingStudyPilot.tsx` is now approximately 1,857 lines. The remaining parent owns the stage, settings animation, history, Pomodoro, and runtime orchestration; the connected-chat golden flow remains the highest-value extension evidence gap.
 - Extension verification after the extraction: typecheck, 16 Vitest files / 74 tests, production build, manifest validation, and a complete 10/10 unpacked Playwright run passed sequentially.
+
+### Current release gate recheck — 2026-08-24
+
+- `npm run verify:release` passed on the current web worktree with approved public HTTPS placeholders: Vitest 16 files / 94 tests, production build, and `verify-built-env` all passed.
+- The hosted Supabase function allowlist remained explicitly **SKIPPED** because `SUPABASE_ACCESS_TOKEN` was not configured in the release process. This is still an external credential/CI gate, not a hosted verification pass.
