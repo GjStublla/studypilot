@@ -27,6 +27,8 @@ const NON_NEGATIVE_COLUMNS = new Set([
   'citations_supported',
   'median_latency_ms',
 ]);
+const TARGET_PARTICIPANT_MIN = 10;
+const TARGET_PARTICIPANT_MAX = 15;
 
 const SENSITIVE_VALUE_PATTERNS = [
   { label: 'email address', pattern: /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i },
@@ -243,6 +245,9 @@ export function formatPilotResult(result) {
     : `${metrics.groundingPrecision} (${metrics.citationsSupported}/${metrics.citationsChecked})`;
   return [
     `validate-pilot-results: ${metrics.participantCount} participant row(s) validated`,
+    `sample_target: ${metrics.participantCount >= TARGET_PARTICIPANT_MIN && metrics.participantCount <= TARGET_PARTICIPANT_MAX
+      ? 'within target (10–15)'
+      : 'outside target (10–15); report limitation'}`,
     `completion_rate: ${metrics.completionRate} (${metrics.completedCount}/${metrics.participantCount})`,
     `median_time_to_feedback_seconds: ${metrics.medianTimeToFeedbackSeconds}`,
     `mean_before_score: ${metrics.meanBeforeScore}`,

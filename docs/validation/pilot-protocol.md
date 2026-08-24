@@ -55,4 +55,7 @@ checked counts, rubric scores between 0 and 100, and no email, credential,
 draft, audio, screenshot, transcript, or rubric content. The checked-in
 header-only template exits successfully with an explicit “no participant rows”
 status; use `--require-data` only after the approved pilot has actually produced
-rows.
+rows. The validator reports whether the row count is within the 10–15
+participant target, but does not reject a smaller or larger approved sample;
+report any deviation as a limitation rather than silently treating it as target
+evidence.
