@@ -1258,3 +1258,10 @@ Web: this log only. Phase 5 was not started.
 
 - `npm run verify:release` passed with approved public HTTPS placeholder values: web Vitest (16 files / 91 tests), production build, and `verify-built-env` all passed.
 - The hosted Supabase function allowlist was explicitly **SKIPPED** because `SUPABASE_ACCESS_TOKEN` is not set. This remains an external credential/CI gate, not a hosted verification pass.
+
+### Phase 9A answer-card composition — 2026-08-24
+
+- Canonical extension commit `7283a69` extracted the answer-card renderer, markdown presentation helper, structured flashcard/quiz branching, screenshot treatment, and feedback/read-aloud/copy actions into `src/content/AnswerCardPanel.tsx`.
+- `FloatingStudyPilot.tsx` is now approximately 1,952 lines; the parent still owns the main study/live/chat orchestration and remains above the 1,000-line maintainability target.
+- Extension verification after the extraction: typecheck, 15 Vitest files / 71 tests, production build, manifest validation, and 10/10 unpacked Playwright checks passed.
+- The connected-chat golden flow and direct workspace-hook characterization remain open; no new product capability or deployment claim is implied by this composition-only change.
