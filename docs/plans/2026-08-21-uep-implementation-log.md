@@ -1430,3 +1430,7 @@ Web: this log only. Phase 5 was not started.
 
 - Reconciled the formal judging plan with the already-landed privacy/claims work: the landing-page local-processing language, tab-audio/exact-second/device-storage/no-account claims, extension disclosure, metadata, and report overview now have explicit checked rows and source/test evidence.
 - This audit does not convert manual hosted-session evidence into a local pass. The real hosted Live behavior, deployed dashboard, and production claim review remain external gates.
+
+### Definition-of-done evidence reconciliation — 2026-08-24
+
+- The formal plan now marks only locally evidenced integrity/UX rows complete: independent privacy defaults, no browser model/service-role secrets, working local legal/install/help navigation, source/scaffold cleanup, and local axe/Lighthouse thresholds. Rows requiring a pitch, hosted deployment, clean-profile hosted flow, CI branch protection, pilot results, team approvals, or final media remain unchecked.
