@@ -1372,3 +1372,9 @@ Web: this log only. Phase 5 was not started.
 - Canonical extension commit `fe8d5f5` moves the `STUDYPILOT_SAVE_SESSION` request, single-flight lock, and mounted-response guard into `useDashboardWorkspace.ts`. `FloatingStudyPilot.tsx` retains session construction and user-facing notices but no longer owns the persistence request lifecycle.
 - Canonical extension commit `933b1ca` adds settled screenshots to the 360×640 / 390×700 viewport test, avoids waiting on an external dashboard page during handoff, and adds a short-height responsive layout so the optional Focus row is not hidden behind the footer. The generated screenshots were visually inspected locally; they are test artifacts, not hosted-product evidence.
 - Verification after both commits: typecheck passed; Vitest passed 16 files / 74 tests; production build and manifest validation passed; unpacked Playwright passed 11/11. The full suite includes rapid toggle console/page-error checks, connected chat/reload persistence, and the responsive screenshot-producing test.
+
+### Phase 9A Live async-operation boundary — 2026-08-24
+
+- Canonical extension commit `9aa2ac3` adds a mounted/latest-operation guard around Live start, stop, pause, and resume responses. Late responses are ignored after a newer control operation or panel unmount, preventing stale state from replacing the current Live status.
+- The same guard now covers SpeechRecognition callbacks and cleanup. Recognition is explicitly stopped and detached during cleanup, and browser voice types replace the previous `any`-typed boundary.
+- Verification after the slice: typecheck passed; Vitest passed 16 files / 76 tests; production build passed; unpacked Playwright passed 11/11. Hosted Live token/getUserMedia behavior remains an external release gate.
