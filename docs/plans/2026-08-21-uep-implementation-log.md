@@ -1296,3 +1296,9 @@ Web: this log only. Phase 5 was not started.
 - Canonical extension commit `4ffdc79` extracted the screenshot strip, file input, paste handling boundary, question input, and send control into `src/content/ComposerPanel.tsx`.
 - `FloatingStudyPilot.tsx` is now approximately 1,884 lines; answer-card, composer, study-mode, shell, settings, quick-actions, and chat-switcher boundaries are explicit. The remaining parent still owns stage/voice/session orchestration and the connected-chat surface.
 - Extension verification after the extraction: typecheck, 16 Vitest files / 74 tests, production build, manifest validation, and 10/10 unpacked Playwright checks passed sequentially.
+
+### Phase 9A voice-dock composition — 2026-08-24
+
+- Canonical extension commit `e68730a` extracted the microphone, read-aloud, pause/resume, and session-settings controls into `src/content/VoiceDock.tsx`, preserving the existing live-state labels and disabled-state rules.
+- `FloatingStudyPilot.tsx` is now approximately 1,857 lines. The remaining parent owns the stage, settings animation, history, Pomodoro, and runtime orchestration; the connected-chat golden flow remains the highest-value extension evidence gap.
+- Extension verification after the extraction: typecheck, 16 Vitest files / 74 tests, production build, manifest validation, and a complete 10/10 unpacked Playwright run passed sequentially.
