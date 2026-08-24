@@ -75,6 +75,14 @@ export const DEMO_DOCUMENT = Object.freeze({
   claimRules: Object.freeze([]),
 });
 
+export const PITCH_DOCUMENT = Object.freeze({
+  label: 'pitch claims brief',
+  relativePath: 'docs/submission/pitch-claims-brief.md',
+  // The brief is human-owned communication copy. Guard it against retired
+  // claims without pretending that it is the approved ceremony pitch.
+  claimRules: Object.freeze([]),
+});
+
 function matchesAny(text, patterns) {
   return patterns.some(pattern => pattern.test(text));
 }
@@ -117,6 +125,8 @@ export function parseCliArgs(argv, cwd = process.cwd()) {
   let requireExtension = false;
   let includeDemoScript = false;
   let requireDemoScript = false;
+  let includePitchBrief = false;
+  let requirePitchBrief = false;
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === '--require-extension') {
@@ -126,6 +136,11 @@ export function parseCliArgs(argv, cwd = process.cwd()) {
     } else if (argument === '--require-demo-script') {
       includeDemoScript = true;
       requireDemoScript = true;
+    } else if (argument === '--include-pitch-brief') {
+      includePitchBrief = true;
+    } else if (argument === '--require-pitch-brief') {
+      includePitchBrief = true;
+      requirePitchBrief = true;
     } else if (argument === '--extension-root') {
       const value = argv[index + 1];
       if (!value || value.startsWith('--')) {
@@ -140,6 +155,8 @@ export function parseCliArgs(argv, cwd = process.cwd()) {
         requireExtension,
         includeDemoScript,
         requireDemoScript,
+        includePitchBrief,
+        requirePitchBrief,
       };
     } else {
       throw new Error(`unknown argument: ${argument}`);
@@ -151,6 +168,8 @@ export function parseCliArgs(argv, cwd = process.cwd()) {
     requireExtension,
     includeDemoScript,
     requireDemoScript,
+    includePitchBrief,
+    requirePitchBrief,
   };
 }
 
@@ -159,6 +178,8 @@ export function loadClaimDocuments(root, {
   requireExtension = false,
   includeDemoScript = false,
   requireDemoScript = false,
+  includePitchBrief = false,
+  requirePitchBrief = false,
 } = {}) {
   const documents = WEB_DOCUMENTS.map(document => ({
     ...document,
@@ -190,13 +211,27 @@ export function loadClaimDocuments(root, {
     }
   }
 
+  if (includePitchBrief || requirePitchBrief) {
+    const pitchBriefPath = path.join(root, PITCH_DOCUMENT.relativePath);
+    if (fs.existsSync(pitchBriefPath)) {
+      documents.push({
+        ...PITCH_DOCUMENT,
+        path: pitchBriefPath,
+        text: fs.readFileSync(pitchBriefPath, 'utf8'),
+      });
+    } else if (requirePitchBrief) {
+      throw new Error(`pitch claims brief not found: ${pitchBriefPath}`);
+    }
+  }
+
   return documents;
 }
 
 function printHelp() {
-  console.log('Usage: node scripts/validate-claims.mjs [--extension-root PATH] [--require-extension] [--include-demo-script] [--require-demo-script]');
+  console.log('Usage: node scripts/validate-claims.mjs [--extension-root PATH] [--require-extension] [--include-demo-script] [--require-demo-script] [--include-pitch-brief] [--require-pitch-brief]');
   console.log('Checks public claim wording in the web repository and, when present, the canonical extension README.');
   console.log('The optional demo-script check blocks retired claims while leaving its required wording for human review.');
+  console.log('The optional pitch-brief check blocks retired claims while leaving final pitch approval human-owned.');
 }
 
 export function run(argv = process.argv.slice(2), root = process.cwd()) {
@@ -215,6 +250,9 @@ export function run(argv = process.argv.slice(2), root = process.cwd()) {
   }
   if (options.includeDemoScript && !documents.some(document => document.label === 'demo script')) {
     console.log('validate:claims: demo script SKIPPED (not present; use --require-demo-script to fail)');
+  }
+  if (options.includePitchBrief && !documents.some(document => document.label === PITCH_DOCUMENT.label)) {
+    console.log('validate:claims: pitch claims brief SKIPPED (not present; use --require-pitch-brief to fail)');
   }
   if (!result.ok) {
     for (const failure of result.failures) {

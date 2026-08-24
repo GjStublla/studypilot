@@ -8,6 +8,7 @@ import {
   FORBIDDEN_CLAIMS,
   loadClaimDocuments,
   parseCliArgs,
+  PITCH_DOCUMENT,
   validateClaimDocuments,
 } from './validate-claims.mjs';
 
@@ -77,9 +78,23 @@ test('parses the required demo-script check', () => {
   assert.equal(options.requireDemoScript, true);
 });
 
+test('parses the required pitch-brief check', () => {
+  const options = parseCliArgs(['--require-pitch-brief'], 'C:/workspace/studypilot');
+  assert.equal(options.includePitchBrief, true);
+  assert.equal(options.requirePitchBrief, true);
+});
+
 test('checks retired claims in human-owned demo copy without requiring every disclosure', () => {
   const result = validateClaimDocuments([
     { label: DEMO_DOCUMENT.label, text: 'The demo captures tab audio.', claimRules: [] },
+  ]);
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.failures.map(failure => failure.rule), ['tab-audio']);
+});
+
+test('checks retired claims in the human-owned pitch brief without requiring final-pitch approval', () => {
+  const result = validateClaimDocuments([
+    { label: PITCH_DOCUMENT.label, text: 'The pitch captures tab audio.', claimRules: [] },
   ]);
   assert.equal(result.ok, false);
   assert.deepEqual(result.failures.map(failure => failure.rule), ['tab-audio']);
@@ -91,4 +106,11 @@ test('loads the checked-in demo script when requested', () => {
     extensionRoot: path.resolve(process.cwd(), '..', 'studypilot-extension'),
   });
   assert.equal(documents.at(-1)?.label, DEMO_DOCUMENT.label);
+});
+
+test('loads the checked-in pitch brief when requested', () => {
+  const documents = loadClaimDocuments(process.cwd(), {
+    requirePitchBrief: true,
+  });
+  assert.equal(documents.at(-1)?.label, PITCH_DOCUMENT.label);
 });
