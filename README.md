@@ -75,6 +75,8 @@ cd studypilot-clean
 npm ci
 npm test
 npm run test:deno
+node --test scripts/validate-claims.test.mjs
+npm run validate:claims
 npm run validate:pilot
 python -m pip install -r backend/requirements.txt -r backend/requirements-dev.txt
 python -m pytest backend/tests -q
@@ -98,6 +100,17 @@ On PowerShell, assign the same values with `$env:VITE_API_BASE_URL =
 'https://api.example.invalid'` and equivalent assignments for the two
 Supabase variables before running the build commands. Replace placeholders
 only through a secure release environment; never commit hosted keys.
+
+When both repositories are checked out side by side, include the canonical
+extension README in the claim check:
+
+```powershell
+npm run validate:claims -- --extension-root ../studypilot-extension --require-extension
+```
+
+The claim check guards the web README, landing/legal copy, final report draft,
+and (when present) the canonical extension README. It does not certify the
+separately owned pitch wording.
 
 ## Running with Docker
 

@@ -645,6 +645,7 @@ The extension has one live implementation, one dashboard integration path, and n
 - [x] Draft all nine required report sections in the PDF's exact order and link the readable architecture diagram. Team contribution text remains a separate human-approval task below and is intentionally still placeholder text.
 - [x] Populate the technical-stack table with React 19, TypeScript, Vite, FastAPI, Python, Supabase Auth/Postgres/Realtime/Storage/Edge Functions, Deno, Vertex AI/Gemini, Chrome MV3/offscreen documents, Docker, GitHub Actions, Vitest, pgTAP, and Playwright only when each appears in the final code. The current draft lists only technologies present in the repositories.
 - [x] Use three evidence-backed challenges: cross-surface chat synchronization, privacy-safe live context/persistence controls, and grounded rubric retrieval with secure model brokering. The current draft ties each to implementation boundaries and tests without claiming measured outcomes.
+- [x] Add a credential-free public-claim validator for the web README, landing/legal copy, final report, and optional canonical extension README; reject retired claims such as tab-audio, exact-second citations, and device-only processing. The pitch remains a human-owned artifact.
 - [ ] Obtain each member's approved role/contribution text; do not infer contribution percentages from Git commit counts.
 - [x] Add repository links, environment prerequisites, and exact setup/test commands to `submission-checklist.md`; the links are explicitly labeled as local/unpushed until the team publishes the evidence commits.
 - [ ] Add the deployed web URL, Chrome Store or beta-access state, and final video/backup links to `submission-checklist.md`.
@@ -695,7 +696,7 @@ These are not decisions Grok may make alone:
 
 ### Product integrity
 
-- [ ] Website, extension, README, report, and pitch make the same capability/privacy claims.
+- [ ] Website, extension, README, report, and pitch make the same capability/privacy claims. Code-facing surfaces now pass `npm run validate:claims` (and the sibling-repository form with `--require-extension`); pitch wording still needs human review.
 - [x] Screenshot capture and dashboard persistence default off and are independently honored. (extension privacy tests and E2E settings coverage)
 - [x] No browser bundle contains or requests a Gemini API key or service-role secret. (source/bundle scan and extension dependency audit)
 - [x] Install, extension-help, privacy, terms, cookies, and changelog actions all work. (web navigation tests and extension handoff coverage)
