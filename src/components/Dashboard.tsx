@@ -227,7 +227,7 @@ export default function Dashboard({
       void fetchSessions().then(setSessions).catch(() => undefined);
     },
     onSessionMessageChanged: (payload) => {
-      const sessionId = payload.new?.session_id;
+      const sessionId = (payload.new as Record<string, unknown>).session_id;
       if (typeof sessionId !== 'string') return;
       void fetchSessionTranscript(sessionId)
         .then((lines) => setTranscripts((current) => ({ ...current, [sessionId]: lines })))
@@ -252,36 +252,38 @@ export default function Dashboard({
       }
     },
     onActionItemChanged: (payload) => {
-      if (payload.event === 'INSERT') {
+      if (payload.eventType === 'INSERT') {
         setActionItems((prev) => [payload.new as ActionItem, ...prev]);
-      } else if (payload.event === 'UPDATE') {
+      } else if (payload.eventType === 'UPDATE') {
         setActionItems((prev) =>
           prev.map((item) =>
-            item.id === payload.new.id ? payload.new as ActionItem : item
+            item.id === (payload.new as Record<string, unknown>).id ? payload.new as ActionItem : item
           )
         );
-      } else if (payload.event === 'DELETE') {
-        setActionItems((prev) => prev.filter((item) => item.id !== payload.old.id));
+      } else if (payload.eventType === 'DELETE') {
+        const deletedId = (payload.old as Record<string, unknown>).id;
+        setActionItems((prev) => prev.filter((item) => item.id !== deletedId));
       }
     },
     onRubricChanged: (payload) => {
-      if (payload.event === 'INSERT') {
+      if (payload.eventType === 'INSERT') {
         setRubrics((prev) => [payload.new as Rubric, ...prev]);
-      } else if (payload.event === 'UPDATE') {
+      } else if (payload.eventType === 'UPDATE') {
         setRubrics((prev) =>
           prev.map((r) =>
-            r.id === payload.new.id ? payload.new as Rubric : r
+            r.id === (payload.new as Record<string, unknown>).id ? payload.new as Rubric : r
           )
         );
-      } else if (payload.event === 'DELETE') {
-        setRubrics((prev) => prev.filter((r) => r.id !== payload.old.id));
+      } else if (payload.eventType === 'DELETE') {
+        const deletedId = (payload.old as Record<string, unknown>).id;
+        setRubrics((prev) => prev.filter((r) => r.id !== deletedId));
       }
     },
     onDashboardChatChanged: () => {
       void refreshChats().catch(() => undefined);
     },
     onDashboardChatMessageChanged: (payload) => {
-      const chatId = payload.new?.chat_id;
+      const chatId = (payload.new as Record<string, unknown>).chat_id;
       if (typeof chatId === 'string') invalidateChat(chatId);
     },
     onSubscribed: () => {
@@ -1022,7 +1024,12 @@ export default function Dashboard({
                       knowledgeDocumentId: newRubric.knowledgeDocumentId ?? newRubric.knowledge_document_id ?? null,
                       fileSearchStatus: newRubric.file_search_status ?? newRubric.fileSearchStatus ?? 'not_indexed',
                       file_search_status: newRubric.file_search_status ?? newRubric.fileSearchStatus ?? 'not_indexed',
-                      criteria: (newRubric.criteria ?? []).map((c: any) => ({ ...c, max: c.max_score ?? c.max })),
+                      criteria: (newRubric.criteria ?? []).map((criterion, index) => ({
+                        id: `${newRubric.id}-criterion-${index}`,
+                        name: criterion.name,
+                        score: criterion.score ?? 0,
+                        max: criterion.max_score ?? criterion.max,
+                      })),
                     };
                     const shouldActivate = Boolean(newRubric.active) || rubrics.length === 0;
                     setRubrics((prev) => {

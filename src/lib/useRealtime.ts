@@ -2,18 +2,21 @@
 // canonical rows instead of treating payloads as durable local state.
 
 import { useEffect, useRef } from 'react';
+import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { injectStoredToken, supabase } from './supabaseClient';
 import type { KnowledgeDocument, Session } from './studypilot-types';
 
+export type StudyPilotRealtimePayload = RealtimePostgresChangesPayload<Record<string, unknown>>;
+
 export interface StudyPilotRealtimeCallbacks {
   onNewSession?: (session: Session) => void;
-  onSessionChanged?: (payload: any) => void;
-  onSessionMessageChanged?: (payload: any) => void;
+  onSessionChanged?: (payload: StudyPilotRealtimePayload) => void;
+  onSessionMessageChanged?: (payload: StudyPilotRealtimePayload) => void;
   onDocumentUpdated?: (document: KnowledgeDocument) => void;
-  onActionItemChanged?: (payload: any) => void;
-  onRubricChanged?: (payload: any) => void;
-  onDashboardChatChanged?: (payload: any) => void;
-  onDashboardChatMessageChanged?: (payload: any) => void;
+  onActionItemChanged?: (payload: StudyPilotRealtimePayload) => void;
+  onRubricChanged?: (payload: StudyPilotRealtimePayload) => void;
+  onDashboardChatChanged?: (payload: StudyPilotRealtimePayload) => void;
+  onDashboardChatMessageChanged?: (payload: StudyPilotRealtimePayload) => void;
   onSubscribed?: () => void;
 }
 
