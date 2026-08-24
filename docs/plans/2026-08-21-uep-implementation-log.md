@@ -1378,3 +1378,9 @@ Web: this log only. Phase 5 was not started.
 - Canonical extension commit `9aa2ac3` adds a mounted/latest-operation guard around Live start, stop, pause, and resume responses. Late responses are ignored after a newer control operation or panel unmount, preventing stale state from replacing the current Live status.
 - The same guard now covers SpeechRecognition callbacks and cleanup. Recognition is explicitly stopped and detached during cleanup, and browser voice types replace the previous `any`-typed boundary.
 - Verification after the slice: typecheck passed; Vitest passed 16 files / 76 tests; production build passed; unpacked Playwright passed 11/11. Hosted Live token/getUserMedia behavior remains an external release gate.
+
+### Phase 8A explicit dashboard prop contracts — 2026-08-24
+
+- Web commit `03a2da1` centralizes named prop interfaces for the extracted dashboard views, shell, chat subcomponents, rubric/upload flow, session detail, context panel, and shared primitives in `src/components/dashboard/dashboard-types.ts`.
+- The refactor preserves callback signatures and render behavior while removing anonymous inline prop-object contracts from the dashboard component tree. No `any`, `@ts-ignore`, or lint suppression was added.
+- Verification after the slice: web Vitest passed 17 files / 96 tests; production build passed; web Playwright passed 4/4 (public axe states plus the deterministic rubric/coaching/action-item/reload flow).
