@@ -1,19 +1,14 @@
 import { memo, useMemo } from 'react';
 import { ArrowRight, Chrome } from 'lucide-react';
 import { DsButton, EmptyState } from './DashboardPrimitives';
-import type { SessionRow } from './dashboard-types';
+import type { SessionsViewProps } from './dashboard-types';
 
 export const SessionsView = memo(function SessionsView({
   rows,
   query,
   onOpenSession,
   onContinueInChat,
-}: {
-  rows: SessionRow[];
-  query: string;
-  onOpenSession: (id: string) => void;
-  onContinueInChat: (id: string) => void;
-}) {
+}: SessionsViewProps) {
   const q = query.trim().toLowerCase();
   const filtered = useMemo(
     () =>

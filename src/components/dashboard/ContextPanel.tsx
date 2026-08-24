@@ -1,9 +1,7 @@
 import { memo, useMemo } from 'react';
 import { ArrowRight, Chrome } from 'lucide-react';
-import type { AiUsage } from '../../lib/studypilot-api';
-import type { Rubric, Session } from '../../lib/dashboardApi';
-import type { View } from './dashboard-types';
 import { DsButton, ScoreDots } from './DashboardPrimitives';
+import type { ContextPanelProps } from './dashboard-types';
 
 const CONTEXT_PROMPTS = [
   'What should I revise first?',
@@ -21,17 +19,7 @@ export const ContextPanel = memo(function ContextPanel({
   onGoTo,
   onContinueInChat,
   onOpenExtension,
-}: {
-  view: View;
-  activeRubric: Rubric | undefined;
-  chatSession: Session | undefined;
-  selectedSession: Session | undefined;
-  openActionItemCount: number;
-  aiUsage: AiUsage | null;
-  onGoTo: (v: View) => void;
-  onContinueInChat: () => void;
-  onOpenExtension: () => void;
-}) {
+}: ContextPanelProps) {
   const contextSession = view === 'session-detail' ? selectedSession : chatSession;
   const visibleCriteria = useMemo(
     () => activeRubric?.criteria.slice(0, 5) ?? [],

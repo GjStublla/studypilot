@@ -1,8 +1,7 @@
 import { memo, useMemo } from 'react';
 import { ArrowRight, BookOpen, Chrome, ChevronRight } from 'lucide-react';
-import type { ActionItem, Rubric, Session } from '../../lib/dashboardApi';
 import { DsButton, EmptyState, ScoreDots, TodoRow } from './DashboardPrimitives';
-import type { DashboardStudent, View } from './dashboard-types';
+import type { HomeViewProps } from './dashboard-types';
 
 const homeDateFormatter = new Intl.DateTimeFormat('en-US', {
   weekday: 'long',
@@ -22,19 +21,7 @@ export const HomeView = memo(function HomeView({
   onOpenSession,
   onToggleAction,
   onGoTo,
-}: {
-  student: DashboardStudent;
-  activeRubric: Rubric | undefined;
-  latestSession: Session | undefined;
-  latestSessionOpenCount: number;
-  openActionItems: ActionItem[];
-  sessionsById: Map<string, Session>;
-  recentActivity: { id: string; time: string; title: string }[];
-  onContinueInChat: () => void;
-  onOpenSession: (id: string) => void;
-  onToggleAction: (id: string) => void;
-  onGoTo: (v: View) => void;
-}) {
+}: HomeViewProps) {
   const todayLabel = useMemo(() => homeDateFormatter.format(new Date()), []);
   const greeting = useMemo(() => {
     const h = new Date().getHours();

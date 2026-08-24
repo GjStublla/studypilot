@@ -1,24 +1,13 @@
 import { memo, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { FileText, ScrollText, Upload, X } from 'lucide-react';
 import { uploadRubricFile } from '../../lib/studypilot-api';
-import type { Rubric } from '../../lib/dashboardApi';
 import { DsButton, EmptyState } from './DashboardPrimitives';
 import { FileSearchStatusBadge, getRubricIndexStatus } from './RubricStatus';
-import type { DashboardRequestState } from './dashboard-types';
-
-export type UploadedRubric = {
-  id: string;
-  title: string;
-  course: string;
-  uploaded_at: string;
-  active: boolean;
-  sessions_count: number;
-  knowledgeDocumentId: string | null;
-  knowledge_document_id: string | null;
-  file_search_status: Rubric['file_search_status'];
-  fileSearchStatus: Rubric['fileSearchStatus'];
-  criteria: Array<{ name: string; score: number; max_score: number; max: number }>;
-};
+import type {
+  RubricsViewProps,
+  UploadedRubric,
+  UploadRubricModalProps,
+} from './dashboard-types';
 
 export const RubricsView = memo(function RubricsView({
   rubrics,
@@ -29,16 +18,7 @@ export const RubricsView = memo(function RubricsView({
   onAskAbout,
   onRetryIndex,
   onRubricUploaded,
-}: {
-  rubrics: Rubric[];
-  activeRubricId: string;
-  query: string;
-  rubricIndexRequestStates?: Readonly<Record<string, DashboardRequestState>>;
-  onSetActive: (id: string) => void;
-  onAskAbout: (id: string) => void;
-  onRetryIndex?: (id: string) => void;
-  onRubricUploaded: (rubric: UploadedRubric) => void;
-}) {
+}: RubricsViewProps) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const q = query.trim().toLowerCase();
   const filtered = useMemo(
@@ -166,10 +146,7 @@ export const RubricsView = memo(function RubricsView({
 export const UploadRubricModal = memo(function UploadRubricModal({
   onClose,
   onUploaded,
-}: {
-  onClose: () => void;
-  onUploaded: (rubric: UploadedRubric) => void;
-}) {
+}: UploadRubricModalProps) {
   const [title, setTitle] = useState('');
   const [course, setCourse] = useState('');
   const [file, setFile] = useState<File | null>(null);

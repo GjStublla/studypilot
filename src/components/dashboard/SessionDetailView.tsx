@@ -3,13 +3,8 @@ import { ArrowRight, ChevronRight, Sparkles } from 'lucide-react';
 import {
   createSessionCaptureSignedUrl,
 } from '../../lib/studypilot-api';
-import type {
-  ActionItem,
-  Rubric,
-  Session,
-  TranscriptLine,
-} from '../../lib/dashboardApi';
 import { DsButton, EmptyState, ScoreDots, TodoRow } from './DashboardPrimitives';
+import type { SessionDetailViewProps } from './dashboard-types';
 
 const SESSION_DETAIL_PROMPTS = [
   'Show me the strongest revision opportunity.',
@@ -28,18 +23,7 @@ export const SessionDetailView = memo(function SessionDetailView({
   onBack,
   onContinueInChat,
   onRetryTranscript,
-}: {
-  session: Session | undefined;
-  rubric: Rubric | undefined;
-  actionItems: ActionItem[];
-  transcript: TranscriptLine[];
-  transcriptLoading: boolean;
-  transcriptError?: string | null;
-  onToggleAction: (id: string) => void;
-  onBack: () => void;
-  onContinueInChat: () => void;
-  onRetryTranscript?: () => void;
-}) {
+}: SessionDetailViewProps) {
   const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
   const [screenshotError, setScreenshotError] = useState(false);
 

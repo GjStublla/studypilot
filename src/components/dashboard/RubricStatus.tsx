@@ -1,5 +1,6 @@
 import { normalizeIndexStatus } from '../../lib/chat-rubric-context';
 import type { Rubric } from '../../lib/dashboardApi';
+import type { FileSearchStatusBadgeProps } from './dashboard-types';
 
 export function getRubricIndexStatus(rubric: Rubric | undefined): string {
   if (!rubric) return 'not_indexed';
@@ -10,11 +11,7 @@ export function FileSearchStatusBadge({
   status,
   error,
   onRetry,
-}: {
-  status: string;
-  error?: string | null;
-  onRetry?: () => void;
-}) {
+}: FileSearchStatusBadgeProps) {
   const label =
     status === 'indexed' ? 'Indexed'
       : status === 'indexing' ? 'Indexing…'

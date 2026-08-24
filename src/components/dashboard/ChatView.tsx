@@ -3,15 +3,14 @@ import {
   ArrowUp, BookOpen, Chrome, Clock, MessageCircle, Mic, MicOff, MoreHorizontal,
   Paperclip, Plus, ScrollText, ShieldCheck, Sparkles,
 } from 'lucide-react';
-import type { DashboardChat, GroundingCitation } from '../../lib/studypilot-types';
-import type { ChatViewMessage } from '../../lib/dashboard-chat-state';
-import type { Rubric, Session } from '../../lib/dashboardApi';
-import type { AiUsage } from '../../lib/studypilot-api';
 import { EmptyState, StudyPilotMark } from './DashboardPrimitives';
 import { FileSearchStatusBadge, getRubricIndexStatus } from './RubricStatus';
-import type { DashboardRequestState, DashboardStudent } from './dashboard-types';
-
-type Message = ChatViewMessage;
+import type {
+  ChatListRowProps,
+  ChatViewProps,
+  CitationItemProps,
+  MessageBubbleProps,
+} from './dashboard-types';
 
 const QUICK_PROMPTS = [
   'What should I revise first?',
@@ -43,29 +42,7 @@ export const ChatView = memo(function ChatView({
   onDeleteChat,
   onSendMessage,
   onRetryIndex,
-}: {
-  student: DashboardStudent;
-  activeRubric: Rubric | undefined;
-  /** Locked chat whose rubric was deleted — do not show the global active rubric. */
-  rubricRemoved?: boolean;
-  session: Session | undefined;
-  chats: DashboardChat[];
-  rubricsById: ReadonlyMap<string, Rubric>;
-  activeChatId: string | null;
-  messages: Message[];
-  historyLoading: boolean;
-  activeChatBusy: boolean;
-  draftCreating: boolean;
-  aiUsage: AiUsage | null;
-  rubricIndexRequestStates?: Readonly<Record<string, DashboardRequestState>>;
-  onOpenSession: () => void;
-  onSelectChat: (chatId: string) => void;
-  onStartNewChat: () => void;
-  onRenameChat: (chatId: string, title: string) => void;
-  onDeleteChat: (chatId: string) => void;
-  onSendMessage: (text: string, sessionId?: string | null) => boolean;
-  onRetryIndex?: (rubricId: string) => void;
-}) {
+}: ChatViewProps) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [micOn, setMicOn] = useState(false);
   const draftKey = activeChatId ?? NEW_CHAT_DRAFT_KEY;
@@ -343,14 +320,7 @@ const ChatListRow = memo(function ChatListRow({
   onSelect,
   onRename,
   onDelete,
-}: {
-  chat: DashboardChat;
-  active: boolean;
-  rubricTitle?: string;
-  onSelect: (chatId: string) => void;
-  onRename: (chatId: string, title: string) => void;
-  onDelete: (chatId: string) => void;
-}) {
+}: ChatListRowProps) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(chat.title);
 
@@ -460,11 +430,7 @@ const MessageBubble = memo(function MessageBubble({
   message,
   student,
   thinking = false,
-}: {
-  message: Message;
-  student: DashboardStudent;
-  thinking?: boolean;
-}) {
+}: MessageBubbleProps) {
   const citations = message.citations ?? [];
 
   return (
@@ -503,7 +469,7 @@ const MessageBubble = memo(function MessageBubble({
   );
 });
 
-function CitationItem({ citation, index }: { citation: GroundingCitation; index: number }) {
+function CitationItem({ citation, index }: CitationItemProps) {
   const label = citation.title || `Source ${index + 1}`;
   return (
     <li className="ds-citation">
