@@ -87,7 +87,6 @@ test('checks retired claims in human-owned demo copy without requiring every dis
 
 test('loads the checked-in demo script when requested', () => {
   const documents = loadClaimDocuments(process.cwd(), {
-    includeDemoScript: true,
     requireDemoScript: true,
     extensionRoot: path.resolve(process.cwd(), '..', 'studypilot-extension'),
   });
