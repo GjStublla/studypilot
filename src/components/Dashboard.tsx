@@ -148,8 +148,18 @@ export default function Dashboard({
   const chatListVersionRef = useRef(0);
   const hasLoadedChatsRef = useRef(false);
   const chatLoadVersionsRef = useRef(new Map<string, number>());
+  const transcriptRequestVersionsRef = useRef(new Map<string, number>());
+  const dashboardMountedRef = useRef(true);
   const inFlightChatIdsRef = useRef(new Set<string>());
   const draftCreatingRef = useRef(false);
+
+  useEffect(() => {
+    dashboardMountedRef.current = true;
+    return () => {
+      dashboardMountedRef.current = false;
+      transcriptRequestVersionsRef.current.clear();
+    };
+  }, []);
 
   useEffect(() => { chatsRef.current = chats; }, [chats]);
   useEffect(() => { activeChatIdRef.current = activeChatId; }, [activeChatId]);
@@ -233,10 +243,12 @@ export default function Dashboard({
       if (typeof sessionId !== 'string') return;
       void fetchSessionTranscript(sessionId)
         .then((lines) => {
+          if (!dashboardMountedRef.current) return;
           setTranscripts((current) => ({ ...current, [sessionId]: lines }));
           setTranscriptStates((current) => ({ ...current, [sessionId]: { status: 'success' } }));
         })
         .catch((error) => {
+          if (!dashboardMountedRef.current) return;
           setTranscriptStates((current) => ({
             ...current,
             [sessionId]: {
@@ -415,6 +427,7 @@ export default function Dashboard({
         fetchSessions().then(setSessions),
         selectedSessionId
           ? fetchSessionTranscript(selectedSessionId).then((lines) => {
+            if (!dashboardMountedRef.current) return;
             setTranscripts((current) => ({ ...current, [selectedSessionId]: lines }));
             setTranscriptStates((current) => ({ ...current, [selectedSessionId]: { status: 'success' } }));
           })
@@ -571,13 +584,23 @@ export default function Dashboard({
     (sessionId: string, force = false) => {
       if (!force && transcriptsRef.current[sessionId] !== undefined) return;
       if (transcriptStatesRef.current[sessionId]?.status === 'loading') return;
+      const requestVersion = (transcriptRequestVersionsRef.current.get(sessionId) ?? 0) + 1;
+      transcriptRequestVersionsRef.current.set(sessionId, requestVersion);
       setTranscriptStates((current) => ({ ...current, [sessionId]: { status: 'loading' } }));
       fetchSessionTranscript(sessionId)
         .then((lines) => {
+          if (
+            !dashboardMountedRef.current
+            || transcriptRequestVersionsRef.current.get(sessionId) !== requestVersion
+          ) return;
           setTranscripts((prev) => ({ ...prev, [sessionId]: lines }));
           setTranscriptStates((current) => ({ ...current, [sessionId]: { status: 'success' } }));
         })
         .catch((error) => {
+          if (
+            !dashboardMountedRef.current
+            || transcriptRequestVersionsRef.current.get(sessionId) !== requestVersion
+          ) return;
           setTranscripts((prev) => ({ ...prev, [sessionId]: [] }));
           setTranscriptStates((current) => ({
             ...current,
