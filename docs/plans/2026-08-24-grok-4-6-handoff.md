@@ -15,7 +15,7 @@ The implementation objective is therefore: make the product demonstrably reliabl
 - Canonical Chrome extension: `C:\Users\gjins\Desktop\studypilot-extension`
 - Preserve the untracked web `output/` directory and the existing formal plan.
 - Web remediation commits include `23ab897` (dashboard chat/session/rubric/context extraction), `60fdd2b` (shell and low-coupling view extraction), `7529dd3` (release/database verification repair), `2ce5667` (implementation log), `281dafa` (explicit dashboard bootstrap request state), `078cb9b` (typed Supabase adapters and realtime payload boundaries), `9dd63b2` (centralized idle/loading/success/error bootstrap state), and `d2cf801` (per-session transcript request state and retry UI).
-- Extension remediation commits include `d9f9fb1` (remove unreachable browser AI/mock/voice paths), `e281450` (split Supabase facade), `279e91f` (extract pure panel components), `c295320` (live-state derivation and listener cleanup), `5ea85a0` (history secret-scan CI), `818a500` (live coaching hook), `d9ff60d` (pure chat selection/presentation state), `1b33f60` (quick-actions component), `7a7051c` (invalid idle pause prevention), `f19a8ec` (dashboard workspace hook, fallback hardening, rapid-toggle and narrow-viewport E2E), `da2dfb0` (panel shell/header composition), `53a3715` (typed shared-chat switcher), `a5d6687` (isolated context/privacy settings), `dfd0e14` (save-queue concurrency/error characterization), and `206da8d` (study-mode panel composition). The extension worktree is clean at this handoff.
+- Extension remediation commits include `d9f9fb1` (remove unreachable browser AI/mock/voice paths), `e281450` (split Supabase facade), `279e91f` (extract pure panel components), `c295320` (live-state derivation and listener cleanup), `5ea85a0` (history secret-scan CI), `818a500` (live coaching hook), `d9ff60d` (pure chat selection/presentation state), `1b33f60` (quick-actions component), `7a7051c` (invalid idle pause prevention), `f19a8ec` (dashboard workspace hook, fallback hardening, rapid-toggle and narrow-viewport E2E), `da2dfb0` (panel shell/header composition), `53a3715` (typed shared-chat switcher), `a5d6687` (isolated context/privacy settings), `dfd0e14` (save-queue concurrency/error characterization), `206da8d` (study-mode panel composition), and `31dbe0d` (isolated workspace auth parsing). The extension worktree is clean at this handoff.
 
 ## Verified evidence
 
@@ -32,7 +32,7 @@ Web:
 Extension:
 
 - Typecheck: passed.
-- Vitest: 14 files / 68 tests.
+- Vitest: 15 files / 71 tests.
 - Production build: passed.
 - Manifest validator: passed; no named microphone permission, no loopback production hosts, offscreen `USER_MEDIA` reason present.
 - Unpacked Playwright: 10/10 passed after the workspace extraction, including rapid open/close with page-error/console-error assertions and settled 360×640 / 390×700 viewport checks for quick-action labels and horizontal overflow. The microphone-denial test has passed in repeated isolated and full-suite runs.
@@ -57,7 +57,7 @@ Extension:
 
 ### P1 — extension maintainability and narrow-width UX
 
-1. Expand characterization tests for the workspace hook and invalid live-control combinations. Save queue concurrency/error cleanup is now covered by `dfd0e14`; Live start/pause/resume/stop now live in `useLiveCoaching.ts`; pure derivation, chat reconciliation, and listener cleanup are covered by `c295320` and `d9ff60d`.
+1. Expand characterization tests for the remaining workspace hook orchestration and invalid live-control combinations. The workspace auth boundary is now covered by `31dbe0d`; save queue concurrency/error cleanup is covered by `dfd0e14`; Live start/pause/resume/stop now live in `useLiveCoaching.ts`; pure derivation, chat reconciliation, and listener cleanup are covered by `c295320` and `d9ff60d`.
 2. Continue focused body composition from `FloatingStudyPilot.tsx`; `useDashboardWorkspace.ts`, `QuickActions.tsx`, `ExtensionPanel.tsx`, `ChatSwitcher.tsx`, `ContextSettings.tsx`, and `StudyModePanel.tsx` are now extracted. The remaining parent is approximately 2,070 lines and still owns the main body render composition.
 3. Keep live transitions explicit (`idle | starting | live | paused | stopping | error`) and make invalid control combinations unrenderable.
 4. Add 360x640 and 390x700 screenshots/E2E checks for fully visible quick actions, no header overlap, no horizontal scroll, and no duplicate listeners after rapid open/close.
