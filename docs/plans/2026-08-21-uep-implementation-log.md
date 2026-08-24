@@ -1402,3 +1402,9 @@ Web: this log only. Phase 5 was not started.
 - The canonical extension `FloatingStudyPilot` now tracks component-owned timeouts, Web Audio context close callbacks, and the confetti animation frame in stable refs. Selection-tooltip, notice, copy, confetti, and sound timers are canceled on replacement and teardown; pending audio contexts are closed on teardown; the confetti loop stops when the canvas leaves the tree or the panel unmounts.
 - The confetti canvas moved from an inline ref callback into a `showConfetti`-scoped effect so rerenders cannot start duplicate animation loops. This is a lifecycle-only change; visual behavior and timing are unchanged.
 - Verification after the slice: extension typecheck passed; Vitest passed 16 files / 76 tests; production build passed; manifest validation passed; unpacked Playwright passed 11/11; `git diff --check` passed. Hosted Live/getUserMedia behavior remains an external release gate.
+
+### Phase 9A panel async-response boundary — 2026-08-24
+
+- Canonical extension commit `8499b79` adds a small tested panel lifecycle boundary. Coaching, study-mode, dashboard-save, screenshot, file-read, and clipboard continuations now check mounted/current operation state before applying late results; a newer coaching or study-mode operation supersedes the previous one.
+- Added `panelLifecycle.test.ts` with mounted/latest, unmounted, and superseded-operation assertions. The workspace hook's existing mounted guard remains the owner of persistence-request cleanup.
+- Verification after the slice: extension typecheck passed; Vitest passed 17 files / 79 tests; production build passed; manifest validation passed; unpacked Playwright passed 11/11. The remaining evidence gap is a browser-level hosted Live start/stop/unmount run with unhandled-promise assertions.
