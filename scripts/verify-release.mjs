@@ -23,6 +23,7 @@ function run(label, command, args) {
 }
 
 run('tests', 'npm', ['test']);
+run('claims tests', 'node', ['--test', 'scripts/validate-claims.test.mjs']);
 run('claims', 'npm', ['run', 'validate:claims']);
 run('production build', 'npm', ['run', 'build']);
 run('built-env scan', 'node', ['scripts/verify-built-env.mjs', 'dist']);
