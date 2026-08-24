@@ -641,7 +641,7 @@ The extension has one live implementation, one dashboard integration path, and n
 
 ### Tasks
 
-- [ ] Complete the final report sections in the PDF's exact order: Project Overview, Problem Statement, Solution Overview, Development Process, Technical Stack, Architectural Design Diagram, Features Implemented, Challenges Faced & Solutions, and Team Contributions.
+- [x] Draft all nine required report sections in the PDF's exact order and link the readable architecture diagram. Team contribution text remains a separate human-approval task below and is intentionally still placeholder text.
 - [x] Populate the technical-stack table with React 19, TypeScript, Vite, FastAPI, Python, Supabase Auth/Postgres/Realtime/Storage/Edge Functions, Deno, Vertex AI/Gemini, Chrome MV3/offscreen documents, Docker, GitHub Actions, Vitest, pgTAP, and Playwright only when each appears in the final code. The current draft lists only technologies present in the repositories.
 - [x] Use three evidence-backed challenges: cross-surface chat synchronization, privacy-safe live context/persistence controls, and grounded rubric retrieval with secure model brokering. The current draft ties each to implementation boundaries and tests without claiming measured outcomes.
 - [ ] Obtain each member's approved role/contribution text; do not infer contribution percentages from Git commit counts.
@@ -701,7 +701,7 @@ These are not decisions Grok may make alone:
 ### Functional quality
 
 - [ ] A new user can sign in, connect the extension, select/upload a rubric, receive grounded coaching, create an action item, and see the same session/chat in the dashboard.
-- [ ] Network, auth expiry, microphone denial, model error, indexing failure, and offline states provide recoverable messages.
+- [x] Local recovery behavior is characterized for network/auth expiry/login/OAuth (`3212aca`), microphone denial (extension E2E), model/SSE errors (`socraticCoach.test.ts` and dashboard chat tests), indexing failure/retry (`Dashboard.rubric-rag.test.tsx`), and bootstrap retry. Hosted clean-profile failure handling remains an external gate.
 - [ ] The golden flow works twice in succession from a clean Chrome profile.
 
 ### Code submission quality
