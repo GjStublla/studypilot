@@ -104,7 +104,7 @@ describe('AuthPage successful account transitions', () => {
 
     await user.type(screen.getByLabelText('Email'), tokens.email);
     await user.type(screen.getByLabelText('Password'), 'CorrectHorse1');
-    await user.click(screen.getByRole('button', { name: 'Sign in', exact: true }));
+    await user.click(screen.getByRole('button', { name: /^Sign in$/ }));
 
     await waitFor(() => expect(authMocks.storeAuth).toHaveBeenCalledWith(tokens));
     expect(window.location.hash).toBe('#dashboard');
@@ -122,7 +122,7 @@ describe('AuthPage successful account transitions', () => {
     await user.type(screen.getByLabelText('Full name'), 'Alex Student');
     await user.type(screen.getByLabelText('Email'), tokens.email);
     await user.type(screen.getByLabelText('Password'), 'CorrectHorse1');
-    await user.click(screen.getByRole('button', { name: 'Create account', exact: true }));
+    await user.click(screen.getByRole('button', { name: /^Create account$/ }));
 
     await waitFor(() => expect(authMocks.storeAuth).toHaveBeenCalledWith(expect.objectContaining(tokens)));
     expect(window.location.hash).toBe('#dashboard');
@@ -143,7 +143,7 @@ describe('AuthPage successful account transitions', () => {
     await user.type(screen.getByLabelText('Full name'), 'Alex Student');
     await user.type(screen.getByLabelText('Email'), tokens.email);
     await user.type(screen.getByLabelText('Password'), 'CorrectHorse1');
-    await user.click(screen.getByRole('button', { name: 'Create account', exact: true }));
+    await user.click(screen.getByRole('button', { name: /^Create account$/ }));
 
     expect(await screen.findByText('Check your inbox to confirm your account.')).toBeInTheDocument();
     expect(authMocks.storeAuth).not.toHaveBeenCalled();
