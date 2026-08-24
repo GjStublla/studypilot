@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  /** Base URL of the StudyPilot FastAPI backend. Falls back to localhost:8000. */
+  /** Base URL of the StudyPilot FastAPI backend. Required public HTTPS URL in production builds. */
   readonly VITE_API_BASE_URL?: string;
 
   /** The public URL for your Supabase project */

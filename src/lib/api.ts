@@ -9,16 +9,14 @@
 
 import { AUTH_REQUIRED } from './authConfig';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '');
 
-if (!import.meta.env.VITE_API_BASE_URL) {
-  // Only warn in production builds — in dev the localhost fallback is intentional.
-  if (import.meta.env.PROD) {
-    console.error(
-      '[StudyPilot] VITE_API_BASE_URL is not set. ' +
-      'All API calls will target http://localhost:8000, which will fail in production.',
-    );
-  }
+if (!import.meta.env.VITE_API_BASE_URL && import.meta.env.PROD) {
+  console.error(
+    '[StudyPilot] VITE_API_BASE_URL is not set. Production builds must define a public API URL.',
+  );
 }
 
 const ACCESS_KEY = 'sp_access_token';
