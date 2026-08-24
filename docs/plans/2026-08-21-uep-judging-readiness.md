@@ -46,7 +46,7 @@ Repository-state cautions:
 The historical baseline above is retained for auditability. Local verification
 has since reached web Vitest 19/106, Deno 42, FastAPI pytest 26, Supabase pgTAP
 5 files/291 tests after a fresh reset, web Playwright 4/4, extension Vitest
-17/84, extension Playwright 14/14, production builds, and manifest/built-env
+18/88, extension Playwright 14/14, production builds, and manifest/built-env
 scans. A clean clone now passes the documented non-hosted gates after
 `d694163` makes missing Supabase browser configuration loadable; a bare
 production build still fails closed until public HTTPS variables are supplied.
@@ -487,7 +487,7 @@ This phase also fixes the crowded 360-390px panel.
 - [x] Return cleanup functions for runtime listeners, speech recognition, animation frames, timers, and pending async operations. `7927799`, `8499b79`, `7301083`, `18f5273`, and `6630915` cover teardown ownership, mounted/latest-operation guards, explicit Live intents, correlated service-worker operations, and the panel remount race.
 - [x] Move the panel-body render composition into a typed `PanelBody.tsx` boundary while keeping live/workspace state and callback ownership in `FloatingStudyPilot.tsx` (`b182624`).
 
-**Follow-up evidence — 2026-08-24:** `6630915` hydrates the panel from `STUDYPILOT_GET_LIVE_STATUS` on mount and adds a deterministic delayed-token Playwright scenario covering Live start, panel unmount/reopen, Live stop, delayed start failure suppression, and page/extension-page console-error assertions. `397c682` then extracts the Pomodoro picker and weekly progress chart, `6138fb0` extracts the selection tooltip into typed components, and `b182624` moves the complete panel-body render into a typed `PanelBody.tsx` boundary. These slices reduce the parent without changing timer, selection-listener, action, live, or workspace ownership. This is local transport characterization only; a real hosted Vertex Live session remains an external gate.
+**Follow-up evidence — 2026-08-24:** `6630915` hydrates the panel from `STUDYPILOT_GET_LIVE_STATUS` on mount and adds a deterministic delayed-token Playwright scenario covering Live start, panel unmount/reopen, Live stop, delayed start failure suppression, and page/extension-page console-error assertions. `397c682` then extracts the Pomodoro picker and weekly progress chart, `6138fb0` extracts the selection tooltip into typed components, `b182624` moves the complete panel-body render into a typed `PanelBody.tsx` boundary, and `4783764` characterizes the rendered VoiceDock pause/resume disabled states for idle, starting, live, and paused sessions. These slices reduce the parent or tighten the live-control contract without changing timer, selection-listener, action, live, or workspace ownership. This is local transport characterization only; a real hosted Vertex Live session remains an external gate.
 
 #### Verify
 
