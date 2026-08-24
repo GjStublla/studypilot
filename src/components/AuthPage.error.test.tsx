@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -78,5 +78,75 @@ describe('AuthPage recoverable errors', () => {
     expect(screen.getByRole('button', { name: 'Show password' })).toHaveAttribute('tabindex', '0');
     await user.click(screen.getByRole('tab', { name: 'Create account' }));
     expect(screen.getByRole('button', { name: 'Show password' })).toHaveAttribute('tabindex', '0');
+  });
+});
+
+describe('AuthPage successful account transitions', () => {
+  const tokens = {
+    access_token: 'access-token',
+    refresh_token: 'refresh-token',
+    user_id: 'user-1',
+    email: 'student@example.test',
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.location.hash = '#auth';
+  });
+
+  it('stores tokens and opens the dashboard after successful sign-in', async () => {
+    const user = userEvent.setup();
+    authMocks.apiPost.mockResolvedValueOnce({
+      ok: true,
+      json: async () => tokens,
+    });
+    render(<AuthPage />);
+
+    await user.type(screen.getByLabelText('Email'), tokens.email);
+    await user.type(screen.getByLabelText('Password'), 'CorrectHorse1');
+    await user.click(screen.getByRole('button', { name: 'Sign in', exact: true }));
+
+    await waitFor(() => expect(authMocks.storeAuth).toHaveBeenCalledWith(tokens));
+    expect(window.location.hash).toBe('#dashboard');
+  });
+
+  it('stores tokens and opens the dashboard after auto-confirmed signup', async () => {
+    const user = userEvent.setup();
+    authMocks.apiPost.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ ...tokens, email_confirmation_required: false }),
+    });
+    render(<AuthPage />);
+
+    await user.click(screen.getByRole('tab', { name: 'Create account' }));
+    await user.type(screen.getByLabelText('Full name'), 'Alex Student');
+    await user.type(screen.getByLabelText('Email'), tokens.email);
+    await user.type(screen.getByLabelText('Password'), 'CorrectHorse1');
+    await user.click(screen.getByRole('button', { name: 'Create account', exact: true }));
+
+    await waitFor(() => expect(authMocks.storeAuth).toHaveBeenCalledWith(expect.objectContaining(tokens)));
+    expect(window.location.hash).toBe('#dashboard');
+  });
+
+  it('shows the confirmation message when signup requires email confirmation', async () => {
+    const user = userEvent.setup();
+    authMocks.apiPost.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        email_confirmation_required: true,
+        message: 'Check your inbox to confirm your account.',
+      }),
+    });
+    render(<AuthPage />);
+
+    await user.click(screen.getByRole('tab', { name: 'Create account' }));
+    await user.type(screen.getByLabelText('Full name'), 'Alex Student');
+    await user.type(screen.getByLabelText('Email'), tokens.email);
+    await user.type(screen.getByLabelText('Password'), 'CorrectHorse1');
+    await user.click(screen.getByRole('button', { name: 'Create account', exact: true }));
+
+    expect(await screen.findByText('Check your inbox to confirm your account.')).toBeInTheDocument();
+    expect(authMocks.storeAuth).not.toHaveBeenCalled();
+    expect(window.location.hash).toBe('#auth');
   });
 });
