@@ -1248,3 +1248,8 @@ Web: this log only. Phase 5 was not started.
 - Canonical extension commit `31dbe0d` moved dashboard-origin checks and local/Supabase auth-session parsing from `useDashboardWorkspace.ts` into `workspaceAuth.ts`, retaining the `isDashboardBridgeOrigin` export used by the parent panel.
 - Added 3 tests for malformed storage, nested Supabase session normalization, dashboard-origin gating, and direct token reads. Non-browser origin checks now return `false` safely.
 - Extension verification: typecheck, 15 Vitest files / 71 tests, production build, manifest validation baseline, and 10/10 unpacked Playwright checks passed. Remaining workspace work is hook orchestration characterization and connected-chat golden-flow coverage.
+
+### Phase 8B transcript stale-response guard — 2026-08-24
+
+- Commit `a989db6` adds a mounted guard and per-session request version to dashboard transcript loads. Superseded retry responses and responses that resolve after dashboard unmount are ignored before mutating transcript state.
+- Targeted dashboard tests (13 tests), full web Vitest (16 files / 91 tests), and `npm run build` passed after the guard. A dedicated unmount-warning test and equivalent guards for other dashboard async paths remain open.
