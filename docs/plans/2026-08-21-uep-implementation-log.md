@@ -1396,3 +1396,9 @@ Web: this log only. Phase 5 was not started.
 - Web commit `5fcb87e` removes tracked generated `vite.config.js` and `vite.config.d.ts` artifacts that Vite preferred over the validated `vite.config.ts`. The stale JavaScript config bypassed deployment validation and allowed a bundle to embed the local API URL.
 - A default production build now fails closed with the value-free error `VITE_API_BASE_URL must be a public HTTPS URL for production builds.` when the local `.env` is selected. A build with public placeholder URLs and a JWT-shaped placeholder anon key passes, and `node scripts/verify-built-env.mjs dist` returns `ok`.
 - Verification after the repair: web Vitest passed 17 files / 96 tests; TypeScript/build passed with public placeholders; built-environment scan passed. Local worktree edits and `output/` remain preserved.
+
+### Phase 9A timer and animation teardown boundary — 2026-08-24
+
+- The canonical extension `FloatingStudyPilot` now tracks component-owned timeouts, Web Audio context close callbacks, and the confetti animation frame in stable refs. Selection-tooltip, notice, copy, confetti, and sound timers are canceled on replacement and teardown; pending audio contexts are closed on teardown; the confetti loop stops when the canvas leaves the tree or the panel unmounts.
+- The confetti canvas moved from an inline ref callback into a `showConfetti`-scoped effect so rerenders cannot start duplicate animation loops. This is a lifecycle-only change; visual behavior and timing are unchanged.
+- Verification after the slice: extension typecheck passed; Vitest passed 16 files / 76 tests; production build passed; manifest validation passed; unpacked Playwright passed 11/11; `git diff --check` passed. Hosted Live/getUserMedia behavior remains an external release gate.
