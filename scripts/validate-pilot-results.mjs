@@ -20,6 +20,7 @@ export const REQUIRED_COLUMNS = [
 
 const BOOLEAN_COLUMNS = new Set(['completed', 'error_free', 'quote_approved']);
 const INTEGER_COLUMNS = new Set(['citations_checked', 'citations_supported']);
+const RUBRIC_SCORE_COLUMNS = new Set(['before_score', 'after_score']);
 const NON_NEGATIVE_COLUMNS = new Set([
   'time_to_feedback_seconds',
   'citations_checked',
@@ -140,6 +141,9 @@ function parseCell(value, rowNumber, column) {
   }
   if (NON_NEGATIVE_COLUMNS.has(column) && parsed < 0) {
     fail(`row ${rowNumber}, ${column} must be non-negative`);
+  }
+  if (RUBRIC_SCORE_COLUMNS.has(column) && (parsed < 0 || parsed > 100)) {
+    fail(`row ${rowNumber}, ${column} must be between 0 and 100`);
   }
   if (column === 'sus_score' && (parsed < 0 || parsed > 100)) {
     fail(`row ${rowNumber}, sus_score must be between 0 and 100`);

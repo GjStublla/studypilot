@@ -72,6 +72,14 @@ test('rejects malformed rows and impossible citation counts', () => {
     () => validatePilotCsv(csv(['P001,true,12,40,55,1,1,true,800,101,false'])),
     /sus_score must be between 0 and 100/,
   );
+  assert.throws(
+    () => validatePilotCsv(csv(['P001,true,12,-1,55,1,1,true,800,70,false'])),
+    /before_score must be between 0 and 100/,
+  );
+  assert.throws(
+    () => validatePilotCsv(csv(['P001,true,12,40,101,1,1,true,800,70,false'])),
+    /after_score must be between 0 and 100/,
+  );
 });
 
 test('rejects identifying, credential, and draft-content values', () => {
