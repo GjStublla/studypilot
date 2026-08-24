@@ -177,7 +177,7 @@ export function loadClaimDocuments(root, {
     throw new Error(`canonical extension README not found: ${extensionReadme}`);
   }
 
-  if (includeDemoScript) {
+  if (includeDemoScript || requireDemoScript) {
     const demoScriptPath = path.join(root, DEMO_DOCUMENT.relativePath);
     if (fs.existsSync(demoScriptPath)) {
       documents.push({
