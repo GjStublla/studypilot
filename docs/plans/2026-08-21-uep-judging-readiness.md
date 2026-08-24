@@ -46,7 +46,7 @@ Repository-state cautions:
 The historical baseline above is retained for auditability. Local verification
 has since reached web Vitest 19/106, Deno 42, FastAPI pytest 26, Supabase pgTAP
 5 files/291 tests after a fresh reset, web Playwright 4/4, extension Vitest
-18/88, extension Playwright 14/14, production builds, and manifest/built-env
+18/88, extension Playwright 15/15, production builds, and manifest/built-env
 scans. A clean clone now passes the documented non-hosted gates after
 `d694163` makes missing Supabase browser configuration loadable; a bare
 production build still fails closed until public HTTPS variables are supplied.
@@ -487,13 +487,13 @@ This phase also fixes the crowded 360-390px panel.
 - [x] Return cleanup functions for runtime listeners, speech recognition, animation frames, timers, and pending async operations. `7927799`, `8499b79`, `7301083`, `18f5273`, and `6630915` cover teardown ownership, mounted/latest-operation guards, explicit Live intents, correlated service-worker operations, and the panel remount race.
 - [x] Move the panel-body render composition into a typed `PanelBody.tsx` boundary while keeping live/workspace state and callback ownership in `FloatingStudyPilot.tsx` (`b182624`).
 
-**Follow-up evidence — 2026-08-24:** `6630915` hydrates the panel from `STUDYPILOT_GET_LIVE_STATUS` on mount and adds a deterministic delayed-token Playwright scenario covering Live start, panel unmount/reopen, Live stop, delayed start failure suppression, and page/extension-page console-error assertions. `397c682` then extracts the Pomodoro picker and weekly progress chart, `6138fb0` extracts the selection tooltip into typed components, `b182624` moves the complete panel-body render into a typed `PanelBody.tsx` boundary, and `4783764` characterizes the rendered VoiceDock pause/resume disabled states for idle, starting, live, and paused sessions. These slices reduce the parent or tighten the live-control contract without changing timer, selection-listener, action, live, or workspace ownership. This is local transport characterization only; a real hosted Vertex Live session remains an external gate.
+**Follow-up evidence — 2026-08-24:** `6630915` hydrates the panel from `STUDYPILOT_GET_LIVE_STATUS` on mount and adds a deterministic delayed-token Playwright scenario covering Live start, panel unmount/reopen, Live stop, delayed start failure suppression, and page/extension-page console-error assertions. `397c682` then extracts the Pomodoro picker and weekly progress chart, `6138fb0` extracts the selection tooltip into typed components, `b182624` moves the complete panel-body render into a typed `PanelBody.tsx` boundary, `4783764` characterizes the rendered VoiceDock pause/resume disabled states for idle, starting, live, and paused sessions, and `bf073bf` adds keyboard activation coverage for the first secondary menu action. These slices reduce the parent or tighten the live-control/accessibility contract without changing timer, selection-listener, action, live, or workspace ownership. This is local transport characterization only; a real hosted Vertex Live session remains an external gate.
 
 #### Verify
 
 - [x] `npm test && npm run typecheck && npm run build` passes.
 - [x] Playwright screenshots at 360x640 and 390x700 show no clipped labels, overlapping header controls, or horizontal scroll. Commit `933b1ca` adds settled screenshot artifacts and the short-height responsive layout; both artifacts were visually inspected locally.
-- [x] Rapid open/close/live-start/live-stop E2E produces no duplicate listener, unmounted-update, or unhandled-promise console error. The unpacked suite passes 14/14, including the deterministic panel remount race in `6630915` and keyboard activation of the launcher/settings/minimize controls in `a77fe49`.
+- [x] Rapid open/close/live-start/live-stop E2E produces no duplicate listener, unmounted-update, or unhandled-promise console error. The unpacked suite passes 15/15, including the deterministic panel remount race in `6630915`, keyboard activation of the launcher/settings/minimize controls in `a77fe49`, and secondary menu activation in `bf073bf`.
 - [x] Exercise keyboard activation for the launcher, settings, and minimize controls through the closed shadow root. `a77fe49` adds the CDP focus helper and unpacked browser assertion; a broader manual keyboard review of every secondary action remains a submission review item.
 - [x] Audit every visible native panel control at 360px and 390px for an accessible name, keyboard focusability, and text clipping. `dd7a2c3` adds the closed-shadow-root audit and `db5ff45` runs it at both supported narrow widths.
 
@@ -718,7 +718,7 @@ These are not decisions Grok may make alone:
 
 ### User experience and evidence
 
-- [x] Extension labels do not truncate at 360px or 390px and all primary controls are keyboard accessible. The 14-test unpacked suite now checks visible control names, tab reachability, and text clipping at both narrow widths (`dd7a2c3`, `db5ff45`).
+- [x] Extension labels do not truncate at 360px or 390px and all primary controls are keyboard accessible. The 15-test unpacked suite now checks visible control names, tab reachability, and text clipping at both narrow widths (`dd7a2c3`, `db5ff45`) and characterizes a secondary menu keyboard action (`bf073bf`).
 - [x] Axe has no serious/critical findings and local production-preview Lighthouse meets the Phase 11 thresholds. (public/authenticated axe and three-run medians in `context/performance-notes.md`; hosted dashboard Lighthouse remains external)
 - [ ] Pilot summary contains traceable results from 10-15 target users and clearly states limitations.
 
