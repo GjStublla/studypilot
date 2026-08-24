@@ -44,7 +44,7 @@ Repository-state cautions:
 ## Current status update — 2026-08-24
 
 The historical baseline above is retained for auditability. Local verification
-has since reached web Vitest 19/103, Deno 42, FastAPI pytest 26, Supabase pgTAP
+has since reached web Vitest 19/106, Deno 42, FastAPI pytest 26, Supabase pgTAP
 5 files/291 tests after a fresh reset, web Playwright 4/4, extension Vitest
 17/84, extension Playwright 14/14, production builds, and manifest/built-env
 scans. A clean clone now passes the documented non-hosted gates after
@@ -704,8 +704,8 @@ These are not decisions Grok may make alone:
 
 ### Functional quality
 
-- [ ] A new user can sign in, connect the extension, select/upload a rubric, receive grounded coaching, create an action item, and see the same session/chat in the dashboard.
-- [x] Local recovery behavior is characterized for network/auth expiry/login/OAuth (`3212aca`), microphone denial (extension E2E), model/SSE errors (`socraticCoach.test.ts` and dashboard chat tests), indexing failure/retry (`Dashboard.rubric-rag.test.tsx`), and bootstrap retry. Hosted clean-profile failure handling remains an external gate.
+- [ ] A new user can sign in, connect the extension, select/upload a rubric, receive grounded coaching, create an action item, and see the same session/chat in the dashboard. Local email login/signup transitions are characterized in `d5657d8`; the connected extension/hosted journey remains external.
+- [x] Local recovery and auth transitions are characterized for network/auth expiry/login/OAuth (`3212aca`, `d5657d8`), including successful sign-in, auto-confirmed signup, and email-confirmation signup; microphone denial (extension E2E), model/SSE errors (`socraticCoach.test.ts` and dashboard chat tests), indexing failure/retry (`Dashboard.rubric-rag.test.tsx`), and bootstrap retry are also covered. Hosted clean-profile failure handling remains an external gate.
 - [ ] The golden flow works twice in succession from a clean Chrome profile.
 
 ### Code submission quality
