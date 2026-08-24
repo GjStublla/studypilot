@@ -1231,3 +1231,8 @@ Web: this log only. Phase 5 was not started.
 - Canonical extension commit `206da8d` extracted the dedicated Flashcards/Quiz panel into `src/content/StudyModePanel.tsx`, preserving the existing animation, retry/regenerate controls, structured-card viewers, and perfect-score callback.
 - `FloatingStudyPilot.tsx` is now approximately 2,070 lines; the remaining body still owns the main chat composer, answer card, voice dock, and study-session controls.
 - Extension verification after the extraction: typecheck, 14 Vitest files / 68 tests, production build, manifest validation baseline, and 10/10 unpacked Playwright checks all passed.
+
+### Phase 8A bootstrap request-state boundary — 2026-08-24
+
+- Commit `9dd63b2` moved `DashboardBootstrapState` into `src/components/dashboard/dashboard-types.ts` and defined the explicit `idle | loading | success | error` union. The dashboard now uses `success` instead of the ambiguous `ready` label while preserving the existing partial-load and fatal-load behavior.
+- Verification: focused dashboard tests (12 tests), full web Vitest (16 files / 90 tests), and `npm run build` all passed. Per-request transcript/indexing states and stale-promise cleanup remain open follow-up work.
