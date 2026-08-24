@@ -1253,3 +1253,8 @@ Web: this log only. Phase 5 was not started.
 
 - Commit `a989db6` adds a mounted guard and per-session request version to dashboard transcript loads. Superseded retry responses and responses that resolve after dashboard unmount are ignored before mutating transcript state.
 - Targeted dashboard tests (13 tests), full web Vitest (16 files / 91 tests), and `npm run build` passed after the guard. A dedicated unmount-warning test and equivalent guards for other dashboard async paths remain open.
+
+### Release gate recheck — 2026-08-24
+
+- `npm run verify:release` passed with approved public HTTPS placeholder values: web Vitest (16 files / 91 tests), production build, and `verify-built-env` all passed.
+- The hosted Supabase function allowlist was explicitly **SKIPPED** because `SUPABASE_ACCESS_TOKEN` is not set. This remains an external credential/CI gate, not a hosted verification pass.
