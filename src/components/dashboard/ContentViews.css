@@ -1,0 +1,787 @@
+/* ---------- Home hero ---------- */
+
+.app-dashboard .ds-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 0 4px;
+}
+.app-dashboard .ds-hero .ds-eyebrow { color: var(--ds-quiet); }
+
+/* ---------- Rows / layout ---------- */
+
+.app-dashboard .ds-row {
+  display: grid;
+  gap: 16px;
+}
+.app-dashboard .ds-row-2 { grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); }
+.app-dashboard .ds-row-2-1 { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
+.app-dashboard .ds-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.app-dashboard .ds-stack-tight { gap: 12px; }
+
+/* ---------- Cards ---------- */
+
+.app-dashboard .ds-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 18px 16px;
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.018), rgba(255, 255, 255, 0.006));
+}
+.app-dashboard .ds-card-primary {
+  background:
+    radial-gradient(620px 240px at 0% 0%, rgba(124, 92, 255, 0.06), transparent 65%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.028), rgba(255, 255, 255, 0.008));
+  border-color: var(--ds-line-strong);
+}
+.app-dashboard .ds-card-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ds-quiet);
+}
+.app-dashboard .ds-card-eyebrow-row {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+}
+.app-dashboard .ds-card-eyebrow-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.app-dashboard .ds-card-title {
+  font-size: 22px;
+  font-weight: 450;
+  line-height: 1.18;
+  color: var(--ds-ink);
+  letter-spacing: -0.012em;
+  font-family: var(--serif);
+}
+.app-dashboard .ds-card-title-sm {
+  font-size: 17px;
+  font-family: var(--sans);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+}
+.app-dashboard .ds-card-sub {
+  margin: -6px 0 2px;
+  color: var(--ds-quiet);
+  font-size: 12.5px;
+}
+.app-dashboard .ds-card-summary {
+  margin: 0;
+  color: var(--ds-muted);
+  font-size: 13.5px;
+  line-height: 1.6;
+  max-width: 62ch;
+}
+.app-dashboard .ds-prose {
+  margin: 0;
+  color: var(--ds-ink);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+.app-dashboard .ds-prose-quiet { color: var(--ds-quiet); }
+.app-dashboard .ds-prose + .ds-prose { margin-top: 8px; }
+
+.app-dashboard .ds-screenshot-card {
+  gap: 14px;
+}
+.app-dashboard .ds-session-screenshot {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border: 1px solid var(--ds-line-soft);
+  border-radius: 8px;
+  background: var(--ds-surface-2);
+}
+
+.app-dashboard .ds-meta-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 12px;
+  margin: 4px 0 0;
+  padding: 12px 0 0;
+  border-top: 1px dashed var(--ds-line);
+}
+.app-dashboard .ds-meta-row div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.app-dashboard .ds-meta-row dt {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ds-quiet);
+}
+.app-dashboard .ds-meta-row dd {
+  margin: 0;
+  color: var(--ds-ink);
+  font-size: 13px;
+}
+
+.app-dashboard .ds-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+/* ---------- Criteria ---------- */
+
+.app-dashboard .ds-criteria {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-top: 1px solid var(--ds-line-soft);
+}
+.app-dashboard .ds-criteria li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--ds-line-soft);
+  font-size: 13px;
+  color: var(--ds-ink);
+}
+.app-dashboard .ds-criteria li:last-child { border-bottom: 0; }
+
+.app-dashboard .ds-criteria-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 2px 0 6px;
+}
+.app-dashboard .ds-criteria-pill {
+  padding: 4px 9px;
+  border: 1px solid var(--ds-line);
+  border-radius: 999px;
+  background: var(--ds-surface);
+  color: var(--ds-muted);
+  font-size: 12px;
+}
+
+.app-dashboard .ds-dots {
+  display: inline-flex;
+  gap: 3px;
+}
+.app-dashboard .ds-dots i {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ds-line-strong);
+  transition: background 140ms ease;
+}
+.app-dashboard .ds-dots i.on { background: var(--ds-ink); }
+
+/* ---------- Todo / action items ---------- */
+
+.app-dashboard .ds-todo {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.app-dashboard .ds-todo li {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--ds-line-soft);
+  font-size: 13px;
+  color: var(--ds-ink);
+}
+.app-dashboard .ds-todo li:first-child { border-top: 0; padding-top: 4px; }
+.app-dashboard .ds-todo li.is-done .ds-todo-text { color: var(--ds-quiet); text-decoration: line-through; }
+.app-dashboard .ds-todo-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.app-dashboard .ds-todo-tag {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--ds-quiet);
+  padding: 3px 7px;
+  border: 1px solid var(--ds-line);
+  border-radius: 999px;
+  background: var(--ds-surface);
+  white-space: nowrap;
+}
+
+.app-dashboard .ds-check {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--ds-line-strong);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ds-deep);
+  transition: background 140ms ease, border-color 140ms ease;
+}
+.app-dashboard .ds-check:hover {
+  border-color: rgba(232, 234, 252, 0.34);
+  background: var(--ds-surface);
+}
+.app-dashboard .ds-check.is-checked {
+  background: var(--ds-ink);
+  border-color: var(--ds-ink);
+}
+
+.app-dashboard .ds-todo-detailed li {
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: flex-start;
+  padding: 14px 0;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 68px;
+}
+.app-dashboard .ds-todo-detailed .ds-check { margin-top: 1px; }
+.app-dashboard .ds-todo-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.app-dashboard .ds-todo-body p {
+  margin: 0;
+  color: var(--ds-ink);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.app-dashboard .ds-todo-detailed li.is-done .ds-todo-body p {
+  color: var(--ds-quiet);
+  text-decoration: line-through;
+}
+.app-dashboard .ds-todo-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.app-dashboard .ds-todo-source,
+.app-dashboard .ds-todo-rubric {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border: 1px solid var(--ds-line);
+  border-radius: 999px;
+  background: var(--ds-surface);
+  font-size: 11px;
+  color: var(--ds-muted);
+  font-family: var(--mono);
+  letter-spacing: 0.04em;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.app-dashboard .ds-todo-source { cursor: pointer; }
+.app-dashboard .ds-todo-source:hover {
+  background: var(--ds-surface-2);
+  color: var(--ds-ink);
+  border-color: var(--ds-line-strong);
+}
+.app-dashboard .ds-todo-rubric svg,
+.app-dashboard .ds-todo-source svg { color: var(--ds-quiet); }
+
+/* ---------- Activity list ---------- */
+
+.app-dashboard .ds-activity {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.app-dashboard .ds-activity li {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 14px;
+  padding: 10px 0;
+  border-top: 1px solid var(--ds-line-soft);
+  font-size: 13px;
+  color: var(--ds-muted);
+}
+.app-dashboard .ds-activity li:first-child { border-top: 0; padding-top: 4px; }
+.app-dashboard .ds-activity li b {
+  color: var(--ds-ink);
+  font-weight: 500;
+}
+.app-dashboard .ds-activity-time {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  color: var(--ds-quiet);
+  text-transform: uppercase;
+}
+
+/* ---------- Sessions list ---------- */
+
+.app-dashboard .ds-session-list,
+.app-dashboard .ds-rubric-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.app-dashboard .ds-session-list > li,
+.app-dashboard .ds-rubric-list > li {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 190px;
+}
+
+.app-dashboard .ds-session-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.014), rgba(255, 255, 255, 0.004));
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+.app-dashboard .ds-session-card:hover {
+  border-color: var(--ds-line-strong);
+  transform: translateY(-1px);
+}
+.app-dashboard .ds-session-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+}
+.app-dashboard .ds-session-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--ds-line-soft);
+}
+
+/* ---------- Rubrics ---------- */
+
+.app-dashboard .ds-rubric-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--ds-line);
+  border-radius: var(--ds-radius);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.014), rgba(255, 255, 255, 0.004));
+  transition: border-color 160ms ease, background 160ms ease;
+}
+.app-dashboard .ds-rubric-card.is-active {
+  border-color: rgba(108, 240, 192, 0.22);
+  background:
+    radial-gradient(420px 200px at 0% 0%, rgba(108, 240, 192, 0.05), transparent 65%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.016), rgba(255, 255, 255, 0.004));
+}
+.app-dashboard .ds-rubric-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ds-line-soft);
+  flex-wrap: wrap;
+}
+
+/* ---------- Tabs ---------- */
+
+.app-dashboard .ds-tabs {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--ds-line);
+  border-radius: 9px;
+  background: var(--ds-surface);
+}
+.app-dashboard .ds-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 11px;
+  border-radius: 6px;
+  color: var(--ds-muted);
+  font-size: 12.5px;
+  font-weight: 500;
+  transition: background 120ms ease, color 120ms ease;
+}
+.app-dashboard .ds-tab:hover { color: var(--ds-ink); }
+.app-dashboard .ds-tab em {
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ds-whisper);
+  letter-spacing: 0.04em;
+}
+.app-dashboard .ds-tab.is-active {
+  background: var(--ds-surface-3);
+  color: var(--ds-ink);
+  box-shadow: inset 0 0 0 1px var(--ds-line);
+}
+.app-dashboard .ds-tab.is-active em { color: var(--ds-muted); }
+
+/* ---------- Session detail ---------- */
+
+.app-dashboard .ds-transcript {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.app-dashboard .ds-transcript li {
+  display: grid;
+  grid-template-columns: 60px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 14px;
+  padding: 10px 0;
+  border-top: 1px solid var(--ds-line-soft);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 52px;
+}
+.app-dashboard .ds-transcript li:first-child { border-top: 0; padding-top: 4px; }
+.app-dashboard .ds-transcript-who {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ds-quiet);
+}
+.app-dashboard .ds-transcript li.is-ai .ds-transcript-who { color: var(--ds-accent); }
+.app-dashboard .ds-transcript p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--ds-ink);
+}
+.app-dashboard .ds-transcript time {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--ds-whisper);
+}
+
+.app-dashboard .ds-followups {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--ds-line-soft);
+}
+.app-dashboard .ds-followups li { border-bottom: 1px solid var(--ds-line-soft); }
+.app-dashboard .ds-followups li:last-child { border-bottom: 0; }
+.app-dashboard .ds-followups button {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 4px;
+  text-align: left;
+  color: var(--ds-ink);
+  font-size: 13px;
+  transition: padding 120ms ease, color 120ms ease;
+}
+.app-dashboard .ds-followups button svg { color: var(--ds-quiet); transition: color 120ms ease, transform 120ms ease; }
+.app-dashboard .ds-followups button:hover { padding-left: 8px; }
+.app-dashboard .ds-followups button:hover svg { color: var(--ds-ink); }
+.app-dashboard .ds-followups button:hover svg:last-child { transform: translateX(2px); }
+
+/* ---------- Settings ---------- */
+
+.app-dashboard .ds-settings-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+}
+.app-dashboard .ds-segment {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--ds-line);
+  border-radius: 9px;
+  background: var(--ds-surface);
+  align-self: flex-start;
+}
+.app-dashboard .ds-segment-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 6px;
+  color: var(--ds-muted);
+  font-size: 12.5px;
+  font-weight: 500;
+  transition: background 120ms ease, color 120ms ease;
+}
+.app-dashboard .ds-segment-btn:hover { color: var(--ds-ink); }
+.app-dashboard .ds-segment-btn.is-active {
+  background: var(--ds-surface-3);
+  color: var(--ds-ink);
+  box-shadow: inset 0 0 0 1px var(--ds-line);
+}
+
+/* ---------- Empty state ---------- */
+
+.app-dashboard .ds-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 22px 0 6px;
+  border-top: 1px dashed var(--ds-line);
+}
+.app-dashboard .ds-empty-title {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 17px;
+  color: var(--ds-ink);
+  letter-spacing: -0.005em;
+}
+.app-dashboard .ds-empty-body {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ds-quiet);
+  max-width: 48ch;
+}
+
+/* Chat empty state: center it within the message viewport instead of the
+   default top-left inline treatment used by list views. Scoped to
+   .ds-messages, which only exists in the chat view. */
+.app-dashboard .ds-messages .ds-empty {
+  min-height: 100%;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 10px;
+  padding: 24px;
+  border-top: none;
+}
+.app-dashboard .ds-messages .ds-empty-title {
+  font-size: 20px;
+}
+.app-dashboard .ds-messages .ds-empty-body {
+  max-width: 38ch;
+}
+
+/* ---------- Loading / error states ---------- */
+
+.app-dashboard .ds-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 60vh;
+  padding: 48px 28px;
+  text-align: center;
+}
+.app-dashboard .ds-state p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ds-muted);
+  max-width: 44ch;
+}
+.app-dashboard .ds-state-inline {
+  min-height: 0;
+  padding: 28px 0 10px;
+  align-items: flex-start;
+  flex-direction: row;
+  gap: 10px;
+  text-align: left;
+}
+.app-dashboard .ds-state-spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--ds-line-strong);
+  border-top-color: var(--ds-accent-cyan);
+  animation: ds-spin 0.7s linear infinite;
+  flex: none;
+}
+.app-dashboard .ds-state-error p {
+  color: var(--ds-muted);
+}
+
+@keyframes ds-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-dashboard .ds-state-spinner {
+    animation-duration: 1.6s;
+  }
+}
+
+/* ---------- Upload Rubric Modal ---------- */
+
+.app-dashboard .ds-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(2, 3, 10, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.app-dashboard .ds-modal {
+  width: 100%;
+  max-width: 480px;
+  border: 1px solid var(--ds-line-strong);
+  border-radius: var(--ds-radius-lg);
+  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.012)), var(--ds-canvas);
+  box-shadow: 0 40px 80px -24px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04);
+  overflow: hidden;
+}
+
+.app-dashboard .ds-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 18px 0;
+}
+
+.app-dashboard .ds-modal-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ds-ink);
+  letter-spacing: -0.005em;
+}
+
+.app-dashboard .ds-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 18px 18px;
+}
+
+.app-dashboard .ds-modal-fields { display: flex; flex-direction: column; gap: 10px; }
+.app-dashboard .ds-modal-field { display: flex; flex-direction: column; gap: 6px; }
+
+.app-dashboard .ds-modal-field label {
+  font-size: 12px; font-weight: 500; color: var(--ds-muted);
+}
+
+.app-dashboard .ds-modal-field input {
+  height: 36px; padding: 0 12px;
+  border: 1px solid var(--ds-line-strong); border-radius: 8px;
+  background: var(--ds-surface); color: var(--ds-ink);
+  font-family: inherit; font-size: 13.5px; outline: none;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+.app-dashboard .ds-modal-field input::placeholder { color: var(--ds-quiet); }
+.app-dashboard .ds-modal-field input:focus {
+  border-color: rgba(124,92,255,0.5); background: rgba(124,92,255,0.05);
+}
+.app-dashboard .ds-modal-field input:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.app-dashboard .ds-modal-error {
+  margin: 0; padding: 9px 12px;
+  border: 1px solid rgba(255,79,100,0.22); border-radius: 7px;
+  background: rgba(255,79,100,0.07); color: #ff7080; font-size: 12.5px; line-height: 1.5;
+}
+
+.app-dashboard .ds-modal-foot {
+  display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-top: 4px;
+}
+
+.app-dashboard .ds-help-lead {
+  margin: 0;
+  color: var(--ds-muted);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.app-dashboard .ds-help-steps {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ds-ink);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.app-dashboard .ds-help-steps li + li {
+  margin-top: 10px;
+}
+
+.app-dashboard .ds-help-steps a {
+  color: var(--ds-accent-cyan);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.app-dashboard .ds-help-steps a:focus-visible {
+  outline: 2px solid rgba(57, 215, 255, 0.85);
+  outline-offset: 3px;
+}
+
+/* ---------- Dropzone ---------- */
+
+.app-dashboard .ds-dropzone {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; min-height: 110px; padding: 20px;
+  border: 1px dashed var(--ds-line-strong); border-radius: var(--ds-radius);
+  background: var(--ds-surface); color: var(--ds-muted);
+  cursor: pointer; text-align: center; user-select: none;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+.app-dashboard .ds-dropzone:hover,
+.app-dashboard .ds-dropzone.is-over {
+  border-color: rgba(124,92,255,0.45); background: rgba(124,92,255,0.06); color: var(--ds-ink);
+}
+.app-dashboard .ds-dropzone.has-file {
+  border-style: solid; border-color: var(--ds-line); min-height: 56px; padding: 14px 16px;
+}
+.app-dashboard .ds-dropzone-input { display: none; }
+.app-dashboard .ds-dropzone-label { margin: 0; font-size: 13px; color: var(--ds-muted); }
+.app-dashboard .ds-dropzone-hint {
+  margin: 0; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.06em; color: var(--ds-quiet);
+}
+.app-dashboard .ds-dropzone-file {
+  display: flex; align-items: center; gap: 10px; width: 100%; font-size: 13px; color: var(--ds-ink);
+}
+.app-dashboard .ds-dropzone-file span {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left;
+}
+.app-dashboard .ds-dropzone-remove {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 4px; color: var(--ds-quiet);
+  transition: color 120ms ease, background 120ms ease;
+}
+.app-dashboard .ds-dropzone-remove:hover { color: #ff7080; background: rgba(255,79,100,0.08); }
+
