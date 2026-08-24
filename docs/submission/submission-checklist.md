@@ -5,7 +5,7 @@
 This section records what is reproducible in the workspace; it is not a deployment or mentor sign-off.
 
 - Web local evidence baseline: `5fcb87e` (with adapter-boundary evidence `4bd77c8`, prop-contract evidence `03a2da1`, authorization evidence `d85b27f`, accessibility/performance, architecture, and scaffold commits `8db5a40`, `7a68341`, and `6a08fac`; later documentation commits record submission state).
-- Canonical extension local head: `6630915`; its worktree is clean. The latest slices include workspace-owned persistence, settled narrow-panel screenshot evidence, mounted/latest-operation guards for Live and SpeechRecognition cleanup, teardown ownership for panel timers/Web Audio/confetti animation, stale-result guards for panel coaching/study/save/capture/file/clipboard continuations, explicit Live start/stop/fallback control transitions, correlated service-worker status operations, valid-state pause/resume controls, and panel Live-status hydration/remount characterization.
+- Canonical extension local head: `397c682`; its worktree is clean. The latest slices include workspace-owned persistence, settled narrow-panel screenshot evidence, mounted/latest-operation guards for Live and SpeechRecognition cleanup, teardown ownership for panel timers/Web Audio/confetti animation, stale-result guards for panel coaching/study/save/capture/file/clipboard continuations, explicit Live start/stop/fallback control transitions, correlated service-worker status operations, valid-state pause/resume controls, panel Live-status hydration/remount characterization, and the typed Pomodoro picker extraction.
 - Web Vitest: 17 files / 96 tests; web Playwright: 4/4; public-placeholder production build and built-environment scan: passed. A default build with the local `.env` fails closed before bundling.
 - Extension typecheck, Vitest (17 files / 84 tests), build, manifest validation, and unpacked Playwright (12/12): passed; the viewport test now emits and visually inspects 360×640 and 390×700 screenshots, and the Live remount race has deterministic page/extension-page console assertions.
 - FastAPI pytest: 26 passed; Supabase local pgTAP: 5 files / 291 passed after a fresh reset, including the six-table update-policy matrix.
@@ -18,7 +18,7 @@ This section records what is reproducible in the workspace; it is not a deployme
 ## Evidence and links
 
 - [x] Web repository local evidence commits: code baseline `5fcb87e`; latest tracked documentation `26d1e98`. The worktree still preserves unrelated uncommitted edits listed by `git status --short`.
-- [x] Canonical extension repository commit: `6630915` (clean worktree).
+- [x] Canonical extension repository commit: `397c682` (clean worktree).
 - [x] Deployed web URL: explicitly not deployed in this workspace; hosted deployment and smoke testing remain external.
 - [ ] Chrome Web Store/beta-access state: [link or approved invite-only state]
 - [ ] Demo video: [link]
