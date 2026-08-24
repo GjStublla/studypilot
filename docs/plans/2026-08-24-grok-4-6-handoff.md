@@ -27,6 +27,8 @@ Web:
 - Production build with approved public HTTPS placeholders: passed.
 - `node scripts/verify-built-env.mjs dist`: passed.
 - Web Playwright golden flow: 1/1 passed in 8.7s with a deterministic fixture covering rubric upload/extraction, rubric-scoped SSE coaching, action-item refresh, and reload persistence. The fixture uses only public placeholder values and is excluded from Vitest discovery.
+- Dashboard axe check: 0 violations on the authenticated action-items view during the same golden flow; the check is committed in `f89d658`.
+- Production-preview Lighthouse medians over three runs per route: landing performance `0.85`, accessibility `1.00`, best practices `1.00`, SEO `1.00`; auth performance `0.94`, accessibility `1.00`, best practices `1.00`, SEO `1.00`. These are local production-preview measurements, not hosted production claims.
 - Supabase local lint: exit 0; one pre-existing unused-local warning remains.
 - `npm run verify:release` with approved public placeholders: web tests/build/built-env passed; hosted allowlist explicitly skipped because `SUPABASE_ACCESS_TOKEN` is absent.
 
@@ -66,7 +68,7 @@ Extension:
 
 ### P2 — judging evidence and polish
 
-1. Run axe checks and Lighthouse medians for landing, auth, and dashboard; fix serious/critical accessibility issues and contrast/focus defects.
+1. ~~Run axe checks and Lighthouse medians for landing, auth, and dashboard; fix serious/critical accessibility issues and contrast/focus defects.~~ Landing/auth Lighthouse medians and authenticated-dashboard axe are complete in `f89d658`; a dashboard Lighthouse performance median remains a follow-up because the current browser fixture is mocked and must not be presented as hosted production evidence.
 2. Add canonical metadata, valid `robots.txt`, sitemap, and accurate claims across website, extension, README, report, and pitch.
 3. Write the architecture ADR and left-to-right system diagram showing browser clients, FastAPI CRUD, Supabase Auth/Realtime/Edge, Postgres/Storage, and Vertex AI.
 4. Run the 10–15 participant protocol with anonymous metrics; report limitations and never claim causal learning improvement without evidence.
