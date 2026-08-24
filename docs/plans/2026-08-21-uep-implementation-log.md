@@ -1242,3 +1242,9 @@ Web: this log only. Phase 5 was not started.
 - Commit `d2cf801` replaces the dashboard's global transcript-loading boolean with a per-session `DashboardRequestState` map. Loading, success, and error are now isolated to the selected session, and transcript failures render a retry action instead of silently becoming an empty transcript.
 - Added a dashboard characterization test for failure → retry → successful transcript recovery; the retry uses the selected session ID and does not refetch unrelated sessions.
 - Verification: targeted rubric/dashboard tests (9 tests), full web Vitest (16 files / 91 tests), and `npm run build` all passed. Unmount cancellation and request-state coverage for chat sends/rubric indexing remain open.
+
+### Phase 9A workspace-auth characterization — 2026-08-24
+
+- Canonical extension commit `31dbe0d` moved dashboard-origin checks and local/Supabase auth-session parsing from `useDashboardWorkspace.ts` into `workspaceAuth.ts`, retaining the `isDashboardBridgeOrigin` export used by the parent panel.
+- Added 3 tests for malformed storage, nested Supabase session normalization, dashboard-origin gating, and direct token reads. Non-browser origin checks now return `false` safely.
+- Extension verification: typecheck, 15 Vitest files / 71 tests, production build, manifest validation baseline, and 10/10 unpacked Playwright checks passed. Remaining workspace work is hook orchestration characterization and connected-chat golden-flow coverage.
