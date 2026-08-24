@@ -15,7 +15,7 @@ The implementation objective is therefore: make the product demonstrably reliabl
 - Canonical Chrome extension: `C:\Users\gjins\Desktop\studypilot-extension`
 - Preserve the untracked web `output/` directory and the existing formal plan.
 - Web remediation commits include `23ab897` (dashboard chat/session/rubric/context extraction), `60fdd2b` (shell and low-coupling view extraction), `7529dd3` (release/database verification repair), and `2ce5667` (implementation log).
-- Extension remediation commits include `d9f9fb1` (remove unreachable browser AI/mock/voice paths), `e281450` (split Supabase facade), and `279e91f` (extract pure panel components). The extension worktree is clean at this handoff.
+- Extension remediation commits include `d9f9fb1` (remove unreachable browser AI/mock/voice paths), `e281450` (split Supabase facade), `279e91f` (extract pure panel components), and `c295320` (live-state derivation and listener cleanup). The extension worktree is clean at this handoff.
 
 ## Verified evidence
 
@@ -31,10 +31,10 @@ Web:
 Extension:
 
 - Typecheck: passed.
-- Vitest: 12 files / 58 tests.
+- Vitest: 13 files / 60 tests.
 - Production build: passed.
 - Manifest validator: passed; no named microphone permission, no loopback production hosts, offscreen `USER_MEDIA` reason present.
-- Unpacked Playwright: 8/8 passed after the latest extraction.
+- Unpacked Playwright: 8/8 passed after the latest extraction and live cleanup slice.
 - `npm ls @google/generative-ai --depth=0`: empty; source and built bundle contain no `VITE_GEMINI_API_KEY`, `GoogleGenerativeAI`, or `@google/generative-ai`.
 
 ## Highest-priority remaining work
@@ -56,7 +56,7 @@ Extension:
 
 ### P1 — extension maintainability and narrow-width UX
 
-1. Add characterization tests for mount, chat reconciliation, save queue, live start/pause/resume/stop, and cleanup before moving logic.
+1. Expand characterization tests for chat reconciliation, save queue, and live start/pause/resume/stop before moving the remaining closures. Pure live-state derivation and several listener cleanups are already covered by `c295320`.
 2. Extract `useLiveCoaching.ts`, `useDashboardWorkspace.ts`, `ExtensionPanel.tsx`, `ContextSettings.tsx`, and `QuickActions.tsx` from `FloatingStudyPilot.tsx`.
 3. Keep live transitions explicit (`idle | starting | live | paused | stopping | error`) and make invalid control combinations unrenderable.
 4. Add 360x640 and 390x700 screenshots/E2E checks for fully visible quick actions, no header overlap, no horizontal scroll, and no duplicate listeners after rapid open/close.
