@@ -4,7 +4,7 @@
 
 This section records what is reproducible in the workspace; it is not a deployment or mentor sign-off.
 
-- Web local evidence baseline: `d85b27f` (with accessibility/performance, architecture, and scaffold commits `8db5a40`, `7a68341`, and `6a08fac`; later documentation commits record submission state).
+- Web local evidence baseline: `03a2da1` (with authorization evidence `d85b27f`, accessibility/performance, architecture, and scaffold commits `8db5a40`, `7a68341`, and `6a08fac`; later documentation commits record submission state).
 - Canonical extension local head: `9aa2ac3`; its worktree is clean. The latest slices include workspace-owned persistence, settled narrow-panel screenshot evidence, and mounted/latest-operation guards for Live and SpeechRecognition cleanup.
 - Web Vitest: 17 files / 96 tests; web Playwright: 4/4; production build and built-environment scan: passed.
 - Extension typecheck, Vitest (16 files / 76 tests), build, manifest validation, and unpacked Playwright (11/11): passed; the viewport test now emits and visually inspects 360×640 and 390×700 screenshots.
