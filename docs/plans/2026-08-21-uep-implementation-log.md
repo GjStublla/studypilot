@@ -1421,6 +1421,11 @@ Web: this log only. Phase 5 was not started.
 - The panel ignores older status fan-out, and `liveRuntime.privacy.test.ts` proves a delayed start failure after a newer stop returns the newer idle status without broadcasting a stale error.
 - Verification after the slice: extension Vitest passed 17 files / 83 tests; typecheck/build/manifest validation passed; unpacked Playwright passed 11/11. Hosted Vertex Live remains an external gate.
 
+### Phase 9A invalid pause guard — 2026-08-24
+
+- Canonical extension commit `d1af764` restricts pause/resume to `live` and `paused` states. The pause control is disabled during `starting`, `connecting`, and `stopping`, while the microphone remains available for canceling a start.
+- Added state assertions for the pause eligibility matrix. Verification after the slice: extension Vitest passed 17 files / 84 tests; typecheck/build/manifest validation passed; unpacked Playwright passed 11/11.
+
 ### Phase 1/2 privacy and claims audit — 2026-08-24
 
 - Reconciled the formal judging plan with the already-landed privacy/claims work: the landing-page local-processing language, tab-audio/exact-second/device-storage/no-account claims, extension disclosure, metadata, and report overview now have explicit checked rows and source/test evidence.
