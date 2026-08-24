@@ -1204,6 +1204,12 @@ Web: this log only. Phase 5 was not started.
 - Commit `dfd0e14` added tests proving per-chat concurrency, aggregate busy-state cleanup, pending-drain behavior after executor errors, and recovery after a failed save.
 - The queue behavior is now evidence-backed without changing the production queue implementation; targeted queue verification passed (7 tests).
 
+### Phase 8A dashboard request-state slice — 2026-08-24
+
+- Commit `281dafa` replaced the dashboard bootstrap `loading`/`loadError` boolean pair with the explicit `DashboardBootstrapState` union (`loading | ready | error`).
+- The existing `Promise.allSettled` partial-load behavior and retry UI are preserved; fatal error remains limited to the authenticated case where sessions, rubrics, and action items all fail.
+- Targeted dashboard chat/rubric tests (12 tests) and the production build passed. The pre-existing whitespace-only dashboard change remains unstaged and preserved.
+
 ### Phase 9A context-settings boundary — 2026-08-24
 
 - Commit `a5d6687` moved the privacy/context `SettingsSheet` and toggle primitive into `src/content/ContextSettings.tsx`; `FloatingStudyPilot` continues to re-export the same component for existing tests/imports.
