@@ -657,6 +657,7 @@ The extension has one live implementation, one dashboard integration path, and n
 - [ ] Edit out loading pauses, notifications, unrelated tabs, credentials, personal data, and browser debug UI; keep the final video under 1:58 to leave upload/transcode margin below two minutes.
 - [ ] Record a backup video and prepare a text-input fallback plus screenshots of each golden-path checkpoint.
 - [ ] Run the full release checklist from a clean clone, then have a teammate follow the README without verbal help.
+- [x] Reproduce the documented non-hosted release checklist from fresh committed-head clone `C:\Users\gjins\Desktop\studypilot-clean-clone-20260824-teammate-record` at `c39732c`; the independent teammate follow-up remains external.
 - [x] Prepare `docs/submission/hosted-golden-flow-checklist.md` with two clean-profile runs, checkpoint evidence, privacy/fallback rules, and owner sign-off; the actual hosted execution remains external.
 - [x] Prepare `docs/submission/teammate-reproduction-record.md` with exact-commit, README-only execution, deviation, and independent-sign-off fields; the actual teammate walkthrough remains external.
 
