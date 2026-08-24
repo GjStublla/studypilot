@@ -1438,3 +1438,7 @@ Web: this log only. Phase 5 was not started.
 ### UEP criterion evidence matrix — 2026-08-24
 
 - Added `docs/submission/judging-evidence-matrix.md`, mapping every pre-pitch and ceremony criterion to the artifact or test that supports it, the remaining owner/gate, and the two-minute demo cue. The matrix explicitly forbids turning local fixtures, placeholder URLs, test counts, or preview Lighthouse runs into hosted or causal claims.
+
+### Reproducibility checklist refresh — 2026-08-24
+
+- `README.md` now states Python 3.13 for direct FastAPI/pytest runs and points to the pinned `python:3.13-slim` backend image. The submission checklist now marks public-variable documentation, local test evidence, the visible hosted-check skip, and the current-tree secret scan as complete while retaining clean-clone, deployment, pilot, and approval gates.

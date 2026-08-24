@@ -23,6 +23,7 @@ the hosted daily limit.
 ### Prerequisites
 
 - Node.js 22 or later
+- Python 3.13 when running the FastAPI backend or pytest outside Docker (the backend image pins `python:3.13-slim`)
 - Docker Desktop
 - Gemini service-account credentials for real local AI responses
 
