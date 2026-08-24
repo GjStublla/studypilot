@@ -3,6 +3,10 @@
 **Target length:** 1:58 maximum
 **Status:** Script/template; record only after the deployed golden flow is verified.
 
+Synthetic rubric, paragraph, prompt sequence, and checkpoint expectations are
+in [`demo-fixture.md`](demo-fixture.md). The fixture is content-only; it does
+not replace a hosted demo account or pilot result.
+
 | Time | On screen | Spoken point |
 |---|---|---|
 | 0:00–0:12 | Weak paragraph and rubric | The problem is fragmented browser context, rubric criteria, and follow-up work. |

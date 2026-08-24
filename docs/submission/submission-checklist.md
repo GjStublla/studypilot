@@ -17,6 +17,7 @@ This section records what is reproducible in the workspace; it is not a deployme
 
 ## Evidence and links
 
+- Repository URLs: [web/dashboard](https://github.com/GjStublla/studypilot) and [canonical extension](https://github.com/GjStublla/studypilot-extension). The remote `main` heads are still the historical baselines; the local evidence commits below must be pushed and checked before submission.
 - [x] Web repository local evidence commits: code baseline `5fcb87e`; documentation evidence anchor `d1e28e2` (this checklist is subsequently refreshed as needed). The worktree still preserves unrelated uncommitted edits listed by `git status --short`.
 - [x] Canonical extension repository commit: `a77fe49` (clean worktree).
 - [x] Deployed web URL: explicitly not deployed in this workspace; hosted deployment and smoke testing remain external.
@@ -25,6 +26,7 @@ This section records what is reproducible in the workspace; it is not a deployme
 - [ ] Backup video/screenshots: [secure location]
 - [ ] Pilot summary: [link after approved collection]
 - [x] Architecture diagram PNG: `docs/architecture/system.png` (`7a68341`; include the repository link in the final submission)
+- [x] Credential-free synthetic demo fixture: `docs/submission/demo-fixture.md`; hosted account creation and recording remain external.
 
 ## Reproducibility
 
