@@ -24,6 +24,7 @@
     "verify:release": "node scripts/verify-release.mjs",
     "validate:submission": "node scripts/validate-submission-package.mjs",
     "validate:claims": "node scripts/validate-claims.mjs --include-demo-script --require-demo-script",
+    "validate:pitch": "node scripts/validate-claims.mjs --include-pitch-brief --require-pitch-brief",
     "validate:pilot": "node scripts/validate-pilot-results.mjs",
     "extension:build": "npm run build --prefix ../studypilot-extension"
   },

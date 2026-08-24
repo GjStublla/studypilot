@@ -54,7 +54,8 @@ The current evidence includes web Vitest, FastAPI pytest, local Supabase pgTAP, 
 The reproducible local snapshot is: web Vitest 19 files/106 tests, web
 Playwright 4/4, FastAPI pytest 26 tests, local Supabase pgTAP 291 assertions,
 and the canonical extension Vitest 20 files/98 tests with unpacked Playwright
-15/15. The current web release wrapper also passes claim tests (8/8),
+15/15. The current web release wrapper also passes claim tests (11/11), the
+sibling-aware six-document claim check, the pitch-brief retired-claim guard,
 submission-artifact tests (7/7), the public-placeholder production build, and
 the built-environment scan. These are local engineering signals, not hosted
 availability, clean-profile production proof, pilot outcomes, or causal

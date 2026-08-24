@@ -698,7 +698,7 @@ These are not decisions Grok may make alone:
 
 ### Product integrity
 
-- [ ] Website, extension, README, report, and pitch make the same capability/privacy claims. Code-facing surfaces and the demo script now pass `npm run validate:claims` (the script is guarded for retired claims, while its evidence/timing and final pitch wording still need human review).
+- [ ] Website, extension, README, report, and pitch make the same capability/privacy claims. Code-facing surfaces and the demo script pass `npm run validate:claims`, while the human-owned pitch brief passes `npm run validate:pitch`; final pitch wording, evidence, and approval still require human review.
 - [x] Screenshot capture and dashboard persistence default off and are independently honored. (extension privacy tests and E2E settings coverage)
 - [x] No browser bundle contains or requests a Gemini API key or service-role secret. (source/bundle scan and extension dependency audit)
 - [x] Install, extension-help, privacy, terms, cookies, and changelog actions all work. (web navigation tests and extension handoff coverage)

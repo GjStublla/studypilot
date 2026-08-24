@@ -25,6 +25,7 @@ function run(label, command, args) {
 run('tests', 'npm', ['test']);
 run('claims tests', 'node', ['--test', 'scripts/validate-claims.test.mjs']);
 run('claims', 'npm', ['run', 'validate:claims']);
+run('pitch claims', 'npm', ['run', 'validate:pitch']);
 run('submission artifact tests', 'node', ['--test', 'scripts/validate-submission-package.test.mjs']);
 run('submission artifacts', 'npm', ['run', 'validate:submission']);
 run('production build', 'npm', ['run', 'build']);

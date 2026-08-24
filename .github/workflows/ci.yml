@@ -97,6 +97,7 @@ jobs:
         run: |
           node --test scripts/validate-claims.test.mjs
           npm run validate:claims
+          npm run validate:pitch
 
       - name: Validate submission artifacts
         run: |

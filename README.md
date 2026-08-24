@@ -77,6 +77,7 @@ npm test
 npm run test:deno
 node --test scripts/validate-claims.test.mjs
 npm run validate:claims
+npm run validate:pitch
 node --test scripts/validate-submission-package.test.mjs
 npm run validate:submission
 npm run validate:pilot
