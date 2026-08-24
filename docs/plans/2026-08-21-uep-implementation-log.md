@@ -1184,7 +1184,7 @@ Web: this log only. Phase 5 was not started.
 - Commit `1b33f60` extracted the quick-action chip composition into `QuickActions.tsx` without changing the parent panel wrapper or callback behavior.
 - Commit `7a7051c` made the pause control unavailable outside an active Live state and prevented `togglePause` from creating an impossible idle/paused combination.
 - Commit `f19a8ec` extracted auth, shared-chat reconciliation, session continuation, in-flight tracking, and dashboard bridging into `useDashboardWorkspace.ts`; it also hardens the no-runtime Live fallback to text/speech coaching.
-- The extension now has 10 unpacked Playwright checks: rapid open/close host stability plus settled geometry assertions at 360×640 and 390×700. Typecheck, 14 Vitest files / 66 tests, production build, manifest validation, and the targeted repeated microphone fallback check passed. One full-suite run still exposed a timing-sensitive microphone assertion that reported the stale `Mic muted` label; rerun that case before treating the browser gate as green.
+- The extension now has 10 unpacked Playwright checks: rapid open/close host stability with page-error/console-error capture plus settled geometry, quick-action text, and overflow assertions at 360×640 and 390×700. Typecheck, 14 Vitest files / 68 tests, production build, manifest validation, and the repeated microphone fallback check passed; the latest full browser run passed 10/10.
 - Remaining Phase 9A: focused `ExtensionPanel`/context composition, direct workspace-hook characterization, save-queue coverage, and a browser-backed connected-chat golden flow.
 
 ### Phase 9A panel-shell composition — 2026-08-24
