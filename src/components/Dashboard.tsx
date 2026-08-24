@@ -1,11 +1,9 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   View,
   Theme,
   CoachMode,
   SessionRow,
-  DashboardBootstrapState,
-  DashboardRequestState,
 } from './dashboard/dashboard-types';
 import { Sidebar, TopBar } from './dashboard/DashboardShell';
 import { ActionItemsView } from './dashboard/ActionItemsView';
@@ -17,55 +15,42 @@ import { RubricsView, type UploadedRubric } from './dashboard/RubricsView';
 import { ChatView } from './dashboard/ChatView';
 import { ContextPanel } from './dashboard/ContextPanel';
 import { SessionDetailView } from './dashboard/SessionDetailView';
+import { ExtensionHelpModal } from './dashboard/ExtensionHelpModal';
+import { useDashboardData } from './dashboard/useDashboardData';
 export { ChatView } from './dashboard/ChatView';
 import { clearAuth, apiFetch } from '../lib/api';
 import { AUTH_REQUIRED } from '../lib/authConfig';
-import { supabase } from '../lib/supabaseClient';
 import {
-  getAiUsage,
   createDashboardChat,
   deleteDashboardChat,
-  getDashboardChatMessages,
-  getDashboardChats,
   getOrCreateRubricChat,
   getOrCreateSessionChat,
   retryRubricIndexing,
   updateDashboardChat,
-  type AiUsage,
 } from '../lib/studypilot-api';
 import {
-  fetchSessions,
-  fetchRubrics,
-  fetchActionItems,
   fetchSessionTranscript,
   setActionItemDone,
   activateRubric,
-  type ActionItem,
   type Rubric,
   type Session,
-  type TranscriptLine,
 } from '../lib/dashboardApi';
 import { sendCoachingMessage } from '../lib/socraticCoach';
-import { useStudyPilotRealtime } from '../lib/useRealtime';
 import type { DashboardChat } from '../lib/studypilot-types';
 import {
-  dashboardChatReducer,
   isChatBusy,
   isChatHistoryLoading,
   selectChatMessages,
 } from '../lib/dashboard-chat-state';
 import { formatDashboardRoute, parseDashboardRoute } from '../lib/dashboard-route';
-import { BETA_ACCESS_MAILTO, getChromeWebStoreUrl } from '../lib/productLinks';
 import {
-  normalizeIndexStatus,
   resolveChatRubricContext,
+  normalizeIndexStatus,
 } from '../lib/chat-rubric-context';
 import './dashboard/DashboardShell.css';
 import './dashboard/ChatView.css';
 import './dashboard/ContentViews.css';
 import './Dashboard.css';
-
-import { X } from 'lucide-react';
 
 /* ============================================================================
    StudyPilot — Dashboard
@@ -132,303 +117,57 @@ export default function Dashboard({
     parseDashboardRoute(routeHash).chatId ? 'chat' : 'home'
   ));
 
-  // ── Live data from the backend ──────────────────────────────────────────────
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [rubrics, setRubrics] = useState<Rubric[]>([]);
-  const [actionItems, setActionItems] = useState<ActionItem[]>([]);
-  const [chats, setChats] = useState<DashboardChat[]>([]);
-  const [activeChatId, setActiveChatId] = useState<string | null>(null);
-  const [chatState, dispatchChat] = useReducer(dashboardChatReducer, {});
-  const [draftCreating, setDraftCreating] = useState(false);
-  const [chatRequestState, setChatRequestState] = useState<DashboardRequestState>({ status: 'idle' });
-  const [transcripts, setTranscripts] = useState<Record<string, TranscriptLine[]>>({});
-  const [transcriptStates, setTranscriptStates] = useState<Record<string, DashboardRequestState>>({});
-  const [rubricIndexRequestStates, setRubricIndexRequestStates] = useState<Record<string, DashboardRequestState>>({});
-  const [bootstrapState, setBootstrapState] = useState<DashboardBootstrapState>({ status: 'loading' });
-  const [aiUsage, setAiUsage] = useState<AiUsage | null>(null);
-  const [extensionHelpOpen, setExtensionHelpOpen] = useState(false);
-  const chatsRef = useRef<DashboardChat[]>([]);
-  const activeChatIdRef = useRef<string | null>(null);
-  const chatListVersionRef = useRef(0);
-  const hasLoadedChatsRef = useRef(false);
-  const chatLoadVersionsRef = useRef(new Map<string, number>());
-  const rubricIndexRequestVersionsRef = useRef(new Map<string, number>());
-  const transcriptRequestVersionsRef = useRef(new Map<string, number>());
-  const dashboardMountedRef = useRef(true);
-  const inFlightChatIdsRef = useRef(new Set<string>());
-  const draftCreatingRef = useRef(false);
-
-  useEffect(() => {
-    dashboardMountedRef.current = true;
-    return () => {
-      dashboardMountedRef.current = false;
-      transcriptRequestVersionsRef.current.clear();
-    };
-  }, []);
-
-  useEffect(() => { chatsRef.current = chats; }, [chats]);
-  useEffect(() => { activeChatIdRef.current = activeChatId; }, [activeChatId]);
-
-  const refreshAiUsage = useCallback(() => {
-    if (!AUTH_REQUIRED) return;
-    getAiUsage().then((usage) => {
-      if (dashboardMountedRef.current) setAiUsage(usage);
-    }).catch(() => {
-      // The migration may not be deployed yet; usage UI is optional in that case.
-    });
-  }, []);
-
-  const refreshChats = useCallback(async (): Promise<DashboardChat[]> => {
-    const version = ++chatListVersionRef.current;
-    if (dashboardMountedRef.current) setChatRequestState({ status: 'loading' });
-
-    try {
-      const rows = await getDashboardChats();
-      if (!dashboardMountedRef.current || version !== chatListVersionRef.current) return chatsRef.current;
-
-      const firstLoad = !hasLoadedChatsRef.current;
-      hasLoadedChatsRef.current = true;
-      setChats(rows);
-      setChatRequestState({ status: 'success' });
-      const current = activeChatIdRef.current;
-      const next = firstLoad && current === null
-        ? rows[0]?.id ?? null
-        : current && !rows.some((chat) => chat.id === current)
-          ? rows[0]?.id ?? null
-          : current;
-      activeChatIdRef.current = next;
-      setActiveChatId(next);
-      if (!firstLoad && current && current !== next) replaceDashboardHash(next);
-      return rows;
-    } catch (error) {
-      if (dashboardMountedRef.current && version === chatListVersionRef.current) {
-        setChatRequestState({
-          status: 'error',
-          message: error instanceof Error ? error.message : 'Could not load chats',
-        });
-      }
-      throw error;
-    }
-  }, []);
-
-  const loadChatMessages = useCallback(async (chatId: string): Promise<void> => {
-    if (!dashboardMountedRef.current) return;
-    const version = (chatLoadVersionsRef.current.get(chatId) ?? 0) + 1;
-    chatLoadVersionsRef.current.set(chatId, version);
-    dispatchChat({ type: 'load-started', chatId, version });
-    try {
-      const rows = await getDashboardChatMessages(chatId);
-      if (!dashboardMountedRef.current) return;
-      dispatchChat({ type: 'load-succeeded', chatId, version, rows });
-    } catch (error) {
-      if (!dashboardMountedRef.current) return;
-      console.error('Failed to load dashboard chat messages:', error);
-      dispatchChat({ type: 'load-failed', chatId, version });
-    }
-  }, []);
-
-  const invalidateChat = useCallback((chatId: string) => {
-    dispatchChat({ type: 'invalidate', chatId });
-    if (activeChatIdRef.current === chatId) void loadChatMessages(chatId);
-  }, [loadChatMessages]);
-
-  // ── Realtime subscriptions ─────────────────────────────────────────────────
-  const [userId, setUserId] = useState<string | null>(null);
-
-  // Resolve the Supabase UUID for realtime channel filtering.
-  // For email/password users the user ID is already in localStorage (sp_user_id).
-  // For OAuth users it comes from the Supabase session.
-  // We avoid calling supabase.auth.getUser() here because it makes a network
-  // request that can 403 if the token is expired or the client has no session yet.
-  useEffect(() => {
-    // Try localStorage first — populated immediately after any login
-    const storedId = localStorage.getItem('sp_user_id');
-    if (storedId) {
-      setUserId(storedId);
-      return;
-    }
-    // Fallback for OAuth users whose ID may only be in the Supabase session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (dashboardMountedRef.current && session?.user?.id) setUserId(session.user.id);
-    }).catch(() => { /* not fatal */ });
-  }, []);
-
-  useStudyPilotRealtime(userId, {
-    onNewSession: () => {
-      void fetchSessions().then((rows) => {
-        if (dashboardMountedRef.current) setSessions(rows);
-      }).catch(() => undefined);
-    },
-    onSessionChanged: () => {
-      void fetchSessions().then((rows) => {
-        if (dashboardMountedRef.current) setSessions(rows);
-      }).catch(() => undefined);
-    },
-    onSessionMessageChanged: (payload) => {
-      const sessionId = (payload.new as Record<string, unknown>).session_id;
-      if (typeof sessionId !== 'string') return;
-      void fetchSessionTranscript(sessionId)
-        .then((lines) => {
-          if (!dashboardMountedRef.current) return;
-          setTranscripts((current) => ({ ...current, [sessionId]: lines }));
-          setTranscriptStates((current) => ({ ...current, [sessionId]: { status: 'success' } }));
-        })
-        .catch((error) => {
-          if (!dashboardMountedRef.current) return;
-          setTranscriptStates((current) => ({
-            ...current,
-            [sessionId]: {
-              status: 'error',
-              message: error instanceof Error ? error.message : 'Transcript unavailable',
-            },
-          }));
-        });
-    },
-    onDocumentUpdated: (doc) => {
-      if (!dashboardMountedRef.current) return;
-      // Update rubric status if document is linked to a rubric
-      if (doc.rubric_id) {
-        const status = normalizeIndexStatus(doc.index_status);
-        setRubrics((prev) =>
-          prev.map((r) =>
-            r.id === doc.rubric_id
-              ? {
-                ...r,
-                file_search_status: status,
-                fileSearchStatus: status,
-                knowledgeDocumentId: doc.id ?? r.knowledgeDocumentId,
-              }
-              : r
-          )
-        );
-      }
-    },
-    onActionItemChanged: (payload) => {
-      if (!dashboardMountedRef.current) return;
-      if (payload.eventType === 'INSERT') {
-        setActionItems((prev) => [payload.new as ActionItem, ...prev]);
-      } else if (payload.eventType === 'UPDATE') {
-        setActionItems((prev) =>
-          prev.map((item) =>
-            item.id === (payload.new as Record<string, unknown>).id ? payload.new as ActionItem : item
-          )
-        );
-      } else if (payload.eventType === 'DELETE') {
-        const deletedId = (payload.old as Record<string, unknown>).id;
-        setActionItems((prev) => prev.filter((item) => item.id !== deletedId));
-      }
-    },
-    onRubricChanged: (payload) => {
-      if (!dashboardMountedRef.current) return;
-      if (payload.eventType === 'INSERT') {
-        setRubrics((prev) => [payload.new as Rubric, ...prev]);
-      } else if (payload.eventType === 'UPDATE') {
-        setRubrics((prev) =>
-          prev.map((r) =>
-            r.id === (payload.new as Record<string, unknown>).id ? payload.new as Rubric : r
-          )
-        );
-      } else if (payload.eventType === 'DELETE') {
-        const deletedId = (payload.old as Record<string, unknown>).id;
-        setRubrics((prev) => prev.filter((r) => r.id !== deletedId));
-      }
-    },
-    onDashboardChatChanged: () => {
-      if (!dashboardMountedRef.current) return;
-      void refreshChats().catch(() => undefined);
-    },
-    onDashboardChatMessageChanged: (payload) => {
-      if (!dashboardMountedRef.current) return;
-      const chatId = (payload.new as Record<string, unknown>).chat_id;
-      if (typeof chatId === 'string') invalidateChat(chatId);
-    },
-    onSubscribed: () => {
-      if (!dashboardMountedRef.current) return;
-      void refreshChats().catch(() => undefined);
-      const activeId = activeChatIdRef.current;
-      if (activeId) void loadChatMessages(activeId);
-    },
-  });
-
   const [activeRubricId, setActiveRubricId] = useState<string>('');
   const [selectedSessionId, setSelectedSessionId] = useState<string>('');
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
-  // Real profile from the backend; starts as the email-derived guess so first
-  // paint isn't blank, then gets replaced with the actual name/initials/email.
-  const [student, setStudent] = useState(STUDENT);
   // Default coach mode also comes from the profile; persisted back via PATCH /users/me.
   const [coachMode, setCoachMode] = useState<CoachMode>('essay');
-
-  // Load the signed-in user's real profile. apiFetch refreshes the token on a
-  // 401 and, if that fails, redirects to #auth — so this doubles as the session
-  // validity check on dashboard entry (no longer trusting mere token presence).
-  useEffect(() => {
-    let cancelled = false;
-    apiFetch('/users/me')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((profile) => {
-        if (cancelled || !profile) return;
-        setStudent({
-          name: profile.name,
-          email: profile.email,
-          initials: profile.initials,
-        });
-        if (profile.default_coach_mode) {
-          setCoachMode(profile.default_coach_mode as CoachMode);
-        }
-        // Backend is authoritative for a logged-in user — adopt the saved theme
-        // (React bails out if it already matches, so no needless re-render/flash).
-        if (profile.theme === 'light' || profile.theme === 'dark') {
-          setTheme(profile.theme);
-          try {
-            window.localStorage.setItem(THEME_STORAGE_KEY, profile.theme);
-          } catch {
-            /* localStorage unavailable */
-          }
-        }
-      })
-      .catch(() => {
-        /* network error or expired session (already redirected) — keep fallback */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Load sessions, rubrics, action items, and chats in parallel. allSettled means one
-  // failing endpoint doesn't blank the whole dashboard — we render whatever loaded.
-  useEffect(() => {
-    let cancelled = false;
-    Promise.allSettled([fetchSessions(), fetchRubrics(), fetchActionItems(), refreshChats()])
-      .then(([s, r, a]) => {
-        if (cancelled) return;
-        if (s.status === 'fulfilled') setSessions(s.value);
-        if (r.status === 'fulfilled') {
-          setRubrics(r.value);
-          const active = r.value.find((x) => x.active) ?? r.value[0];
-          if (active) setActiveRubricId((prev) => prev || active.id);
-        }
-        if (a.status === 'fulfilled') setActionItems(a.value);
-        const fatalLoadError =
-          AUTH_REQUIRED &&
-          s.status === 'rejected' &&
-          r.status === 'rejected' &&
-          a.status === 'rejected';
-        setBootstrapState({ status: fatalLoadError ? 'error' : 'success' });
-      })
-      .catch(() => {
-        if (!cancelled) setBootstrapState({ status: 'success' });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [refreshChats]);
-
-  useEffect(() => {
-    refreshAiUsage();
-  }, [refreshAiUsage]);
-
   const replaceChatRoute = useCallback(replaceDashboardHash, []);
+
+  const {
+    sessions,
+    rubrics,
+    setRubrics,
+    actionItems,
+    setActionItems,
+    chats,
+    setChats,
+    activeChatId,
+    setActiveChatId,
+    chatState,
+    dispatchChat,
+    draftCreating,
+    setDraftCreating,
+    chatRequestState,
+    transcripts,
+    setTranscripts,
+    transcriptStates,
+    setTranscriptStates,
+    rubricIndexRequestStates,
+    setRubricIndexRequestStates,
+    bootstrapState,
+    aiUsage,
+    student,
+    chatsRef,
+    activeChatIdRef,
+    rubricIndexRequestVersionsRef,
+    transcriptRequestVersionsRef,
+    dashboardMountedRef,
+    inFlightChatIdsRef,
+    draftCreatingRef,
+    refreshAiUsage,
+    refreshChats,
+    loadChatMessages,
+  } = useDashboardData({
+    initialStudent: STUDENT,
+    selectedSessionId,
+    replaceChatRoute,
+    setActiveRubricId,
+    setCoachMode,
+    setTheme,
+  });
+
+  const [extensionHelpOpen, setExtensionHelpOpen] = useState(false);
 
   useEffect(() => {
     const chatRequestSettled = chatRequestState.status === 'success'
@@ -447,38 +186,6 @@ export default function Dashboard({
   useEffect(() => {
     if (activeChatId) void loadChatMessages(activeChatId);
   }, [activeChatId, loadChatMessages]);
-
-  useEffect(() => {
-    let refreshPending = false;
-    const refreshCanonicalState = () => {
-      if (document.visibilityState === 'hidden' || refreshPending) return;
-      refreshPending = true;
-      const activeId = activeChatIdRef.current;
-      void Promise.allSettled([
-        refreshChats(),
-        activeId ? loadChatMessages(activeId) : Promise.resolve(),
-        fetchSessions().then((rows) => {
-          if (dashboardMountedRef.current) setSessions(rows);
-        }),
-        selectedSessionId
-          ? fetchSessionTranscript(selectedSessionId).then((lines) => {
-            if (!dashboardMountedRef.current) return;
-            setTranscripts((current) => ({ ...current, [selectedSessionId]: lines }));
-            setTranscriptStates((current) => ({ ...current, [selectedSessionId]: { status: 'success' } }));
-          })
-          : Promise.resolve(),
-      ]).finally(() => {
-        refreshPending = false;
-      });
-    };
-
-    window.addEventListener('focus', refreshCanonicalState);
-    document.addEventListener('visibilitychange', refreshCanonicalState);
-    return () => {
-      window.removeEventListener('focus', refreshCanonicalState);
-      document.removeEventListener('visibilitychange', refreshCanonicalState);
-    };
-  }, [loadChatMessages, refreshChats, selectedSessionId]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -1226,81 +933,6 @@ export default function Dashboard({
   );
 }
 
-/* ============================================================================
-   Sidebar
-   ============================================================================ */
-
-/* ============================================================================
-   Chat view
-   ============================================================================ */
-
 function titleFromFirstMessage(text: string): string {
   return text.replace(/\s+/g, ' ').trim().slice(0, 40) || 'New chat';
-}
-
-
-
-/* ============================================================================
-   Sessions view
-   ============================================================================ */
-
-
-function ExtensionHelpModal({ onClose }: { onClose: () => void }) {
-  const storeUrl = getChromeWebStoreUrl();
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
-  return (
-    <div
-      className="ds-modal-backdrop"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="extension-help-title"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="ds-modal">
-        <div className="ds-modal-head">
-          <h2 id="extension-help-title" className="ds-modal-title">
-            Open the StudyPilot extension
-          </h2>
-          <button type="button" className="ds-icon-btn" onClick={onClose} aria-label="Close">
-            <X size={14} strokeWidth={1.7} />
-          </button>
-        </div>
-        <div className="ds-modal-body">
-          <p className="ds-help-lead">
-            StudyPilot lives in Chrome. Install it, pin it, then click the toolbar icon on the page you are studying.
-          </p>
-          <ol className="ds-help-steps">
-            <li>
-              {storeUrl ? (
-                <>
-                  Install the extension from the{' '}
-                  <a href={storeUrl} target="_blank" rel="noopener noreferrer">
-                    Chrome Web Store
-                  </a>
-                  .
-                </>
-              ) : (
-                <>
-                  Install the Chrome extension. The public listing is not live yet — this beta is invite-only.{' '}
-                  <a href={BETA_ACCESS_MAILTO}>Request beta access</a>.
-                </>
-              )}
-            </li>
-            <li>Pin StudyPilot to the Chrome toolbar so the icon stays visible.</li>
-            <li>Open a study page and click the StudyPilot toolbar icon to start coaching.</li>
-          </ol>
-        </div>
-      </div>
-    </div>
-  );
 }
