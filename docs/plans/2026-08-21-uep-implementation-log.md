@@ -1408,3 +1408,9 @@ Web: this log only. Phase 5 was not started.
 - Canonical extension commit `8499b79` adds a small tested panel lifecycle boundary. Coaching, study-mode, dashboard-save, screenshot, file-read, and clipboard continuations now check mounted/current operation state before applying late results; a newer coaching or study-mode operation supersedes the previous one.
 - Added `panelLifecycle.test.ts` with mounted/latest, unmounted, and superseded-operation assertions. The workspace hook's existing mounted guard remains the owner of persistence-request cleanup.
 - Verification after the slice: extension typecheck passed; Vitest passed 17 files / 79 tests; production build passed; manifest validation passed; unpacked Playwright passed 11/11. The remaining evidence gap is a browser-level hosted Live start/stop/unmount run with unhandled-promise assertions.
+
+### Phase 9A explicit Live control transitions — 2026-08-24
+
+- Canonical extension commit `7301083` makes the panel enter `starting` before an active-chat Live request, `stopping` before a stop request, and `error` on failed starts/stops instead of leaving the mic control in a misleading busy state.
+- A pure `liveMicIntent` boundary now distinguishes Live stop, SpeechRecognition stop, resume, start, and ignore-while-stopping. The mic control remains cancelable during `starting`/`connecting`, ignores a second click during `stopping`, and can mute fallback SpeechRecognition without sending another Live request.
+- Verification after the slice: focused live-state tests passed (8 assertions), full extension Vitest passed 17 files / 80 tests, typecheck/build/manifest validation passed, and unpacked Playwright passed 11/11. Hosted Vertex Live remains an external gate.
