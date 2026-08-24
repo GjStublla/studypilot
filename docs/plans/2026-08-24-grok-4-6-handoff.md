@@ -49,7 +49,7 @@ Extension:
 
 ### P1 — dashboard maintainability and release confidence
 
-1. Keep `Dashboard.tsx` orchestration-only and reduce it below the plan's 1,000-line target. It is currently about 1,161 lines.
+1. Keep `Dashboard.tsx` orchestration-only and reduce it below the plan's 1,000-line target. It is currently about 1,303 lines after the request-state guards; the exact next boundaries are CSS splitting and any remaining orchestration-only helpers.
 2. Add explicit request-state unions for the remaining dashboard fetches and add stale-promise/unmount cleanup tests; `DashboardBootstrapState` now centralizes `idle | loading | success | error` in `9dd63b2`, `d2cf801` applies the same state boundary to per-session transcript loading/error/retry, `a989db6` ignores superseded/unmounted transcript responses, `6814cc5` applies the boundary to chat-list refreshes and common realtime/session fallbacks, `431533f` versions rubric-index retries, and `a667fff` prevents late chat-stream dispatches after dashboard unmount. CSS splitting and the deterministic web Playwright golden flow remain open.
 3. Split `Dashboard.css` into shell, chat, and content-view styles without changing selector scope or visual behavior.
 4. Add the deterministic web Playwright golden flow: upload/select rubric, grounded prompt, Socratic follow-up, action item, reload, and verify the same chat.
