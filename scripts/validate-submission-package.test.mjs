@@ -9,6 +9,7 @@ import {
   findPendingFinalInputs,
   parseCliArgs,
   validateDemoTimeline,
+  validateChecklistOwnership,
   validateReportSections,
   validateSubmissionArtifacts,
 } from './validate-submission-package.mjs';
@@ -41,6 +42,13 @@ test('rejects an overlong or incomplete demo timeline', () => {
   assert.equal(result.ok, false);
   assert.ok(result.failures.some(failure => /1:58 maximum/.test(failure)));
   assert.ok(result.failures.some(failure => /text-input fallback/.test(failure)));
+});
+
+test('requires an owner annotation for pending human-owned checklist items', () => {
+  assert.equal(validateChecklistOwnership('- [ ] Demo video: [link] — Owner: demo lead').ok, true);
+  const result = validateChecklistOwnership('- [ ] Demo video: [link]');
+  assert.equal(result.ok, false);
+  assert.match(result.failures[0], /needs an owner/);
 });
 
 test('reports human-owned final inputs without treating them as structural failures', () => {

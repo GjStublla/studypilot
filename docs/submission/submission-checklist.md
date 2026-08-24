@@ -28,10 +28,10 @@ This section records what is reproducible in the workspace; it is not a deployme
 - [x] Web repository local evidence commits: code baseline `5fcb87e`; latest documentation commits include the panel-body, auth-success, release-gate, demo-claim, and submission-artifact updates. The worktree still preserves unrelated uncommitted edits listed by `git status --short`.
 - [x] Canonical extension repository commit: `92887aa` (clean worktree).
 - [x] Deployed web URL: explicitly not deployed in this workspace; hosted deployment and smoke testing remain external.
-- [ ] Chrome Web Store/beta-access state: [link or approved invite-only state]
-- [ ] Demo video: [link]
-- [ ] Backup video/screenshots: [secure location]
-- [ ] Pilot summary: [link after approved collection]
+- [ ] Chrome Web Store/beta-access state: [link or approved invite-only state] — Owner: deployment/release lead
+- [ ] Demo video: [link] — Owner: demo lead
+- [ ] Backup video/screenshots: [secure location] — Owner: demo lead
+- [ ] Pilot summary: [link after approved collection] — Owner: pilot lead
 - [x] Architecture diagram PNG: `docs/architecture/system.png` (`7a68341`; include the repository link in the final submission)
 - [x] Credential-free synthetic demo fixture: `docs/submission/demo-fixture.md`; hosted account creation and recording remain external.
 
@@ -47,8 +47,8 @@ This section records what is reproducible in the workspace; it is not a deployme
 
 ## Safety and sign-off
 
-- [ ] Historical service-account credential rotation approved and recorded privately.
+- [ ] Historical service-account credential rotation approved and recorded privately. — Owner: repository owner/security lead
 - [x] No secret-bearing `.env`, service-account JSON, access token, refresh token, or service-role key is present in the current tracked tree; historical service-account rotation remains a human gate.
-- [ ] Website, extension, README, report, and pitch use the same capability/privacy claims.
-- [ ] Team members approve their contribution text.
-- [ ] Mentor/team owner signs off the report, video, deployed URL, and final checklist.
+- [ ] Website, extension, README, report, and pitch use the same capability/privacy claims. — Owner: product/communications lead
+- [ ] Team members approve their contribution text. — Owner: team lead
+- [ ] Mentor/team owner signs off the report, video, deployed URL, and final checklist. — Owner: team lead / mentor

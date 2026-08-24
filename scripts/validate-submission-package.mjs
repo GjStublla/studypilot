@@ -35,6 +35,8 @@ export const CHECKLIST_ARTIFACT_MARKERS = Object.freeze([
   'Pilot summary',
 ]);
 
+const HUMAN_OWNED_CHECKLIST_ITEM = /(?:Historical|Chrome|Demo|Backup|Pilot|Team members|Mentor|Deployed)/i;
+
 function seconds(timestamp) {
   const match = /^(\d+):(\d{2})$/.exec(timestamp);
   if (!match) return null;
@@ -103,6 +105,16 @@ export function validateChecklistMarkers(text) {
   return { ok: failures.length === 0, failures };
 }
 
+export function validateChecklistOwnership(text) {
+  const failures = String(text)
+    .split(/\r?\n/)
+    .filter(line => /^\s*-\s*\[ \]/.test(line) && HUMAN_OWNED_CHECKLIST_ITEM.test(line))
+    .filter(line => !/\bOwner\s*:\s*\S/i.test(line))
+    .map(line => `pending checklist item needs an owner: ${line.trim()}`);
+
+  return { ok: failures.length === 0, failures };
+}
+
 export function findPendingFinalInputs({ report, checklist }) {
   const pending = [];
   const reportSource = String(report);
@@ -125,10 +137,12 @@ export function validateSubmissionArtifacts({ report, demo, checklist }) {
   const reportResult = validateReportSections(report);
   const demoResult = validateDemoTimeline(demo);
   const checklistResult = validateChecklistMarkers(checklist);
+  const ownershipResult = validateChecklistOwnership(checklist);
   const failures = [
     ...reportResult.failures,
     ...demoResult.failures,
     ...checklistResult.failures,
+    ...ownershipResult.failures,
   ];
 
   return {
@@ -138,6 +152,7 @@ export function validateSubmissionArtifacts({ report, demo, checklist }) {
     report: reportResult,
     demo: demoResult,
     checklist: checklistResult,
+    ownership: ownershipResult,
   };
 }
 
