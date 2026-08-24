@@ -39,6 +39,7 @@ Web:
 - Production build with approved public HTTPS placeholders: passed.
 - `node scripts/verify-built-env.mjs dist`: passed.
 - Web Playwright golden flow: 1/1 passed (latest full run 18.7s, including axe) with a deterministic fixture covering rubric upload/extraction, rubric-scoped SSE coaching, action-item refresh, and reload persistence. The fixture uses only public placeholder values and is excluded from Vitest discovery.
+- Repeatability check: the complete web Playwright suite passed 4/4 twice consecutively after the auth-recovery slice, using fresh Playwright contexts each run. This strengthens local fixture evidence but is not a hosted clean-profile claim.
 - Dashboard axe check: 0 violations on the authenticated action-items view during the same golden flow; public landing, sign-in, and account-creation axe states also have no serious/critical violations. The checks are committed in `f89d658` and `8db5a40`.
 - Post-change production-preview Lighthouse medians over three runs per route/device: mobile landing performance `0.96` (LCP `2.63s`, CLS `0`), mobile auth `0.96` (LCP `2.58s`, CLS `0`), desktop landing `0.91` (LCP `0.81s`, CLS `0`), and desktop auth `1.00` (LCP `0.55s`, CLS `0`); every route scored `1.00` for accessibility, best practices, and SEO. These are local production-preview measurements, not hosted production claims; exact commands and artifacts are recorded in `context/performance-notes.md`.
 - Supabase local lint: exit 0; one pre-existing unused-local warning remains.
