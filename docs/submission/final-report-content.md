@@ -51,6 +51,16 @@ The implementation used characterization-first phases. Existing behavior was tes
 
 The current evidence includes web Vitest, FastAPI pytest, local Supabase pgTAP, extension Vitest, TypeScript builds, manifest validation, and unpacked extension Playwright. Hosted deployment, production smoke testing, pilot collection, and the final clean-profile golden flow remain explicit release gates rather than implied by local tests.
 
+The reproducible local snapshot is: web Vitest 19 files/106 tests, web
+Playwright 4/4, FastAPI pytest 26 tests, local Supabase pgTAP 291 assertions,
+and the canonical extension Vitest 20 files/98 tests with unpacked Playwright
+15/15. The current web release wrapper also passes claim tests (8/8),
+submission-artifact tests (6/6), the public-placeholder production build, and
+the built-environment scan. These are local engineering signals, not hosted
+availability, clean-profile production proof, pilot outcomes, or causal
+learning evidence; the hosted function allowlist is explicitly skipped when
+protected credentials are unavailable.
+
 ## 5. Technical Stack
 
 | Layer | Technologies used in the submitted code |
