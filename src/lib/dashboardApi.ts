@@ -34,9 +34,11 @@ export type Rubric = {
   sessionsCount: number;
   criteria: RubricCriterion[];
   knowledgeDocumentId?: string | null;
+  knowledge_document_id?: string | null;
   fileSearchStatus?: FileSearchStatus;
   file_search_status?: FileSearchStatus;
   fileSearchError?: string | null;
+  file_search_error?: string | null;
 };
 
 export type Session = {
@@ -49,7 +51,10 @@ export type Session = {
   rubricId: string | null;
   /** Canonical dashboard chat id when the session continues an existing chat. */
   chatId: string | null;
+  /** Compatibility fields for realtime rows not yet passed through the mapper. */
+  chat_id?: string | null;
   screenshotPath?: string | null;
+  screenshot_path?: string | null;
   summary: string;
 };
 
