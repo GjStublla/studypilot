@@ -1,6 +1,8 @@
-# StudyPilot final report content (draft)
+# StudyPilot final report content (submission draft)
 
-Phase 2 starts the report with Overview, Problem, and Solution only. Later phases add development process, stack, architecture, features, challenges, and team contributions.
+The nine required sections are present in the PDF's order. Team contribution
+text, deployment links, pilot measurements, and media links remain approval or
+external-release inputs and are intentionally not invented here.
 
 These sections describe what the beta does. They do not claim measured gains in learning, citation accuracy, speed, privacy, or reliability.
 

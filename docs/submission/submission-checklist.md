@@ -4,7 +4,7 @@
 
 This section records what is reproducible in the workspace; it is not a deployment or mentor sign-off.
 
-- Web local evidence baseline: `5fcb87e` (with adapter-boundary evidence `4bd77c8`, prop-contract evidence `03a2da1`, authorization evidence `d85b27f`, accessibility/performance, architecture, and scaffold commits `8db5a40`, `7a68341`, and `6a08fac`; later documentation commits record submission state).
+- Web local evidence baseline: `5fcb87e` (with adapter-boundary evidence `4bd77c8`, prop-contract evidence `03a2da1`, authorization evidence `d85b27f`, unconfigured-Supabase import fix `d694163`, accessibility/performance, architecture, and scaffold commits `8db5a40`, `7a68341`, and `6a08fac`; later documentation commits record submission state).
 - Canonical extension local head: `6138fb0`; its worktree is clean. The latest slices include workspace-owned persistence, settled narrow-panel screenshot evidence, mounted/latest-operation guards for Live and SpeechRecognition cleanup, teardown ownership for panel timers/Web Audio/confetti animation, stale-result guards for panel coaching/study/save/capture/file/clipboard continuations, explicit Live start/stop/fallback control transitions, correlated service-worker status operations, valid-state pause/resume controls, panel Live-status hydration/remount characterization, and typed Pomodoro and selection-tooltip body extractions.
 - Web Vitest: 17 files / 96 tests; web Playwright: 4/4; public-placeholder production build and built-environment scan: passed. A default build with the local `.env` fails closed before bundling.
 - Extension typecheck, Vitest (17 files / 84 tests), build, manifest validation, and unpacked Playwright (12/12): passed; the viewport test now emits and visually inspects 360×640 and 390×700 screenshots, and the Live remount race has deterministic page/extension-page console assertions.
@@ -30,7 +30,7 @@ This section records what is reproducible in the workspace; it is not a deployme
 
 - [x] Node 22+ and Python prerequisites documented in `README.md` (Python 3.13 is also pinned by `backend/Dockerfile`).
 - [x] Public build variables documented without secrets in `README.md`, `.env.example`, and the release workflow placeholders.
-- [ ] Backend and local Supabase setup tested from a clean clone.
+- [x] Backend and local Supabase setup tested from a clean clone: `npm ci`, web Vitest 17/96, Deno 42, placeholder production build plus `verify-built-env`, backend pytest 26, `npx supabase start`, pgTAP 5 files/291 tests, `npx supabase stop --no-backup`, and web Playwright 4/4 all passed in the isolated 2026-08-24 clone. A bare production build without public variables failed closed as designed.
 - [x] Web Vitest, Deno, pytest, pgTAP, build, and built-environment scan recorded in the implementation log and CI workflow.
 - [x] Extension typecheck, Vitest, build, manifest validation, and unpacked Playwright recorded above.
 - [x] Hosted allowlist is visibly marked skipped because protected Supabase secrets are unavailable; production smoke checks remain an external gate.
