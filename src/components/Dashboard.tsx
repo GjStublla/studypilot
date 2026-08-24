@@ -29,6 +29,7 @@ import {
   updateDashboardChat,
 } from '../lib/studypilot-api';
 import {
+  fetchActionItems,
   fetchSessionTranscript,
   setActionItemDone,
   activateRubric,
@@ -531,6 +532,9 @@ export default function Dashboard({
         inFlightChatIdsRef.current.delete(chatId);
         if (!dashboardMountedRef.current) return;
         refreshAiUsage();
+        void fetchActionItems().then((rows) => {
+          if (dashboardMountedRef.current) setActionItems(rows);
+        }).catch(() => undefined);
         dispatchChat({ type: 'invalidate', chatId });
         void loadChatMessages(chatId);
         void refreshChats().catch(() => undefined);
