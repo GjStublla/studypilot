@@ -80,6 +80,8 @@ npm run validate:claims
 node --test scripts/validate-submission-package.test.mjs
 npm run validate:submission
 npm run validate:pilot
+npx playwright install chromium
+npm run test:e2e -- --reporter=line
 python -m pip install -r backend/requirements.txt -r backend/requirements-dev.txt
 python -m pytest backend/tests -q
 npx supabase start
