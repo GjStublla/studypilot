@@ -15,7 +15,7 @@ The implementation objective is therefore: make the product demonstrably reliabl
 - Canonical Chrome extension: `C:\Users\gjins\Desktop\studypilot-extension`
 - Preserve the untracked web `output/` directory and the existing formal plan.
 - Web remediation commits include `23ab897` (dashboard chat/session/rubric/context extraction), `60fdd2b` (shell and low-coupling view extraction), `7529dd3` (release/database verification repair), and `2ce5667` (implementation log).
-- Extension remediation commits include `d9f9fb1` (remove unreachable browser AI/mock/voice paths), `e281450` (split Supabase facade), `279e91f` (extract pure panel components), and `c295320` (live-state derivation and listener cleanup). The extension worktree is clean at this handoff.
+- Extension remediation commits include `d9f9fb1` (remove unreachable browser AI/mock/voice paths), `e281450` (split Supabase facade), `279e91f` (extract pure panel components), `c295320` (live-state derivation and listener cleanup), and `5ea85a0` (history secret-scan CI). The extension worktree is clean at this handoff.
 
 ## Verified evidence
 
@@ -60,7 +60,7 @@ Extension:
 2. Extract `useLiveCoaching.ts`, `useDashboardWorkspace.ts`, `ExtensionPanel.tsx`, `ContextSettings.tsx`, and `QuickActions.tsx` from `FloatingStudyPilot.tsx`.
 3. Keep live transitions explicit (`idle | starting | live | paused | stopping | error`) and make invalid control combinations unrenderable.
 4. Add 360x640 and 390x700 screenshots/E2E checks for fully visible quick actions, no header overlap, no horizontal scroll, and no duplicate listeners after rapid open/close.
-5. Keep `studypilotSupabase.ts` as the public facade; its auth/chat modules now exist and must retain the current tests.
+5. Keep `studypilotSupabase.ts` as the public facade; its auth/chat modules now exist and must retain the current tests. Extension-specific history secret scanning is now in CI; branch protection remains an admin gate.
 
 ### P2 — judging evidence and polish
 
