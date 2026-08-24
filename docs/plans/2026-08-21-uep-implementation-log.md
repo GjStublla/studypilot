@@ -1271,3 +1271,10 @@ Web: this log only. Phase 5 was not started.
 - Canonical extension commit `29d5731` added a mounted/latest-request predicate and applied it to auth refresh, shared-chat refresh, canonical message loading, selection, session continuation, and dashboard bridging. Late responses no longer update unmounted UI or replace a newer active-chat selection.
 - Added `useDashboardWorkspace.test.ts` characterization coverage for accepted current requests, unmounted/superseded/inactive-chat rejection, and context refreshes without a target chat.
 - Extension verification: typecheck, 16 Vitest files / 74 tests, production build, manifest validation, and 10/10 unpacked Playwright checks passed. The connected-chat golden flow remains open.
+
+### Phase 8B dashboard chat request lifecycle — 2026-08-24
+
+- Canonical web commit `6814cc5` replaced the chat-list loaded boolean with `DashboardRequestState` (`idle | loading | success | error`), so a failed initial chat fetch settles route selection instead of leaving the requested chat in an indeterminate state.
+- Added mounted guards for chat message loads, AI-usage refreshes, Supabase session fallback, realtime session refreshes, rubric/action-item events, chat invalidations, and focus refreshes. Superseded chat-list responses now leave the current list untouched.
+- Added a regression test for a failed chat-list request on a deep-linked chat route. Focused dashboard tests passed (21); full web Vitest passed 16 files / 92 tests; `npx tsc --noEmit`, production build, and `npm run verify:release` with approved public HTTPS placeholders passed. The release command explicitly skipped the hosted function allowlist because no token was present.
+- Remaining dashboard lifecycle work: explicit states for rubric indexing and chat sends, complete unmount/stale characterization, CSS splitting, and the deterministic web Playwright golden flow.
