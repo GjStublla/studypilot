@@ -646,7 +646,7 @@ The extension has one live implementation, one dashboard integration path, and n
 - [x] Use three evidence-backed challenges: cross-surface chat synchronization, privacy-safe live context/persistence controls, and grounded rubric retrieval with secure model brokering. The current draft ties each to implementation boundaries and tests without claiming measured outcomes.
 - [ ] Obtain each member's approved role/contribution text; do not infer contribution percentages from Git commit counts.
 - [ ] Add repository links, deployed web URL, Chrome Store or beta-access state, video link, environment prerequisites, and exact setup/test commands to `submission-checklist.md`.
-- [ ] Prepare a deterministic demo account with one short rubric, one deliberately weak paragraph, one existing chat, and one empty action-item slot; store credentials outside Git.
+- [ ] Create the deterministic hosted demo account with one existing chat and one empty action-item slot; store credentials outside Git. The credential-free rubric/paragraph/prompt fixture is prepared in `docs/submission/demo-fixture.md`.
 - [ ] Record this golden path: `0:00-0:12` problem and promise; `0:12-0:28` rubric upload/selection; `0:28-0:48` weak paragraph in browser; `0:48-1:13` grounded coaching and Socratic follow-up; `1:13-1:31` create action item; `1:31-1:47` open same chat/session in dashboard; `1:47-1:58` measured pilot result and closing differentiator.
 - [ ] Edit out loading pauses, notifications, unrelated tabs, credentials, personal data, and browser debug UI; keep the final video under 1:58 to leave upload/transcode margin below two minutes.
 - [ ] Record a backup video and prepare a text-input fallback plus screenshots of each golden-path checkpoint.

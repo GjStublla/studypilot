@@ -64,6 +64,11 @@ Extension:
 3. Supply real production public build values and run the hosted Edge Function allowlist check. Record a visible skip when secrets are absent.
 4. Configure branch protection so non-secret CI jobs are required. Keep hosted checks and production smoke tests protected by environment secrets.
 
+5. Use the credential-free [demo fixture](../submission/demo-fixture.md) when
+   creating the human-owned hosted demo account; the GitHub remotes are
+   documented in the submission checklist, but the new local commits are not
+   pushed yet.
+
 ### P1 — dashboard maintainability and release confidence
 
 1. Keep `Dashboard.tsx` orchestration-only and below the plan's 1,000-line target. It is now 938 lines after `0cf07d5`, with data loading, realtime reconciliation, profile/bootstrap state, stale-request refs, and the extension-help modal extracted. Remaining work is behavior-level browser evidence, not another broad shell rewrite.
