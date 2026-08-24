@@ -1290,3 +1290,9 @@ Web: this log only. Phase 5 was not started.
 - Canonical web commit `a667fff` guards chat creation, stream token/commit/failure dispatches, chat refreshes, rename/delete rollback, and AI-usage cleanup after the dashboard unmounts. The in-flight ref is still cleared, but late UI work is ignored.
 - Added a regression test that unmounts the dashboard while a stream is pending, then delivers a late token and rejection without logging a stale stream error.
 - Full web Vitest passed 16 files / 94 tests and the production build passed. Remaining dashboard lifecycle work is CSS splitting and the deterministic web Playwright golden flow; explicit request state for chat sends is already represented by `DashboardChatState` pending-turn statuses.
+
+### Phase 9A composer composition — 2026-08-24
+
+- Canonical extension commit `4ffdc79` extracted the screenshot strip, file input, paste handling boundary, question input, and send control into `src/content/ComposerPanel.tsx`.
+- `FloatingStudyPilot.tsx` is now approximately 1,884 lines; answer-card, composer, study-mode, shell, settings, quick-actions, and chat-switcher boundaries are explicit. The remaining parent still owns stage/voice/session orchestration and the connected-chat surface.
+- Extension verification after the extraction: typecheck, 16 Vitest files / 74 tests, production build, manifest validation, and 10/10 unpacked Playwright checks passed sequentially.
