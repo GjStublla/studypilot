@@ -1137,3 +1137,10 @@ Web: this log only. Phase 5 was not started.
 - Full extension Vitest (12 files / 58 tests), typecheck, and production build passed after extraction.
 - Remaining Phase 9A work: extract the live and dashboard-workspace state machines, then compose the panel from focused `ExtensionPanel`, `ContextSettings`, and `QuickActions` components with narrow-width E2E coverage.
 - The unpacked extension Playwright suite was re-run after the extraction: 8/8 tests passed, including panel injection, toolbar-equivalent toggle, privacy defaults, independent page-URL context, microphone denial recovery, and dashboard handoff.
+
+### Phase 9A live-state characterization slice — 2026-08-24
+
+- Canonical extension commit `c295320` added the pure `liveCoachingState` boundary and characterization tests for busy states and microphone/pause/freeze/fallback derivation.
+- Fixed cleanup leaks in the extension shell: `voiceschanged` and dashboard `visibilitychange` listeners now remove the exact callback, and unmount cleanup stops speech recognition, cancels speech synthesis, and clears the notice timer.
+- Extension verification after the slice: 13 Vitest files / 60 tests, typecheck, production build, manifest validation, and 8/8 unpacked Playwright tests passed.
+- The full `useLiveCoaching` and `useDashboardWorkspace` extraction remains open; this slice deliberately reduces risk before moving those closures.
