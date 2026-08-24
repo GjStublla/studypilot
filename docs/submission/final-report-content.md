@@ -62,7 +62,7 @@ The current evidence includes web Vitest, FastAPI pytest, local Supabase pgTAP, 
 
 ## 6. Architectural Design Diagram
 
-The source diagram is `docs/architecture/system.mmd`; its decision record is `docs/adr/0001-runtime-boundaries.md`. FastAPI owns profile/session/rubric/action-item CRUD. Supabase owns Auth, RLS, Realtime, Storage, Edge chat/RAG/live workflows, and cross-surface synchronization. Browser clients never receive model or service-role secrets.
+The source diagram is `docs/architecture/system.mmd`, with the report-readable render at `docs/architecture/system.png`; its decision record is `docs/adr/0001-runtime-boundaries.md`. FastAPI owns profile/session/rubric/action-item CRUD. Supabase owns Auth, RLS, Realtime, Storage, Edge chat/RAG/live workflows, and cross-surface synchronization. Browser clients never receive model or service-role secrets.
 
 ## 7. Features Implemented
 

@@ -1,5 +1,18 @@
 # UEP submission checklist
 
+## Local phase evidence — 2026-08-24
+
+This section records what is reproducible in the workspace; it is not a deployment or mentor sign-off.
+
+- Web local release head: `cc36ec2` (includes `8db5a40`, `7a68341`, and `6a08fac`).
+- Canonical extension local head: `ea76936`; its worktree is clean.
+- Web Vitest: 17 files / 96 tests; web Playwright: 4/4; production build and built-environment scan: passed.
+- Extension typecheck, Vitest (16 files / 74 tests), build, manifest validation, and unpacked Playwright (11/11): passed.
+- Local Lighthouse medians and axe evidence: `context/performance-notes.md`; hosted dashboard performance remains unmeasured.
+- Hosted Supabase allowlist: visibly skipped because the process did not contain `SUPABASE_ACCESS_TOKEN`.
+- Architecture diagram: `docs/architecture/system.png` from `7a68341`.
+- Current external state: no deployed URL, Chrome Web Store URL, pilot dataset, video, or contribution approvals have been supplied in this workspace.
+
 ## Evidence and links
 
 - [ ] Web repository commit: [exact SHA]
@@ -9,7 +22,7 @@
 - [ ] Demo video: [link]
 - [ ] Backup video/screenshots: [secure location]
 - [ ] Pilot summary: [link after approved collection]
-- [ ] Architecture diagram PNG: [link after rendering]
+- [x] Architecture diagram PNG: `docs/architecture/system.png` (`7a68341`; include the repository link in the final submission)
 
 ## Reproducibility
 
