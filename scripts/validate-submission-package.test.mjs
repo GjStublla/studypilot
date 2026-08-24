@@ -7,6 +7,7 @@ import {
   CONTRIBUTION_TEMPLATE_MARKERS,
   EXPECTED_DEMO_RANGES,
   HOSTED_FLOW_MARKERS,
+  REPRODUCTION_RECORD_MARKERS,
   REQUIRED_REPORT_SECTIONS,
   findPendingFinalInputs,
   parseCliArgs,
@@ -14,6 +15,7 @@ import {
   validateDemoTimeline,
   validateChecklistOwnership,
   validateHostedGoldenFlow,
+  validateReproductionRecord,
   validateReportSections,
   validateSubmissionArtifacts,
 } from './validate-submission-package.mjs';
@@ -24,6 +26,7 @@ const demo = fs.readFileSync(path.join(ROOT, 'docs/submission/demo-script.md'), 
 const checklist = fs.readFileSync(path.join(ROOT, 'docs/submission/submission-checklist.md'), 'utf8');
 const hostedFlow = fs.readFileSync(path.join(ROOT, 'docs/submission/hosted-golden-flow-checklist.md'), 'utf8');
 const contributionTemplate = fs.readFileSync(path.join(ROOT, 'docs/submission/team-contributions-template.md'), 'utf8');
+const reproductionRecord = fs.readFileSync(path.join(ROOT, 'docs/submission/teammate-reproduction-record.md'), 'utf8');
 
 test('accepts the checked-in report section order', () => {
   const result = validateReportSections(report);
@@ -73,13 +76,21 @@ test('requires a safe, human-owned contribution template', () => {
   assert.equal(validateContributionTemplate('approved role only').ok, false);
 });
 
+test('requires a non-claiming teammate reproduction record', () => {
+  const result = validateReproductionRecord(reproductionRecord);
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.failures, []);
+  assert.ok(REPRODUCTION_RECORD_MARKERS.length >= 6);
+  assert.equal(validateReproductionRecord('clean clone only').ok, false);
+});
+
 test('reports human-owned final inputs without treating them as structural failures', () => {
   const pending = findPendingFinalInputs({
     report: '## 1. Project Overview\n- [Member name]',
     checklist: '- [ ] Demo video: [link]',
   });
   assert.equal(pending.length, 2);
-  const result = validateSubmissionArtifacts({ report, demo, checklist, hostedFlow, contributionTemplate });
+  const result = validateSubmissionArtifacts({ report, demo, checklist, hostedFlow, contributionTemplate, reproductionRecord });
   assert.equal(result.ok, true);
   assert.ok(result.pendingInputs.length > 0);
 });
