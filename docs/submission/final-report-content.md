@@ -56,7 +56,7 @@ Playwright 4/4, FastAPI pytest 26 tests, local Supabase pgTAP 291 assertions,
 and the canonical extension Vitest 20 files/98 tests with unpacked Playwright
 15/15. The current web release wrapper also passes claim tests (11/11), the
 sibling-aware six-document claim check, the pitch-brief retired-claim guard,
-submission-artifact tests (8/8), the public-placeholder production build, and
+submission-artifact tests (9/9), the public-placeholder production build, and
 the built-environment scan. These are local engineering signals, not hosted
 availability, clean-profile production proof, pilot outcomes, or causal
 learning evidence; the hosted function allowlist is explicitly skipped when
@@ -105,6 +105,11 @@ Rubric grounding is asynchronous and may fail or remain unavailable. The UI expo
 ## 9. Team Contributions
 
 Replace the placeholders below with each member's approved contribution text. Do not infer percentages from Git history.
+
+Use the human-owned [team contributions and sign-off template](team-contributions-template.md)
+to collect member approvals and mentor/team sign-off. The template is a
+preparation aid, not approval evidence; names, roles, percentages, links, and
+dates remain blank until the team supplies and approves them.
 
 **Owner:** The team lead must replace these placeholders with approved member names and contribution text before submission.
 
