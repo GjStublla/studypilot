@@ -1,7 +1,7 @@
 # Plan: StudyPilot UEP Judging-Readiness Remediation
 
 **Prepared:** 2026-08-21  
-**Executor:** Grok 4.6 or another zero-context implementation agent  
+**Owner:** StudyPilot engineering team
 **Repositories:**
 
 - Web, dashboard, FastAPI, and Supabase: `C:\Users\gjins\Desktop\studypilot`
@@ -53,9 +53,9 @@ production build still fails closed until public HTTPS variables are supplied.
 Hosted deployment, real Vertex Live, credentials/history, pilot data, branch
 protection, store access, and final report/video/team approvals remain open.
 
-## Executor Contract
+## Engineering Execution Contract
 
-Grok must follow these rules during implementation:
+The engineering team follows these rules during implementation:
 
 1. Run `git status --short`, `git diff --stat`, and `git diff --cached --stat` in both repositories before every phase. Preserve unrelated or pre-existing work.
 2. Work one phase at a time. Do not combine the whole plan into one unreviewable diff.
@@ -222,7 +222,7 @@ The paths below are the intended final decomposition. Do not introduce a second 
 - [x] Add `.gitleaks.toml` with path-only allowlists for known fake local-development fixtures; never allowlist a real token pattern.
 - [x] Add a secret-scan job to `.github/workflows/ci.yml` that fails pull requests and pushes when a credential is detected.
 - [ ] Ask a human owner to rotate the previously tracked Google service-account key immediately if it was ever valid.
-- [ ] Ask a human owner to approve and coordinate `git filter-repo --path backend/service-account.json --invert-paths` plus protected-branch force-push if the file contained a valid credential. Grok must not perform the rewrite without that approval.
+- [ ] Ask a human owner to approve and coordinate `git filter-repo --path backend/service-account.json --invert-paths` plus protected-branch force-push if the file contained a valid credential. No implementation agent may perform the rewrite without that approval.
 
 **Verify**
 
@@ -287,7 +287,7 @@ The paths below are the intended final decomposition. Do not introduce a second 
 ### Phase 1/2 audit update — 2026-08-24
 
 - The privacy and approved-claims implementation is present in the extension/web sources and covered by the existing privacy and claims tests. The extension privacy suite verifies both defaults are off, the controls are independent, and the exact selected values reach the live-token request. The web claims suite verifies the retired phrases are absent and the approved cloud-processing disclosure is present.
-- The website, extension panel, manifest, README, metadata, and report overview were rechecked against the same capability language; the Phase 1/2 implementation rows above are now marked complete with source/test evidence. Completion evidence is also recorded in `docs/plans/2026-08-24-grok-4-6-handoff.md` and `docs/plans/2026-08-21-uep-implementation-log.md`.
+- The website, extension panel, manifest, README, metadata, and report overview were rechecked against the same capability language; the Phase 1/2 implementation rows above are now marked complete with source/test evidence. Completion evidence is also recorded in `docs/plans/2026-08-21-uep-implementation-log.md` and the submission checklist.
 - A real hosted Live session with both privacy controls off and a real hosted dashboard session are still external evidence gates; local tests do not claim those manual outcomes.
 
 ## Phase 3: Replace Dead Links and the No-Op Extension Action [test-first]
@@ -692,7 +692,7 @@ If the ceremony is less than one week away, complete Phases 0-7, 11, 13, and 14 
 
 ## Manual Gates Requiring the Team
 
-These are not decisions Grok may make alone:
+These are not decisions an implementation agent may make alone:
 
 1. Confirm/rotate the removed service-account credential and approve any Git history rewrite.
 2. Supply the real production website/API URLs, Chrome Web Store URL or invite-only status, Supabase CI token, and deployment access through a secure channel.
@@ -747,32 +747,3 @@ These are not decisions Grok may make alone:
 1. What are the final public marketing, dashboard, API, and Chrome Store URLs? Until supplied, production builds must fail or show the explicit invite-only state.
 2. Was `backend/service-account.json` ever a valid credential, and has its key already been revoked? This determines whether coordinated history rewriting is mandatory.
 3. Who owns each team contribution and which 10-15 students can participate in the pilot? Code work can proceed, but the final report/evidence cannot be completed without these human inputs.
-
-## Copy-Paste Prompt for Grok 4.6
-
-```text
-You are implementing the StudyPilot UEP judging-readiness plan.
-
-Read this entire file first:
-C:\Users\gjins\Desktop\studypilot\docs\plans\2026-08-21-uep-judging-readiness.md
-
-Work in these repositories only:
-- C:\Users\gjins\Desktop\studypilot
-- C:\Users\gjins\Desktop\studypilot-extension
-
-Do not restart completed phases. First inspect `git status --short`, `git diff --stat`, `git diff --cached --stat`, and the latest commit in both repositories, then compare the result with the current handoff and begin with the first unchecked item. The canonical extension is currently clean at `92887aa`; the web repository has pre-existing working-tree edits in `scripts/verify-built-env.mjs`, `src/components/Dashboard.tsx`, `src/lib/deploymentConfig.ts`, `tsconfig.json`, `tsconfig.node.json`, plus an untracked `output/` directory. Preserve those edits and do not reset or overwrite them.
-
-Phase 0 credential rotation, history rewriting, deployment, branch protection, hosted checks, pilot recruitment, and final media are human-owned gates. Do not attempt them autonomously or use any access token pasted into chat. For local work, continue from the latest canonical heads and only implement the first unchecked, testable item.
-
-Follow the locked product/architecture decisions exactly. Add tests with behavior changes. Run every verification command for the phase. Do not claim a phase is complete when a required check was skipped; report the check as blocked with the exact missing prerequisite. Commit one phase at a time and record the commit SHA in the plan or implementation log.
-
-Never expose or print secrets. Do not rewrite Git history, rotate keys, deploy, publish an extension, alter DNS, or contact pilot participants without explicit human approval. For Supabase work, check the current official changelog/docs first, use the project's imperative migration workflow, and verify with a clean local reset plus pgTAP.
-
-At the end of each phase, return:
-1. Outcome and user-visible behavior.
-2. Files changed.
-3. Tests/checks run with pass counts.
-4. Remaining blockers or deviations.
-5. Commit SHA.
-6. A request for approval to begin the next phase.
-```

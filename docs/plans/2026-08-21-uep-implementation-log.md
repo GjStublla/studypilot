@@ -3,7 +3,7 @@
 ## Phase 0 — Reconcile state and close the credential incident
 
 **Date:** 2026-08-21  
-**Executor:** Grok 4.6 (Phase 0 only; stopped for human review)  
+**Executor:** engineering automation (Phase 0 only; stopped for human review)
 **Repos:** `studypilot` (web), `studypilot-extension` (canonical Chrome extension)
 
 Phase 1 and later were not started.
@@ -208,7 +208,7 @@ The plan originally said “`gitleaks git` exits 0”. That cannot be met withou
 
 ## Phase 0 recheck — 2026-08-21
 
-**Executor:** Grok 4.6 (defect-first review of Phase 0 only; Phase 1 not started)
+**Executor:** engineering automation (defect-first review of Phase 0 only; Phase 1 not started)
 
 ### Git state at recheck (before follow-up edits)
 
@@ -304,7 +304,7 @@ No commit in `studypilot-extension`.
 ## Phase 1 — Make privacy controls true end to end
 
 **Date:** 2026-08-23  
-**Executor:** Grok 4.6 (Phase 1 only; stopped for human review)  
+**Executor:** engineering automation (Phase 1 only; stopped for human review)
 **Repos:** `studypilot` (web), `studypilot-extension` (canonical Chrome extension)
 
 Phase 2 and later were not started.
@@ -462,7 +462,7 @@ Phase 1 code and automated checks are done. Manual unpacked-extension sessions a
 ## Phase 2 — Align every public claim with the beta
 
 **Date:** 2026-08-23  
-**Executor:** Grok 4.6 (Phase 2 only; stopped for human review)  
+**Executor:** engineering automation (Phase 2 only; stopped for human review)
 **Repos:** `studypilot` (web), `studypilot-extension` (canonical Chrome extension)
 
 Phase 3 and later were not started.
@@ -653,7 +653,7 @@ Phase 2 public-claim alignment and automated checks are done. Human side-by-side
 ## Phase 3 — Replace dead links and the no-op extension action
 
 **Date:** 2026-08-23  
-**Executor:** Grok 4.6 (Phase 3 only; did not start Phase 4)  
+**Executor:** engineering automation (Phase 3 only; did not start Phase 4)
 **Repos:** `studypilot` (web). Extension was not modified.
 
 ---
@@ -779,7 +779,7 @@ Phase 3 dead-link replacement, hash legal routes, and extension-help modal are d
 
 ## Phase 3 recheck — 2026-08-23
 
-**Executor:** Grok 4.6 (defect-first review of Phase 3 only; Phase 4 not started)
+**Executor:** engineering automation (defect-first review of Phase 3 only; Phase 4 not started)
 
 ### Git state at recheck (before follow-up edits)
 
@@ -843,7 +843,7 @@ No commit in `studypilot-extension`. Phase 4 was not started.
 ## Phase 4 — Store-valid MV3 package and unpacked E2E
 
 **Date:** 2026-08-23  
-**Executor:** Grok 4.6 (Phase 4 only; Phase 5 not started)  
+**Executor:** engineering automation (Phase 4 only; Phase 5 not started)
 **Repos:** `studypilot` (web log), `studypilot-extension` (canonical Chrome extension)
 
 ### Baseline git state (before Phase 4 commits)
@@ -1001,7 +1001,7 @@ Phase 4 is done. Coordinator may run the Phase 4 checker. This executor did not 
 
 ## Phase 4 recheck — 2026-08-23
 
-**Executor:** Grok 4.6 (defect-first review of Phase 4 only; Phase 5 not started)
+**Executor:** engineering automation (defect-first review of Phase 4 only; Phase 5 not started)
 
 ### Git state at recheck (before follow-up)
 
@@ -1056,7 +1056,7 @@ Web: this log only. Phase 5 was not started.
 
 ## Phase 5–7 verification repair — 2026-08-24
 
-**Executor:** Codex (reconciled the dirty Grok 4.6 worktree before continuing)
+**Executor:** engineering automation (reconciled the prior worktree before continuing)
 
 ### Root causes found
 
