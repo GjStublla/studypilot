@@ -1100,3 +1100,10 @@ Web: this log only. Phase 5 was not started.
 - `npx tsc --noEmit`, `npm test` (14 files / 85 tests), and an approved-environment production build passed; the built-environment scan passed afterward.
 - This slice remains uncommitted because `Dashboard.tsx` already contained unrelated whitespace-only working-tree edits from the prior agent. The semantic changes are intentionally preserved for the next dashboard extraction commit.
 - Follow-up commit `5f68749` adds compatibility aliases for realtime rows; targeted dashboard/chat tests pass (3 files / 19 tests).
+
+### Phase 8A extraction result
+
+- Commit `60fdd2b` extracted `DashboardShell`, `HomeView`, `ActionItemsView`, `SettingsView`, and shared dashboard primitives/types into `src/components/dashboard/`.
+- `Dashboard.tsx` is now 2,461 lines (down from 3,249) and the extracted files range from 60 to 203 lines.
+- `npx tsc --noEmit`, full Vitest (14 files / 85 tests), approved-environment production build, and `verify-built-env` all passed after extraction.
+- The remaining 2,461-line shell still owns chat/session/rubric orchestration and views; Phase 8B is the next refactor slice.
