@@ -17,15 +17,15 @@ The implementation objective is therefore: make the product demonstrably reliabl
 - Preserve the untracked web `output/` directory and the existing formal plan.
 - Web remediation commits include `23ab897` (dashboard chat/session/rubric/context extraction), `60fdd2b` (shell and low-coupling view extraction), `7529dd3` (release/database verification repair), `2ce5667` (implementation log), `281dafa` (explicit dashboard bootstrap request state), `078cb9b` (typed Supabase adapters and realtime payload boundaries), `9dd63b2` (centralized idle/loading/success/error bootstrap state), `d2cf801` (per-session transcript request state and retry UI), `a989db6` (stale transcript response guards), `6814cc5` (chat-list request state and dashboard async lifecycle guards), `431533f` (versioned rubric-index retry state), `a667fff` (chat-stream unmount cleanup), `e1632fe` (dashboard stylesheet boundaries and source-contract tests), `0cf07d5` (typed dashboard data/realtime/profile lifecycle hook plus extension-help modal extraction), `c34cd77` (refresh action items after a committed coaching turn), `2b47d6c` (deterministic web rubric/chat/action-item/reload golden flow), `f89d658` (axe/accessibility fixes plus locked audit tooling), and `8db5a40` (public axe coverage plus responsive WebGL/performance remediation and Lighthouse evidence).
 - Documentation cleanup commits include `7a68341` (report-readable architecture PNG) and `6a08fac` (removal of the tracked non-production extension scaffold after canonical-repo audit).
-- Extension remediation commits include `d9f9fb1` (remove unreachable browser AI/mock/voice paths), `e281450` (split Supabase facade), `279e91f` (extract pure panel components), `c295320` (live-state derivation and listener cleanup), `5ea85a0` (history secret-scan CI), `818a500` (live coaching hook), `d9ff60d` (pure chat selection/presentation state), `1b33f60` (quick-actions component), `7a7051c` (invalid idle pause prevention), `f19a8ec` (dashboard workspace hook, fallback hardening, rapid-toggle and narrow-viewport E2E), `da2dfb0` (panel shell/header composition), `53a3715` (typed shared-chat switcher), `a5d6687` (isolated context/privacy settings), `dfd0e14` (save-queue concurrency/error characterization), `206da8d` (study-mode panel composition), `31dbe0d` (isolated workspace auth parsing), `7283a69` (answer-card panel composition), `29d5731` (mounted/latest-response guards for workspace async work), `4ffdc79` (composer panel composition), `e68730a` (voice-dock composition), and `ea76936` (stateful Supabase fixture plus connected-chat/reload E2E). The extension worktree is clean at this handoff.
+- Extension remediation commits include `d9f9fb1` (remove unreachable browser AI/mock/voice paths), `e281450` (split Supabase facade), `279e91f` (extract pure panel components), `c295320` (live-state derivation and listener cleanup), `5ea85a0` (history secret-scan CI), `818a500` (live coaching hook), `d9ff60d` (pure chat selection/presentation state), `1b33f60` (quick-actions component), `7a7051c` (invalid idle pause prevention), `f19a8ec` (dashboard workspace hook, fallback hardening, rapid-toggle and narrow-viewport E2E), `da2dfb0` (panel shell/header composition), `53a3715` (typed shared-chat switcher), `a5d6687` (isolated context/privacy settings), `dfd0e14` (save-queue concurrency/error characterization), `206da8d` (study-mode panel composition), `31dbe0d` (isolated workspace auth parsing), `7283a69` (answer-card panel composition), `29d5731` (mounted/latest-response guards for workspace async work), `4ffdc79` (composer panel composition), `e68730a` (voice-dock composition), `ea76936` (stateful Supabase fixture plus connected-chat/reload E2E), `fe8d5f5` (workspace-owned dashboard persistence), and `933b1ca` (short-panel responsive evidence and handoff-test hardening). The canonical extension worktree is clean at `933b1ca`.
 
 ## Verified evidence
 
 Web:
 
 - Vitest: 17 files / 96 tests.
-- FastAPI pytest: 25 tests.
-- Supabase local pgTAP: 5 files / 287 tests after a clean reset.
+- FastAPI pytest: 26 tests.
+- Supabase local pgTAP: 5 files / 291 tests after a clean reset, including the full six-table update-policy matrix.
 - Production build with approved public HTTPS placeholders: passed.
 - `node scripts/verify-built-env.mjs dist`: passed.
 - Web Playwright golden flow: 1/1 passed (latest full run 18.7s, including axe) with a deterministic fixture covering rubric upload/extraction, rubric-scoped SSE coaching, action-item refresh, and reload persistence. The fixture uses only public placeholder values and is excluded from Vitest discovery.
@@ -33,6 +33,7 @@ Web:
 - Post-change production-preview Lighthouse medians over three runs per route/device: mobile landing performance `0.96` (LCP `2.63s`, CLS `0`), mobile auth `0.96` (LCP `2.58s`, CLS `0`), desktop landing `0.91` (LCP `0.81s`, CLS `0`), and desktop auth `1.00` (LCP `0.55s`, CLS `0`); every route scored `1.00` for accessibility, best practices, and SEO. These are local production-preview measurements, not hosted production claims; exact commands and artifacts are recorded in `context/performance-notes.md`.
 - Supabase local lint: exit 0; one pre-existing unused-local warning remains.
 - `npm run verify:release` with approved public placeholders: web tests/build/built-env passed; hosted allowlist explicitly skipped because `SUPABASE_ACCESS_TOKEN` is absent.
+- Web commit `d85b27f` adds the missing FastAPI ownership proof, completes the local RLS update matrix, and changes the hosted-function CI job to run only on protected branches. The CI step visibly reports `SKIPPED` when protected Supabase secrets are absent; this is not a hosted verification pass.
 
 Extension:
 
@@ -40,7 +41,7 @@ Extension:
 - Vitest: 16 files / 74 tests.
 - Production build: passed.
 - Manifest validator: passed; no named microphone permission, no loopback production hosts, offscreen `USER_MEDIA` reason present.
-- Unpacked Playwright: 11/11 passed after the connected-chat fixture slice, including rapid open/close with page-error/console-error assertions, settled 360×640 / 390×700 viewport checks for quick-action labels and horizontal overflow, and a mocked connected Supabase chat that survives minimize/reopen and page reload. The microphone-denial test has passed in repeated isolated and full-suite runs.
+- Unpacked Playwright: 11/11 passed after the workspace-persistence and responsive-layout slices, including rapid open/close with page-error/console-error assertions, visually inspected settled 360×640 / 390×700 screenshots with all quick-action labels visible, an external-navigation-safe dashboard handoff check, and a mocked connected Supabase chat that survives minimize/reopen and page reload. The microphone-denial test has passed in repeated isolated and full-suite runs.
 - `npm ls @google/generative-ai --depth=0`: empty; source and built bundle contain no `VITE_GEMINI_API_KEY`, `GoogleGenerativeAI`, or `@google/generative-ai`.
 
 ## Highest-priority remaining work
@@ -62,10 +63,10 @@ Extension:
 
 ### P1 — extension maintainability and narrow-width UX
 
-1. Expand characterization tests for the remaining workspace hook orchestration and invalid live-control combinations. The workspace auth boundary is now covered by `31dbe0d`; save queue concurrency/error cleanup is covered by `dfd0e14`; Live start/pause/resume/stop now live in `useLiveCoaching.ts`; pure derivation, chat reconciliation, listener cleanup, and mounted/latest-response guards are covered by `c295320`, `d9ff60d`, and `29d5731`.
+1. Expand characterization tests for the remaining workspace hook orchestration and invalid live-control combinations. The workspace auth boundary is now covered by `31dbe0d`; save queue concurrency/error cleanup is covered by `dfd0e14`; dashboard session persistence now has a single-flight and mounted-response guard in `fe8d5f5`; Live start/pause/resume/stop now live in `useLiveCoaching.ts`; pure derivation, chat reconciliation, listener cleanup, and mounted/latest-response guards are covered by `c295320`, `d9ff60d`, and `29d5731`.
 2. Continue focused body composition from `FloatingStudyPilot.tsx`; `useDashboardWorkspace.ts`, `QuickActions.tsx`, `ExtensionPanel.tsx`, `ChatSwitcher.tsx`, `ContextSettings.tsx`, `StudyModePanel.tsx`, `AnswerCardPanel.tsx`, `ComposerPanel.tsx`, and `VoiceDock.tsx` are now extracted. The remaining parent is approximately 1,857 lines and still owns the main body render composition.
 3. Keep live transitions explicit (`idle | starting | live | paused | stopping | error`) and make invalid control combinations unrenderable.
-4. Keep the 360x640 and 390x700 screenshots/E2E checks for fully visible quick actions, no header overlap, no horizontal scroll, and no duplicate listeners after rapid open/close. The connected shared-chat/reload golden flow is now covered by `ea76936`; the real hosted run remains an external gate.
+4. Keep the 360x640 and 390x700 screenshots/E2E checks for fully visible quick actions, no header overlap, no horizontal scroll, and no duplicate listeners after rapid open/close. `933b1ca` adds the short-height layout guard, settled screenshot artifacts, and an external-navigation-safe handoff assertion. The connected shared-chat/reload golden flow is covered by `ea76936`; the real hosted run remains an external gate.
 5. Keep `studypilotSupabase.ts` as the public facade; its auth/chat modules now exist and must retain the current tests. Extension-specific history secret scanning is now in CI; branch protection remains an admin gate.
 
 ### P2 — judging evidence and polish
