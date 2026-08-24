@@ -26,7 +26,7 @@ export const Sidebar = memo(function Sidebar({
   };
 
   return (
-    <aside className="ds-sidebar">
+    <aside className="ds-sidebar" aria-label="Dashboard navigation">
       <div className="ds-brand">
         <svg
           viewBox="0 0 200 180"

@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 
 const USER_ID = 'e2e-user';
 const CHAT_ID = 'chat-rubric-e2e';
@@ -417,6 +418,8 @@ test('rubric upload, grounded coaching, action item refresh, and reload persiste
   await page.getByRole('button', { name: 'Action items' }).click();
   await expect(page.locator('.ds-view-todo').getByRole('heading', { name: 'Action items' })).toBeVisible();
   await expect(page.getByText('Compare each claim with primary evidence before revising.')).toBeVisible();
+  const accessibility = await new AxeBuilder({ page }).analyze();
+  expect(accessibility.violations).toEqual([]);
 
   await page.reload();
   await page.getByRole('button', { name: 'Action items' }).click();
