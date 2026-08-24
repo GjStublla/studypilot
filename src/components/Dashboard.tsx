@@ -137,7 +137,7 @@ export default function Dashboard({
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [chatState, dispatchChat] = useReducer(dashboardChatReducer, {});
   const [draftCreating, setDraftCreating] = useState(false);
-  const [chatsLoaded, setChatsLoaded] = useState(false);
+  const [chatRequestState, setChatRequestState] = useState<DashboardRequestState>({ status: 'idle' });
   const [transcripts, setTranscripts] = useState<Record<string, TranscriptLine[]>>({});
   const [transcriptStates, setTranscriptStates] = useState<Record<string, DashboardRequestState>>({});
   const [bootstrapState, setBootstrapState] = useState<DashboardBootstrapState>({ status: 'loading' });
@@ -166,40 +166,57 @@ export default function Dashboard({
 
   const refreshAiUsage = useCallback(() => {
     if (!AUTH_REQUIRED) return;
-    getAiUsage().then(setAiUsage).catch(() => {
+    getAiUsage().then((usage) => {
+      if (dashboardMountedRef.current) setAiUsage(usage);
+    }).catch(() => {
       // The migration may not be deployed yet; usage UI is optional in that case.
     });
   }, []);
 
   const refreshChats = useCallback(async (): Promise<DashboardChat[]> => {
     const version = ++chatListVersionRef.current;
-    const rows = await getDashboardChats();
-    if (version !== chatListVersionRef.current) return chatsRef.current;
+    if (dashboardMountedRef.current) setChatRequestState({ status: 'loading' });
 
-    const firstLoad = !hasLoadedChatsRef.current;
-    hasLoadedChatsRef.current = true;
-    setChats(rows);
-    setChatsLoaded(true);
-    const current = activeChatIdRef.current;
-    const next = firstLoad && current === null
-      ? rows[0]?.id ?? null
-      : current && !rows.some((chat) => chat.id === current)
+    try {
+      const rows = await getDashboardChats();
+      if (!dashboardMountedRef.current || version !== chatListVersionRef.current) return chatsRef.current;
+
+      const firstLoad = !hasLoadedChatsRef.current;
+      hasLoadedChatsRef.current = true;
+      setChats(rows);
+      setChatRequestState({ status: 'success' });
+      const current = activeChatIdRef.current;
+      const next = firstLoad && current === null
         ? rows[0]?.id ?? null
-        : current;
-    activeChatIdRef.current = next;
-    setActiveChatId(next);
-    if (!firstLoad && current && current !== next) replaceDashboardHash(next);
-    return rows;
+        : current && !rows.some((chat) => chat.id === current)
+          ? rows[0]?.id ?? null
+          : current;
+      activeChatIdRef.current = next;
+      setActiveChatId(next);
+      if (!firstLoad && current && current !== next) replaceDashboardHash(next);
+      return rows;
+    } catch (error) {
+      if (dashboardMountedRef.current && version === chatListVersionRef.current) {
+        setChatRequestState({
+          status: 'error',
+          message: error instanceof Error ? error.message : 'Could not load chats',
+        });
+      }
+      throw error;
+    }
   }, []);
 
   const loadChatMessages = useCallback(async (chatId: string): Promise<void> => {
+    if (!dashboardMountedRef.current) return;
     const version = (chatLoadVersionsRef.current.get(chatId) ?? 0) + 1;
     chatLoadVersionsRef.current.set(chatId, version);
     dispatchChat({ type: 'load-started', chatId, version });
     try {
       const rows = await getDashboardChatMessages(chatId);
+      if (!dashboardMountedRef.current) return;
       dispatchChat({ type: 'load-succeeded', chatId, version, rows });
     } catch (error) {
+      if (!dashboardMountedRef.current) return;
       console.error('Failed to load dashboard chat messages:', error);
       dispatchChat({ type: 'load-failed', chatId, version });
     }
@@ -227,16 +244,20 @@ export default function Dashboard({
     }
     // Fallback for OAuth users whose ID may only be in the Supabase session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user?.id) setUserId(session.user.id);
+      if (dashboardMountedRef.current && session?.user?.id) setUserId(session.user.id);
     }).catch(() => { /* not fatal */ });
   }, []);
 
   useStudyPilotRealtime(userId, {
     onNewSession: () => {
-      void fetchSessions().then(setSessions).catch(() => undefined);
+      void fetchSessions().then((rows) => {
+        if (dashboardMountedRef.current) setSessions(rows);
+      }).catch(() => undefined);
     },
     onSessionChanged: () => {
-      void fetchSessions().then(setSessions).catch(() => undefined);
+      void fetchSessions().then((rows) => {
+        if (dashboardMountedRef.current) setSessions(rows);
+      }).catch(() => undefined);
     },
     onSessionMessageChanged: (payload) => {
       const sessionId = (payload.new as Record<string, unknown>).session_id;
@@ -259,6 +280,7 @@ export default function Dashboard({
         });
     },
     onDocumentUpdated: (doc) => {
+      if (!dashboardMountedRef.current) return;
       // Update rubric status if document is linked to a rubric
       if (doc.rubric_id) {
         const status = normalizeIndexStatus(doc.index_status);
@@ -277,6 +299,7 @@ export default function Dashboard({
       }
     },
     onActionItemChanged: (payload) => {
+      if (!dashboardMountedRef.current) return;
       if (payload.eventType === 'INSERT') {
         setActionItems((prev) => [payload.new as ActionItem, ...prev]);
       } else if (payload.eventType === 'UPDATE') {
@@ -291,6 +314,7 @@ export default function Dashboard({
       }
     },
     onRubricChanged: (payload) => {
+      if (!dashboardMountedRef.current) return;
       if (payload.eventType === 'INSERT') {
         setRubrics((prev) => [payload.new as Rubric, ...prev]);
       } else if (payload.eventType === 'UPDATE') {
@@ -305,13 +329,16 @@ export default function Dashboard({
       }
     },
     onDashboardChatChanged: () => {
+      if (!dashboardMountedRef.current) return;
       void refreshChats().catch(() => undefined);
     },
     onDashboardChatMessageChanged: (payload) => {
+      if (!dashboardMountedRef.current) return;
       const chatId = (payload.new as Record<string, unknown>).chat_id;
       if (typeof chatId === 'string') invalidateChat(chatId);
     },
     onSubscribed: () => {
+      if (!dashboardMountedRef.current) return;
       void refreshChats().catch(() => undefined);
       const activeId = activeChatIdRef.current;
       if (activeId) void loadChatMessages(activeId);
@@ -368,7 +395,7 @@ export default function Dashboard({
   useEffect(() => {
     let cancelled = false;
     Promise.allSettled([fetchSessions(), fetchRubrics(), fetchActionItems(), refreshChats()])
-      .then(([s, r, a, c]) => {
+      .then(([s, r, a]) => {
         if (cancelled) return;
         if (s.status === 'fulfilled') setSessions(s.value);
         if (r.status === 'fulfilled') {
@@ -377,7 +404,6 @@ export default function Dashboard({
           if (active) setActiveRubricId((prev) => prev || active.id);
         }
         if (a.status === 'fulfilled') setActionItems(a.value);
-        if (c.status === 'rejected') setChatsLoaded(true);
         const fatalLoadError =
           AUTH_REQUIRED &&
           s.status === 'rejected' &&
@@ -400,7 +426,9 @@ export default function Dashboard({
   const replaceChatRoute = useCallback(replaceDashboardHash, []);
 
   useEffect(() => {
-    if (!chatsLoaded) return;
+    const chatRequestSettled = chatRequestState.status === 'success'
+      || chatRequestState.status === 'error';
+    if (!chatRequestSettled) return;
     const requestedChatId = parseDashboardRoute(routeHash).chatId;
     if (!requestedChatId) return;
 
@@ -409,7 +437,7 @@ export default function Dashboard({
     setView('chat');
     setActiveChatId(fallback?.id ?? null);
     if (!target) replaceChatRoute(fallback?.id ?? null);
-  }, [chatsLoaded, replaceChatRoute, routeHash]);
+  }, [chatRequestState.status, replaceChatRoute, routeHash]);
 
   useEffect(() => {
     if (activeChatId) void loadChatMessages(activeChatId);
@@ -424,7 +452,9 @@ export default function Dashboard({
       void Promise.allSettled([
         refreshChats(),
         activeId ? loadChatMessages(activeId) : Promise.resolve(),
-        fetchSessions().then(setSessions),
+        fetchSessions().then((rows) => {
+          if (dashboardMountedRef.current) setSessions(rows);
+        }),
         selectedSessionId
           ? fetchSessionTranscript(selectedSessionId).then((lines) => {
             if (!dashboardMountedRef.current) return;
