@@ -66,6 +66,15 @@ export const WEB_DOCUMENTS = Object.freeze([
   { label: 'final report draft', relativePath: 'docs/submission/final-report-content.md' },
 ]);
 
+export const DEMO_DOCUMENT = Object.freeze({
+  label: 'demo script',
+  relativePath: 'docs/submission/demo-script.md',
+  // The script is human-owned communication copy. Its required capability and
+  // privacy disclosures are reviewed manually, while retired claims are still
+  // blocked automatically by the shared forbidden-claim rules.
+  claimRules: Object.freeze([]),
+});
+
 function matchesAny(text, patterns) {
   return patterns.some(pattern => pattern.test(text));
 }
@@ -77,7 +86,7 @@ export function validateClaimDocuments(documents, {
   const failures = [];
   for (const document of documents) {
     const text = String(document.text ?? '');
-    for (const rule of claimRules) {
+    for (const rule of document.claimRules ?? claimRules) {
       if (!matchesAny(text, rule.patterns)) {
         failures.push({
           document: document.label,
@@ -106,10 +115,17 @@ export function validateClaimDocuments(documents, {
 export function parseCliArgs(argv, cwd = process.cwd()) {
   let extensionRoot = path.resolve(cwd, '..', 'studypilot-extension');
   let requireExtension = false;
+  let includeDemoScript = false;
+  let requireDemoScript = false;
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === '--require-extension') {
       requireExtension = true;
+    } else if (argument === '--include-demo-script') {
+      includeDemoScript = true;
+    } else if (argument === '--require-demo-script') {
+      includeDemoScript = true;
+      requireDemoScript = true;
     } else if (argument === '--extension-root') {
       const value = argv[index + 1];
       if (!value || value.startsWith('--')) {
@@ -118,17 +134,31 @@ export function parseCliArgs(argv, cwd = process.cwd()) {
       extensionRoot = path.resolve(cwd, value);
       index += 1;
     } else if (argument === '--help' || argument === '-h') {
-      return { help: true, extensionRoot, requireExtension };
+      return {
+        help: true,
+        extensionRoot,
+        requireExtension,
+        includeDemoScript,
+        requireDemoScript,
+      };
     } else {
       throw new Error(`unknown argument: ${argument}`);
     }
   }
-  return { help: false, extensionRoot, requireExtension };
+  return {
+    help: false,
+    extensionRoot,
+    requireExtension,
+    includeDemoScript,
+    requireDemoScript,
+  };
 }
 
 export function loadClaimDocuments(root, {
   extensionRoot = path.resolve(root, '..', 'studypilot-extension'),
   requireExtension = false,
+  includeDemoScript = false,
+  requireDemoScript = false,
 } = {}) {
   const documents = WEB_DOCUMENTS.map(document => ({
     ...document,
@@ -146,12 +176,27 @@ export function loadClaimDocuments(root, {
   } else if (requireExtension) {
     throw new Error(`canonical extension README not found: ${extensionReadme}`);
   }
+
+  if (includeDemoScript) {
+    const demoScriptPath = path.join(root, DEMO_DOCUMENT.relativePath);
+    if (fs.existsSync(demoScriptPath)) {
+      documents.push({
+        ...DEMO_DOCUMENT,
+        path: demoScriptPath,
+        text: fs.readFileSync(demoScriptPath, 'utf8'),
+      });
+    } else if (requireDemoScript) {
+      throw new Error(`demo script not found: ${demoScriptPath}`);
+    }
+  }
+
   return documents;
 }
 
 function printHelp() {
-  console.log('Usage: node scripts/validate-claims.mjs [--extension-root PATH] [--require-extension]');
+  console.log('Usage: node scripts/validate-claims.mjs [--extension-root PATH] [--require-extension] [--include-demo-script] [--require-demo-script]');
   console.log('Checks public claim wording in the web repository and, when present, the canonical extension README.');
+  console.log('The optional demo-script check blocks retired claims while leaving its required wording for human review.');
 }
 
 export function run(argv = process.argv.slice(2), root = process.cwd()) {
@@ -167,6 +212,9 @@ export function run(argv = process.argv.slice(2), root = process.cwd()) {
   }
   if (!documents.some(document => document.label === 'canonical extension README')) {
     console.log('validate:claims: canonical extension README SKIPPED (not present; use --require-extension locally)');
+  }
+  if (options.includeDemoScript && !documents.some(document => document.label === 'demo script')) {
+    console.log('validate:claims: demo script SKIPPED (not present; use --require-demo-script to fail)');
   }
   if (!result.ok) {
     for (const failure of result.failures) {
