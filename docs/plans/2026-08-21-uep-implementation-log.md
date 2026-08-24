@@ -1384,3 +1384,9 @@ Web: this log only. Phase 5 was not started.
 - Web commit `03a2da1` centralizes named prop interfaces for the extracted dashboard views, shell, chat subcomponents, rubric/upload flow, session detail, context panel, and shared primitives in `src/components/dashboard/dashboard-types.ts`.
 - The refactor preserves callback signatures and render behavior while removing anonymous inline prop-object contracts from the dashboard component tree. No `any`, `@ts-ignore`, or lint suppression was added.
 - Verification after the slice: web Vitest passed 17 files / 96 tests; production build passed; web Playwright passed 4/4 (public axe states plus the deterministic rubric/coaching/action-item/reload flow).
+
+### Phase 8B CRUD/remote adapter boundary — 2026-08-24
+
+- Web commit `4bd77c8` removes the runtime Supabase import from `src/lib/dashboardApi.ts`. Rubric activation now uses the FastAPI-owned `/rubrics/{id}/active` CRUD route; the Supabase `set_active_rubric` RPC remains inside the Supabase upload workflow where it belongs.
+- `dashboardApi.test.ts` now proves the FastAPI request and its recoverable failure path. The source boundary search returns no `studypilot-api` runtime import from `dashboardApi.ts`.
+- Verification after the slice: targeted activation tests passed 2/2; full web Vitest passed 17 files / 96 tests; production build passed; web Playwright passed 4/4.
