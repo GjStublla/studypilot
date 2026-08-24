@@ -1307,3 +1307,9 @@ Web: this log only. Phase 5 was not started.
 
 - `npm run verify:release` passed on the current web worktree with approved public HTTPS placeholders: Vitest 16 files / 94 tests, production build, and `verify-built-env` all passed.
 - The hosted Supabase function allowlist remained explicitly **SKIPPED** because `SUPABASE_ACCESS_TOKEN` was not configured in the release process. This is still an external credential/CI gate, not a hosted verification pass.
+
+### Phase 8B dashboard stylesheet decomposition — 2026-08-24
+
+- Canonical web commit `e1632fe` moved the shell/base, chat, and content-view sections out of the 2,389-line `Dashboard.css` into `DashboardShell.css` (730 lines), `ChatView.css` (373 lines), and `ContentViews.css` (787 lines). The remaining `Dashboard.css` (499 lines) retains context, theme, responsive, scrollbar, and reduced-motion precedence rules.
+- `Dashboard.tsx` imports moved base styles first and the shared precedence layer last. A source-contract test verifies section ownership, `.app-dashboard` selector scope, and import ordering; the nonblank CSS selector sequence matches the pre-split stylesheet.
+- Verification: full web Vitest passed 17 files / 96 tests; public-placeholder production build passed; `npm run verify:built-env` passed. No visual behavior or product claim was changed.
