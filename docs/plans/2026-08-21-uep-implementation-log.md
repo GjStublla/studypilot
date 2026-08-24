@@ -1434,3 +1434,7 @@ Web: this log only. Phase 5 was not started.
 ### Definition-of-done evidence reconciliation — 2026-08-24
 
 - The formal plan now marks only locally evidenced integrity/UX rows complete: independent privacy defaults, no browser model/service-role secrets, working local legal/install/help navigation, source/scaffold cleanup, and local axe/Lighthouse thresholds. Rows requiring a pitch, hosted deployment, clean-profile hosted flow, CI branch protection, pilot results, team approvals, or final media remain unchecked.
+
+### UEP criterion evidence matrix — 2026-08-24
+
+- Added `docs/submission/judging-evidence-matrix.md`, mapping every pre-pitch and ceremony criterion to the artifact or test that supports it, the remaining owner/gate, and the two-minute demo cue. The matrix explicitly forbids turning local fixtures, placeholder URLs, test counts, or preview Lighthouse runs into hosted or causal claims.

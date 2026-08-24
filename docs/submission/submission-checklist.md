@@ -12,6 +12,7 @@ This section records what is reproducible in the workspace; it is not a deployme
 - Local Lighthouse medians and axe evidence: `context/performance-notes.md`; hosted dashboard performance remains unmeasured.
 - Hosted Supabase allowlist: visibly skipped because the process did not contain `SUPABASE_ACCESS_TOKEN`.
 - Architecture diagram: `docs/architecture/system.png` from `7a68341`.
+- Judging evidence matrix: `docs/submission/judging-evidence-matrix.md` maps every pre-pitch and ceremony criterion to local proof, remaining owner, and demo cue.
 - Current external state: no deployed URL, Chrome Web Store URL, pilot dataset, video, or contribution approvals have been supplied in this workspace.
 
 ## Evidence and links
