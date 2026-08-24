@@ -489,6 +489,7 @@ function Hero({ user, onLogout }: { user: ReturnType<typeof getStoredUser>; onLo
                 src={productSvg}
                 width="448"
                 height="820"
+                fetchPriority="high"
                 alt="StudyPilot study panel showing voice listening, quick actions, and a summary card"
               />
               <div className="hero-product-shadow" aria-hidden="true" />
