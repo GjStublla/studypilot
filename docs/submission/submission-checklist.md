@@ -17,10 +17,10 @@ This section records what is reproducible in the workspace; it is not a deployme
 
 ## Evidence and links
 
-- [ ] Web repository commit: [exact SHA]
-- [ ] Canonical extension repository commit: [exact SHA]
-- [ ] Deployed web URL: [URL or explicit not-deployed statement]
-- [ ] Chrome Web Store/beta-access state: [link or state]
+- [x] Web repository local evidence commits: code baseline `5fcb87e`; latest tracked documentation `429ccbb`. The worktree still preserves unrelated uncommitted edits listed by `git status --short`.
+- [x] Canonical extension repository commit: `d1af764` (clean worktree).
+- [x] Deployed web URL: explicitly not deployed in this workspace; hosted deployment and smoke testing remain external.
+- [ ] Chrome Web Store/beta-access state: [link or approved invite-only state]
 - [ ] Demo video: [link]
 - [ ] Backup video/screenshots: [secure location]
 - [ ] Pilot summary: [link after approved collection]
