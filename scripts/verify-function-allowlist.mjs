@@ -65,6 +65,11 @@ try {
   process.exit(1);
 }
 
+if (!Array.isArray(functions)) {
+  console.error('verify:functions: malformed API response');
+  process.exit(1);
+}
+
 const bySlug = new Map(functions.map((fn) => [fn.slug, fn]));
 const errors = [];
 
