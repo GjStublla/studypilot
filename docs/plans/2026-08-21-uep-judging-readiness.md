@@ -756,7 +756,9 @@ Work in these repositories only:
 - C:\Users\gjins\Desktop\studypilot
 - C:\Users\gjins\Desktop\studypilot-extension
 
-Start with Phase 0 and stop after that phase for review. Before editing, inspect git status, unstaged diff, staged diff, and the latest commit in both repositories. Preserve all pre-existing and unrelated changes. The extension currently reports five modified files with no visible textual diff; resolve and document that state before touching them.
+Do not restart completed phases. First inspect `git status --short`, `git diff --stat`, `git diff --cached --stat`, and the latest commit in both repositories, then compare the result with the current handoff and begin with the first unchecked item. The canonical extension is currently clean at `92887aa`; the web repository has pre-existing working-tree edits in `scripts/verify-built-env.mjs`, `src/components/Dashboard.tsx`, `src/lib/deploymentConfig.ts`, `tsconfig.json`, `tsconfig.node.json`, plus an untracked `output/` directory. Preserve those edits and do not reset or overwrite them.
+
+Phase 0 credential rotation, history rewriting, deployment, branch protection, hosted checks, pilot recruitment, and final media are human-owned gates. Do not attempt them autonomously or use any access token pasted into chat. For local work, continue from the latest canonical heads and only implement the first unchecked, testable item.
 
 Follow the locked product/architecture decisions exactly. Add tests with behavior changes. Run every verification command for the phase. Do not claim a phase is complete when a required check was skipped; report the check as blocked with the exact missing prerequisite. Commit one phase at a time and record the commit SHA in the plan or implementation log.
 

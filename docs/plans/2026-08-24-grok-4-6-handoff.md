@@ -64,7 +64,7 @@ Extension:
 
 ### P0 — human/external release gates
 
-1. Human owner rotates the historically tracked Google service-account key if it was ever valid.
+1. The historical `backend/service-account.json` was added in `1e0f6bb` and removed in `0cd0d99`; it is absent from the working tree. A human owner must still confirm/rotate the key if it was ever valid and approve any required history rewrite.
 2. Human owner approves any history rewrite and protected-branch force-push; the agent must not do this autonomously.
 3. Supply real production public build values and run the hosted Edge Function allowlist check. Record a visible skip when secrets are absent.
 4. Configure branch protection so non-secret CI jobs are required. Keep hosted checks and production smoke tests protected by environment secrets.
