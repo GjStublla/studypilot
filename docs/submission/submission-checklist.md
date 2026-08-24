@@ -17,7 +17,7 @@ This section records what is reproducible in the workspace; it is not a deployme
 
 ## Evidence and links
 
-- [x] Web repository local evidence commits: code baseline `5fcb87e`; latest tracked documentation `26d1e98`. The worktree still preserves unrelated uncommitted edits listed by `git status --short`.
+- [x] Web repository local evidence commits: code baseline `5fcb87e`; latest tracked documentation `d1e28e2`. The worktree still preserves unrelated uncommitted edits listed by `git status --short`.
 - [x] Canonical extension repository commit: `6138fb0` (clean worktree).
 - [x] Deployed web URL: explicitly not deployed in this workspace; hosted deployment and smoke testing remain external.
 - [ ] Chrome Web Store/beta-access state: [link or approved invite-only state]
