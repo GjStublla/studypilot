@@ -46,7 +46,7 @@ Repository-state cautions:
 The historical baseline above is retained for auditability. Local verification
 has since reached web Vitest 19/103, Deno 42, FastAPI pytest 26, Supabase pgTAP
 5 files/291 tests after a fresh reset, web Playwright 4/4, extension Vitest
-17/84, extension Playwright 13/13, production builds, and manifest/built-env
+17/84, extension Playwright 14/14, production builds, and manifest/built-env
 scans. A clean clone now passes the documented non-hosted gates after
 `d694163` makes missing Supabase browser configuration loadable; a bare
 production build still fails closed until public HTTPS variables are supplied.
@@ -492,8 +492,9 @@ This phase also fixes the crowded 360-390px panel.
 
 - [x] `npm test && npm run typecheck && npm run build` passes.
 - [x] Playwright screenshots at 360x640 and 390x700 show no clipped labels, overlapping header controls, or horizontal scroll. Commit `933b1ca` adds settled screenshot artifacts and the short-height responsive layout; both artifacts were visually inspected locally.
-- [x] Rapid open/close/live-start/live-stop E2E produces no duplicate listener, unmounted-update, or unhandled-promise console error. The unpacked suite passes 13/13, including the deterministic panel remount race in `6630915` and keyboard activation of the launcher/settings/minimize controls in `a77fe49`.
+- [x] Rapid open/close/live-start/live-stop E2E produces no duplicate listener, unmounted-update, or unhandled-promise console error. The unpacked suite passes 14/14, including the deterministic panel remount race in `6630915` and keyboard activation of the launcher/settings/minimize controls in `a77fe49`.
 - [x] Exercise keyboard activation for the launcher, settings, and minimize controls through the closed shadow root. `a77fe49` adds the CDP focus helper and unpacked browser assertion; a broader manual keyboard review of every secondary action remains a submission review item.
+- [x] Audit every visible native panel control at 360px and 390px for an accessible name, keyboard focusability, and text clipping. `dd7a2c3` adds the closed-shadow-root audit and `db5ff45` runs it at both supported narrow widths.
 
 #### Exit
 
@@ -714,7 +715,7 @@ These are not decisions Grok may make alone:
 
 ### User experience and evidence
 
-- [ ] Extension labels do not truncate at 360px or 390px and all primary controls are keyboard accessible.
+- [x] Extension labels do not truncate at 360px or 390px and all primary controls are keyboard accessible. The 14-test unpacked suite now checks visible control names, tab reachability, and text clipping at both narrow widths (`dd7a2c3`, `db5ff45`).
 - [x] Axe has no serious/critical findings and local production-preview Lighthouse meets the Phase 11 thresholds. (public/authenticated axe and three-run medians in `context/performance-notes.md`; hosted dashboard Lighthouse remains external)
 - [ ] Pilot summary contains traceable results from 10-15 target users and clearly states limitations.
 
