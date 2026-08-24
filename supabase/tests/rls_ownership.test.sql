@@ -2,7 +2,7 @@
 -- This test intentionally covers every user-data table currently created by
 -- the migrations and exercises representative authenticated read/write paths.
 begin;
-select plan(36);
+select plan(40);
 
 -- Every exposed user-data table must have RLS enabled.
 select is((select c.relrowsecurity from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relname = 'profiles'), true, 'profiles has RLS enabled');
@@ -72,6 +72,10 @@ update public.dashboard_chats set title = 'Hacked Chat' where user_id = '1111111
 select is((select count(*)::int from public.dashboard_chats where title = 'Hacked Chat'), 0, 'User B cannot update User A chat');
 update public.action_items set text = 'Hacked Item' where user_id = '11111111-1111-1111-1111-111111111111';
 select is((select count(*)::int from public.action_items where text = 'Hacked Item'), 0, 'User B cannot update User A action item');
+update public.profiles set theme = 'light' where id = '11111111-1111-1111-1111-111111111111';
+select is((select count(*)::int from public.profiles where id = '11111111-1111-1111-1111-111111111111' and theme = 'light'), 0, 'User B cannot update User A profile');
+update public.knowledge_documents set title = 'Hacked Document' where user_id = '11111111-1111-1111-1111-111111111111';
+select is((select count(*)::int from public.knowledge_documents where title = 'Hacked Document'), 0, 'User B cannot update User A knowledge document');
 
 delete from public.rubrics where user_id = '11111111-1111-1111-1111-111111111111';
 delete from public.action_items where user_id = '11111111-1111-1111-1111-111111111111';
@@ -91,6 +95,10 @@ update public.rubrics set title = 'Updated Rubric A' where id = (select rubric_a
 select is((select count(*)::int from public.rubrics where title = 'Updated Rubric A'), 1, 'User A can update own rubric');
 update public.action_items set done = true where id = (select item_a_id from rls_fixture_state);
 select is((select count(*)::int from public.action_items where done and id = (select item_a_id from rls_fixture_state)), 1, 'User A can mark own action item done');
+update public.profiles set theme = 'light' where id = '11111111-1111-1111-1111-111111111111';
+select is((select count(*)::int from public.profiles where id = '11111111-1111-1111-1111-111111111111' and theme = 'light'), 1, 'User A can update own profile');
+update public.knowledge_documents set title = 'Updated Document A' where id = (select document_a_id from rls_fixture_state);
+select is((select count(*)::int from public.knowledge_documents where title = 'Updated Document A'), 1, 'User A can update own knowledge document');
 
 select * from finish();
 rollback;
