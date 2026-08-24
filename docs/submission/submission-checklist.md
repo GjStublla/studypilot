@@ -4,7 +4,7 @@
 
 This section records what is reproducible in the workspace; it is not a deployment or mentor sign-off.
 
-- Web local release head: `8e3d1f4` (includes `8db5a40`, `7a68341`, `6a08fac`, and the evidence-documentation commits).
+- Web local evidence baseline: `8db5a40` (with architecture/scaffold commits `7a68341` and `6a08fac`; later documentation commits record submission state).
 - Canonical extension local head: `ea76936`; its worktree is clean.
 - Web Vitest: 17 files / 96 tests; web Playwright: 4/4; production build and built-environment scan: passed.
 - Extension typecheck, Vitest (16 files / 74 tests), build, manifest validation, and unpacked Playwright (11/11): passed.
