@@ -4,9 +4,9 @@
 
 This section records what is reproducible in the workspace; it is not a deployment or mentor sign-off.
 
-- Web local evidence baseline: `4bd77c8` (with prop-contract evidence `03a2da1`, authorization evidence `d85b27f`, accessibility/performance, architecture, and scaffold commits `8db5a40`, `7a68341`, and `6a08fac`; later documentation commits record submission state).
+- Web local evidence baseline: `5fcb87e` (with adapter-boundary evidence `4bd77c8`, prop-contract evidence `03a2da1`, authorization evidence `d85b27f`, accessibility/performance, architecture, and scaffold commits `8db5a40`, `7a68341`, and `6a08fac`; later documentation commits record submission state).
 - Canonical extension local head: `9aa2ac3`; its worktree is clean. The latest slices include workspace-owned persistence, settled narrow-panel screenshot evidence, and mounted/latest-operation guards for Live and SpeechRecognition cleanup.
-- Web Vitest: 17 files / 96 tests; web Playwright: 4/4; production build and built-environment scan: passed.
+- Web Vitest: 17 files / 96 tests; web Playwright: 4/4; public-placeholder production build and built-environment scan: passed. A default build with the local `.env` fails closed before bundling.
 - Extension typecheck, Vitest (16 files / 76 tests), build, manifest validation, and unpacked Playwright (11/11): passed; the viewport test now emits and visually inspects 360×640 and 390×700 screenshots.
 - FastAPI pytest: 26 passed; Supabase local pgTAP: 5 files / 291 passed after a fresh reset, including the six-table update-policy matrix.
 - Local Lighthouse medians and axe evidence: `context/performance-notes.md`; hosted dashboard performance remains unmeasured.
