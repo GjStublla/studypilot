@@ -262,15 +262,78 @@ export function formatPilotResult(result) {
   ].join('\n');
 }
 
+export function formatPilotSummary(result, { source = 'docs/validation/pilot-results.csv' } = {}) {
+  if (result.status === 'empty') {
+    return [
+      '# StudyPilot pilot metrics',
+      '',
+      '**Status:** No participant rows; no pilot result claimed.',
+      `**Source:** ${source}`,
+      '',
+      'Run this command with `--require-data` only after approved anonymous collection.',
+    ].join('\n');
+  }
+
+  const { metrics } = result;
+  const grounding = metrics.groundingPrecision === null
+    ? 'Unavailable'
+    : `${metrics.groundingPrecision} (${metrics.citationsSupported}/${metrics.citationsChecked})`;
+  const sampleTarget = metrics.participantCount >= TARGET_PARTICIPANT_MIN
+    && metrics.participantCount <= TARGET_PARTICIPANT_MAX
+    ? 'within 10–15 target'
+    : 'outside 10–15 target; report limitation';
+
+  return [
+    '# StudyPilot pilot metrics',
+    '',
+    '**Status:** Validated pilot observations; not causal evidence of learning improvement.',
+    `**Source:** ${source}`,
+    '',
+    '## Sample',
+    '',
+    `- Participants: ${metrics.participantCount}`,
+    `- Sample target: ${sampleTarget}`,
+    '',
+    '## Results',
+    '',
+    '| Metric | Result | Denominator / note |',
+    '|---|---:|---|',
+    `| Task completion | ${metrics.completionRate} (${metrics.completedCount}/${metrics.participantCount}) | participant rows |`,
+    `| Median time to useful feedback | ${metrics.medianTimeToFeedbackSeconds} seconds | ${metrics.participantCount} rows |`,
+    `| Mean before score | ${metrics.meanBeforeScore} | normalized 0–100; ${metrics.participantCount} rows |`,
+    `| Mean after score | ${metrics.meanAfterScore} | normalized 0–100; ${metrics.participantCount} rows |`,
+    `| Mean score change | ${metrics.meanScoreChange} | after minus before; ${metrics.participantCount} rows |`,
+    `| Grounding precision | ${grounding} | supported / checked |`,
+    `| Error-free session rate | ${metrics.errorFreeRate} (${metrics.errorFreeCount}/${metrics.participantCount}) | participant rows |`,
+    `| Median response latency | ${metrics.medianResponseLatencyMs} ms | ${metrics.participantCount} rows |`,
+    `| Mean SUS | ${metrics.meanSus} | standard ten-item scoring; ${metrics.participantCount} rows |`,
+    `| Approved quote rows | ${metrics.approvedQuoteCount} | quote text intentionally omitted |`,
+    '',
+    '## Human completion fields',
+    '',
+    '- Collection dates: [team input]',
+    '- Protocol version: [team input]',
+    '- Findings, limitations, and approved quotes: [team input]',
+    '- Do not add participant names, contact details, drafts, audio, screenshots, transcripts, credentials, or rubric text.',
+  ].join('\n');
+}
+
 function parseArgs(argv) {
-  const options = { file: 'docs/validation/pilot-results.csv', requireData: false, json: false };
+  const options = {
+    file: 'docs/validation/pilot-results.csv',
+    requireData: false,
+    json: false,
+    markdown: false,
+  };
   for (const argument of argv) {
     if (argument === '--require-data') options.requireData = true;
     else if (argument === '--json') options.json = true;
+    else if (argument === '--markdown') options.markdown = true;
     else if (argument.startsWith('-')) fail(`unknown option ${argument}`);
     else if (options.file !== 'docs/validation/pilot-results.csv') fail('only one CSV path may be provided');
     else options.file = argument;
   }
+  if (options.json && options.markdown) fail('--json and --markdown cannot be used together');
   return options;
 }
 
@@ -279,7 +342,12 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
     const options = parseArgs(process.argv.slice(2));
     const text = await fs.readFile(options.file, 'utf8');
     const result = validatePilotCsv(text, { requireData: options.requireData });
-    console.log(options.json ? JSON.stringify(result, null, 2) : formatPilotResult(result));
+    const output = options.json
+      ? JSON.stringify(result, null, 2)
+      : options.markdown
+        ? formatPilotSummary(result, { source: options.file })
+        : formatPilotResult(result);
+    console.log(output);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`validate-pilot-results: ${message}`);

@@ -28,6 +28,9 @@ run('claims', 'npm', ['run', 'validate:claims']);
 run('pitch claims', 'npm', ['run', 'validate:pitch']);
 run('submission artifact tests', 'node', ['--test', 'scripts/validate-submission-package.test.mjs']);
 run('submission artifacts', 'npm', ['run', 'validate:submission']);
+run('pilot evidence tests', 'node', ['--test', 'scripts/validate-pilot-results.test.mjs']);
+run('pilot template', 'npm', ['run', 'validate:pilot']);
+run('pilot summary template', 'npm', ['run', 'summarize:pilot']);
 run('production build', 'npm', ['run', 'build']);
 run('built-env scan', 'node', ['scripts/verify-built-env.mjs', 'dist']);
 

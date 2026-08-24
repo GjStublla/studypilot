@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   REQUIRED_COLUMNS,
   formatPilotResult,
+  formatPilotSummary,
   validatePilotCsv,
 } from './validate-pilot-results.mjs';
 
@@ -18,6 +19,9 @@ test('accepts the checked-in empty template without claiming pilot evidence', ()
 
   assert.deepEqual(result, { status: 'empty', participantCount: 0, metrics: null });
   assert.match(formatPilotResult(result), /template validated, no pilot result claimed/);
+  const summary = formatPilotSummary(result);
+  assert.match(summary, /No participant rows; no pilot result claimed/);
+  assert.doesNotMatch(summary, /P001|participant_id/);
 });
 
 test('calculates protocol metrics with explicit denominators', () => {
@@ -50,6 +54,12 @@ test('calculates protocol metrics with explicit denominators', () => {
   assert.match(formatPilotResult(result), /grounding_precision: 0.75 \(3\/4\)/);
   assert.match(formatPilotResult(result), /sample_target: outside target \(10–15\); report limitation/);
   assert.match(formatPilotResult(result), /not causal evidence/);
+  const summary = formatPilotSummary(result, { source: 'approved-pilot.csv' });
+  assert.match(summary, /Participants: 2/);
+  assert.match(summary, /Grounding precision \| 0.75 \(3\/4\)/);
+  assert.match(summary, /Mean score change \| 7.5/);
+  assert.match(summary, /approved-pilot\.csv/);
+  assert.doesNotMatch(summary, /P001|P002|weak paragraph/);
 });
 
 test('requires participant data only when explicitly requested', () => {
