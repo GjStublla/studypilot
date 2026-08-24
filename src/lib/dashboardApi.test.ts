@@ -1,14 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { activateRubric } from './dashboardApi';
 import { apiFetch } from './api';
-import { setActiveRubric } from './studypilot-api';
 
 vi.mock('./api', () => ({
   apiFetch: vi.fn(),
-}));
-
-vi.mock('./studypilot-api', () => ({
-  setActiveRubric: vi.fn(),
 }));
 
 describe('dashboardApi.activateRubric', () => {
@@ -16,17 +11,7 @@ describe('dashboardApi.activateRubric', () => {
     vi.clearAllMocks();
   });
 
-  it('prefers the set_active_rubric RPC via setActiveRubric', async () => {
-    vi.mocked(setActiveRubric).mockResolvedValue(undefined);
-
-    await activateRubric('rubric-123');
-
-    expect(setActiveRubric).toHaveBeenCalledWith('rubric-123');
-    expect(apiFetch).not.toHaveBeenCalled();
-  });
-
-  it('falls back to FastAPI when the RPC fails', async () => {
-    vi.mocked(setActiveRubric).mockRejectedValue(new Error('RPC missing'));
+  it('uses the FastAPI rubric CRUD boundary', async () => {
     vi.mocked(apiFetch).mockResolvedValue({
       ok: true,
       text: async () => '',
@@ -34,7 +19,18 @@ describe('dashboardApi.activateRubric', () => {
 
     await activateRubric('rubric-123');
 
-    expect(setActiveRubric).toHaveBeenCalledWith('rubric-123');
     expect(apiFetch).toHaveBeenCalledWith('/rubrics/rubric-123/active', { method: 'PATCH' });
+  });
+
+  it('surfaces a failed activation response', async () => {
+    vi.mocked(apiFetch).mockResolvedValue({
+      ok: false,
+      status: 409,
+      text: async () => '',
+    } as Response);
+
+    await expect(activateRubric('rubric-123')).rejects.toThrow(
+      'PATCH /rubrics/rubric-123/active failed: 409',
+    );
   });
 });
