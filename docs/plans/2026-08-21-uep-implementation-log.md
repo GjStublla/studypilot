@@ -1177,3 +1177,12 @@ Web: this log only. Phase 5 was not started.
 - Added `docs/submission/demo-script.md` with the sub-two-minute golden path, fallback, and recording rules.
 - Added `docs/submission/submission-checklist.md` for exact commits, links, verification evidence, safety sign-off, and human approvals.
 - The report, video, deployed URL, pilot results, diagram PNG, and contribution approvals remain incomplete external deliverables.
+
+### Phase 9A workspace and narrow-viewport follow-up — 2026-08-24
+
+- Commit `d9ff60d` moved deterministic shared-chat selection and canonical-message presentation into `dashboardChatState.ts` with characterization tests; the full extension suite reached 14 Vitest files / 66 tests.
+- Commit `1b33f60` extracted the quick-action chip composition into `QuickActions.tsx` without changing the parent panel wrapper or callback behavior.
+- Commit `7a7051c` made the pause control unavailable outside an active Live state and prevented `togglePause` from creating an impossible idle/paused combination.
+- Commit `f19a8ec` extracted auth, shared-chat reconciliation, session continuation, in-flight tracking, and dashboard bridging into `useDashboardWorkspace.ts`; it also hardens the no-runtime Live fallback to text/speech coaching.
+- The extension now has 10 unpacked Playwright checks: rapid open/close host stability plus settled geometry assertions at 360×640 and 390×700. Typecheck, 14 Vitest files / 66 tests, production build, manifest validation, and the targeted repeated microphone fallback check passed. One full-suite run still exposed a timing-sensitive microphone assertion that reported the stale `Mic muted` label; rerun that case before treating the browser gate as green.
+- Remaining Phase 9A: focused `ExtensionPanel`/context composition, direct workspace-hook characterization, save-queue coverage, and a browser-backed connected-chat golden flow.
