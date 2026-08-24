@@ -68,9 +68,10 @@ Extension:
 4. Configure branch protection so non-secret CI jobs are required. Keep hosted checks and production smoke tests protected by environment secrets.
 
    Read-only GitHub API inspection on 2026-08-24 reports `main` as **not
-   protected** for the web repository, and `gh run list` shows no visible runs
-   for either remote because the local remediation heads have not been pushed.
-   Treat this as an admin/push gate, not as evidence that CI is green.
+   protected** for both the web and extension repositories, and `gh run list`
+   shows no visible runs for either remote because the local remediation heads
+   have not been pushed. Treat this as an admin/push gate, not as evidence that
+   CI is green.
 
 5. Use the credential-free [demo fixture](../submission/demo-fixture.md) when
    creating the human-owned hosted demo account; the GitHub remotes are
