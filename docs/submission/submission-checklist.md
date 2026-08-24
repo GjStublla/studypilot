@@ -21,7 +21,7 @@ This section records what is reproducible in the workspace; it is not a deployme
 ## Evidence and links
 
 - Repository URLs: [web/dashboard](https://github.com/GjStublla/studypilot) and [canonical extension](https://github.com/GjStublla/studypilot-extension). The remote `main` heads are still the historical baselines; the local evidence commits below must be pushed and checked before submission.
-- [x] Web repository local evidence commits: code baseline `5fcb87e`; current documentation evidence anchor `00ce898` (including the panel-body, auth-success, release-gate, and demo-claim updates). The worktree still preserves unrelated uncommitted edits listed by `git status --short`.
+- [x] Web repository local evidence commits: code baseline `5fcb87e`; current documentation evidence anchor `34f1993` (including the panel-body, auth-success, release-gate, demo-claim, and submission-artifact updates). The worktree still preserves unrelated uncommitted edits listed by `git status --short`.
 - [x] Canonical extension repository commit: `b182624` (clean worktree).
 - [x] Deployed web URL: explicitly not deployed in this workspace; hosted deployment and smoke testing remain external.
 - [ ] Chrome Web Store/beta-access state: [link or approved invite-only state]
