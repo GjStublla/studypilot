@@ -109,8 +109,9 @@ npm run validate:claims -- --extension-root ../studypilot-extension --require-ex
 ```
 
 The claim check guards the web README, landing/legal copy, final report draft,
-and (when present) the canonical extension README. It does not certify the
-separately owned pitch wording.
+the time-coded demo script for retired claims, and (when present) the canonical
+extension README. It does not certify the separately owned pitch wording or
+approve the demo's hosted/learning-impact evidence.
 
 ## Running with Docker
 
