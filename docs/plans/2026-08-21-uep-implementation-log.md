@@ -1414,3 +1414,8 @@ Web: this log only. Phase 5 was not started.
 - Canonical extension commit `7301083` makes the panel enter `starting` before an active-chat Live request, `stopping` before a stop request, and `error` on failed starts/stops instead of leaving the mic control in a misleading busy state.
 - A pure `liveMicIntent` boundary now distinguishes Live stop, SpeechRecognition stop, resume, start, and ignore-while-stopping. The mic control remains cancelable during `starting`/`connecting`, ignores a second click during `stopping`, and can mute fallback SpeechRecognition without sending another Live request.
 - Verification after the slice: focused live-state tests passed (8 assertions), full extension Vitest passed 17 files / 80 tests, typecheck/build/manifest validation passed, and unpacked Playwright passed 11/11. Hosted Vertex Live remains an external gate.
+
+### Phase 1/2 privacy and claims audit — 2026-08-24
+
+- Reconciled the formal judging plan with the already-landed privacy/claims work: the landing-page local-processing language, tab-audio/exact-second/device-storage/no-account claims, extension disclosure, metadata, and report overview now have explicit checked rows and source/test evidence.
+- This audit does not convert manual hosted-session evidence into a local pass. The real hosted Live behavior, deployed dashboard, and production claim review remain external gates.
