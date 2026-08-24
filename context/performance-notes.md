@@ -52,6 +52,43 @@ A scan compared dev and production preview. Dev was heavier because it served so
 
 The WebGL background was identified as a good candidate to defer because it is visually nice but not required for first paint.
 
+## Measured evidence — 2026-08-24
+
+These measurements use the production bundle from `npm run build` served with:
+
+```bash
+npm run preview -- --host 127.0.0.1 --port 5178
+```
+
+Each route was audited three times. The JSON artifacts are local, ignored files under `tmp/`:
+
+| Route | Device | Performance median | Accessibility | Best practices | SEO | LCP median | CLS median | TBT median |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `/` | Lighthouse mobile (412×823) | 0.96 | 1.00 | 1.00 | 1.00 | 2,627 ms | 0.00 | 14.5 ms |
+| `/#auth` | Lighthouse mobile (412×823) | 0.96 | 1.00 | 1.00 | 1.00 | 2,575 ms | 0.00 | 0 ms |
+| `/` | Lighthouse desktop (1,350×940) | 0.91 | 1.00 | 1.00 | 1.00 | 807 ms | 0.00 | 234 ms |
+| `/#auth` | Lighthouse desktop (1,350×940) | 1.00 | 1.00 | 1.00 | 1.00 | 547 ms | 0.00 | 0 ms |
+
+The mobile landing median was below the Phase 11 performance target before this slice (0.85, LCP 2.93 s, TBT 310 ms). The hero now keeps its CSS gradient fallback and skips the decorative WebGL renderer below 900 px; the post-change mobile median is 0.96 with LCP 2.63 s and TBT 14.5 ms. Desktop still loads the WebGL treatment and remains above 0.90.
+
+Representative commands (repeat with `-1`, `-2`, and `-3` output suffixes):
+
+```bash
+# mobile
+npx --yes lighthouse http://127.0.0.1:5178/ --output=json \
+  --output-path=tmp/lighthouse-home-prod-mobile-fallback-20260824-1.json \
+  --only-categories=performance,accessibility,best-practices,seo \
+  --chrome-flags="--headless --no-sandbox" --quiet
+
+# desktop
+npx --yes lighthouse http://127.0.0.1:5178/ --output=json \
+  --output-path=tmp/lighthouse-home-desktop-fallback-20260824-1.json \
+  --preset=desktop --only-categories=performance,accessibility,best-practices,seo \
+  --chrome-flags="--headless --no-sandbox" --quiet
+```
+
+On Windows, Lighthouse writes valid JSON and scores before occasionally reporting an `EPERM` error while removing its temporary Chrome directory. That cleanup error is a tooling/environment issue; inspect the JSON artifact rather than calling the CLI exit code a clean pass. These are local preview results, not hosted deployment or authenticated-dashboard performance claims. The dashboard has a deterministic axe check in the web golden flow; a hosted dashboard Lighthouse run remains an external release gate.
+
 ## Recommended Next Steps
 
 1. Use production preview as the baseline, not Vite dev.
