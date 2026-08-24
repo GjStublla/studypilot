@@ -153,7 +153,11 @@ jobs:
     name: Hosted function allowlist
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: github.ref == 'refs/heads/main'
+    # Never expose the management-token check to arbitrary branches or pull
+    # requests. The job is scheduled only where repository administrators have
+    # enabled branch protection; the step below reports a visible skip when
+    # the protected environment has not supplied both secrets yet.
+    if: github.ref_protected
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
