@@ -20,12 +20,6 @@ import type {
   ExtractRubricResponse,
   TranscriptMessage,
 } from './studypilot-types';
-import type {
-  ActionItem as DashboardActionItem,
-  Rubric as DashboardRubric,
-  Session as DashboardSession,
-} from './dashboard-types';
-
 // Re-export types for convenience
 export type {
   Profile,
@@ -37,15 +31,6 @@ export type {
   DashboardChat,
   DashboardChatMessage,
   ActivityLog,
-};
-
-// ─── Type Adapters for Dashboard Compatibility ─────────────────────────────────────
-
-type SessionMessageRow = {
-  id: string;
-  role: TranscriptMessage['role'];
-  message_text: string;
-  time_offset_seconds: number;
 };
 
 export type SessionListRow = Pick<
@@ -75,135 +60,12 @@ export type SessionDetails = {
   rubric: Rubric | null;
 };
 
-// Dashboard expects camelCase, Supabase uses snake_case
-export function adaptSession(session: SessionListRow): DashboardSession {
-  return {
-    ...session,
-    rubricId: session.rubric_id ?? null,
-    chatId: session.chat_id ?? null,
-    screenshotPath: session.screenshot_path ?? null,
-    when: formatWhen(session.when_timestamp),
-    duration: formatDuration(session.duration_seconds),
-    summary: session.summary ?? '',
-  };
-}
-
-export function adaptRubric(rubric: Rubric): DashboardRubric {
-  return {
-    ...rubric,
-    sessionsCount: rubric.sessions_count ?? 0,
-    knowledgeDocumentId: rubric.knowledge_document_id ?? null,
-    fileSearchStatus: rubric.file_search_status ?? 'not_indexed',
-    fileSearchError: rubric.file_search_error ?? null,
-    uploaded: new Date(rubric.uploaded_at).toLocaleDateString(),
-    criteria: (rubric.criteria ?? []).map((criterion, index) => ({
-      id: criterion.id ?? `${rubric.id}-criterion-${index}`,
-      name: criterion.name,
-      score: criterion.score ?? 0,
-      max: criterion.max_score,
-    })),
-  };
-}
-
-export function adaptActionItem(item: ActionItem): DashboardActionItem {
-  return {
-    ...item,
-    sessionId: item.session_id ?? null,
-    rubricId: item.rubric_id ?? null,
-  };
-}
-
-function formatDuration(seconds?: number | null): string {
-  if (!seconds) return '0m';
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
-}
-
-/**
- * Format an ISO timestamp into a relative display label:
- *   "Today · 2:38 PM", "Yesterday · 8:12 PM", "Apr 21 · 10:02 AM"
- * Matches the formatting in backend/routers/sessions.py _when_str().
- */
-function formatWhen(isoTimestamp?: string | null): string {
-  if (!isoTimestamp) return '';
-  try {
-    const dt = new Date(isoTimestamp);
-    const now = new Date();
-    const dtDate = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
-    const nowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const diffDays = Math.round((nowDate.getTime() - dtDate.getTime()) / 86_400_000);
-
-    const timeStr = dt.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
-
-    if (diffDays === 0) return `Today · ${timeStr}`;
-    if (diffDays === 1) return `Yesterday · ${timeStr}`;
-    const month = dt.toLocaleString('en-US', { month: 'short' });
-    return `${month} ${dt.getDate()} · ${timeStr}`;
-  } catch {
-    return isoTimestamp;
-  }
-}
-
-export type TranscriptLine = {
-  id: string;
-  who: string;
-  text: string;
-  t: number;
-};
-
-export async function fetchSessionTranscript(sessionId: string): Promise<TranscriptLine[]> {
-  const { data, error } = await supabase
-    .from('session_messages')
-    .select('id, role, message_text, time_offset_seconds, server_sequence')
-    .eq('session_id', sessionId)
-    .order('time_offset_seconds', { ascending: true })
-    .order('server_sequence', { ascending: true })
-    .order('id', { ascending: true });
-
-  if (error) throw error;
-
-  return (data || []).map((m: SessionMessageRow) => ({
-    id: m.id,
-    who: m.role === 'user' ? 'Student' : 'StudyPilot',
-    text: m.message_text,
-    t: m.time_offset_seconds,
-  }));
-}
-
 export async function createSessionCaptureSignedUrl(path: string): Promise<string> {
   await injectStoredToken();
   const { data, error } = await supabase.storage.from('session-captures').createSignedUrl(path, 60 * 60);
 
   if (error) throw error;
   return data.signedUrl.startsWith('/') ? `${import.meta.env.VITE_SUPABASE_URL}${data.signedUrl}` : data.signedUrl;
-}
-
-// ─── Dashboard-compatible wrappers ─────────────────────────────────────────────────
-
-export async function fetchSessions(): Promise<DashboardSession[]> {
-  const sessions = await getSessions();
-  return sessions.map(adaptSession);
-}
-
-export async function fetchRubrics(): Promise<DashboardRubric[]> {
-  const rubrics = await getRubrics();
-  return rubrics.map(adaptRubric);
-}
-
-export async function fetchActionItems(): Promise<DashboardActionItem[]> {
-  const items = await getActionItems();
-  return items.map(adaptActionItem);
-}
-
-export async function setActionItemDone(id: string, done: boolean): Promise<void> {
-  // toggleActionItem(id, currentDone) writes { done: !currentDone }.
-  // To land on the desired `done` value we pass !done as currentDone.
-  await toggleActionItem(id, !done);
 }
 
 // ─── Profile Operations ───────────────────────────────────────────────────────────
