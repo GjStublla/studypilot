@@ -1069,7 +1069,7 @@ Web: this log only. Phase 5 was not started.
 ### Verification
 
 - `npm test` — 14 files, 85 tests passed.
-- `python -m pytest backend/tests -q` — 24 tests passed (8 deprecation warnings from dependencies).
+- `python -m pytest backend/tests -q` — 25 tests passed (8 deprecation warnings from dependencies).
 - Production build with approved placeholder public HTTPS values — passed.
 - `node scripts/verify-built-env.mjs dist` — passed.
 - `npx supabase test db` against a fresh local reset — 5 files, 287 tests passed.
