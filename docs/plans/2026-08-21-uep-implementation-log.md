@@ -1278,3 +1278,9 @@ Web: this log only. Phase 5 was not started.
 - Added mounted guards for chat message loads, AI-usage refreshes, Supabase session fallback, realtime session refreshes, rubric/action-item events, chat invalidations, and focus refreshes. Superseded chat-list responses now leave the current list untouched.
 - Added a regression test for a failed chat-list request on a deep-linked chat route. Focused dashboard tests passed (21); full web Vitest passed 16 files / 92 tests; `npx tsc --noEmit`, production build, and `npm run verify:release` with approved public HTTPS placeholders passed. The release command explicitly skipped the hosted function allowlist because no token was present.
 - Remaining dashboard lifecycle work: explicit states for rubric indexing and chat sends, complete unmount/stale characterization, CSS splitting, and the deterministic web Playwright golden flow.
+
+### Phase 8B rubric-index request lifecycle — 2026-08-24
+
+- Canonical web commit `431533f` added per-rubric request-state tracking and request versions for retry indexing. Both `RubricsView` and `ChatView` now suppress duplicate Retry controls while indexing and surface the request error without allowing stale responses to overwrite newer state.
+- Added a deferred-request regression test for the in-flight indexing state. Full web Vitest passed 16 files / 93 tests; `npm run verify:release` with approved public HTTPS placeholders passed tests, production build, and `verify-built-env`. Hosted function allowlist remained explicitly skipped because no token was present.
+- Remaining dashboard lifecycle work: explicit send-state/unmount characterization, CSS splitting, and the deterministic web Playwright golden flow.
