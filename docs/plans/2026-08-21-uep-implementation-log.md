@@ -1090,3 +1090,12 @@ Web: this log only. Phase 5 was not started.
 - Canonical extension workflow now runs Node 22 typecheck, Vitest, production build, manifest validation, Chromium installation, and unpacked-extension Playwright under Xvfb.
 - Both workflows use dependency caching only and cancel superseded runs.
 - Workflow YAML parsed successfully with PyYAML. Local equivalents for web, backend, and Supabase passed before this edit; extension’s previously recorded typecheck/Vitest/build/manifest/Playwright gates remain green.
+
+---
+
+## Phase 8A type-safety slice — 2026-08-24 (working tree)
+
+- Replaced the three `Session`/`Rubric`/`ActionItem` `any` aliases in `Dashboard.tsx` with the typed dashboard API domain models.
+- Added the persisted `screenshotPath` field to the dashboard session model and mapper, then removed snake_case fallback reads that masked type drift.
+- `npx tsc --noEmit`, `npm test` (14 files / 85 tests), and an approved-environment production build passed; the built-environment scan passed afterward.
+- This slice remains uncommitted because `Dashboard.tsx` already contained unrelated whitespace-only working-tree edits from the prior agent. The semantic changes are intentionally preserved for the next dashboard extraction commit.
