@@ -658,6 +658,7 @@ The extension has one live implementation, one dashboard integration path, and n
 - [ ] Record a backup video and prepare a text-input fallback plus screenshots of each golden-path checkpoint.
 - [ ] Run the full release checklist from a clean clone, then have a teammate follow the README without verbal help.
 - [x] Prepare `docs/submission/hosted-golden-flow-checklist.md` with two clean-profile runs, checkpoint evidence, privacy/fallback rules, and owner sign-off; the actual hosted execution remains external.
+- [x] Prepare `docs/submission/teammate-reproduction-record.md` with exact-commit, README-only execution, deviation, and independent-sign-off fields; the actual teammate walkthrough remains external.
 
 **Verify**
 
