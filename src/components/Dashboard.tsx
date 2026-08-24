@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import type { View, Theme, CoachMode, SessionRow } from './dashboard/dashboard-types';
+import type {
+  View,
+  Theme,
+  CoachMode,
+  SessionRow,
+  DashboardBootstrapState,
+} from './dashboard/dashboard-types';
 import { Sidebar, TopBar } from './dashboard/DashboardShell';
 import { ActionItemsView } from './dashboard/ActionItemsView';
 import { HomeView } from './dashboard/HomeView';
@@ -98,11 +104,6 @@ function getLoggedInStudent() {
 }
 
 const STUDENT = getLoggedInStudent();
-
-type DashboardBootstrapState =
-  | { status: 'loading' }
-  | { status: 'ready' }
-  | { status: 'error' };
 
 /* ---------- Component ---------- */
 
@@ -358,10 +359,10 @@ export default function Dashboard({
           s.status === 'rejected' &&
           r.status === 'rejected' &&
           a.status === 'rejected';
-        setBootstrapState({ status: fatalLoadError ? 'error' : 'ready' });
+        setBootstrapState({ status: fatalLoadError ? 'error' : 'success' });
       })
       .catch(() => {
-        if (!cancelled) setBootstrapState({ status: 'ready' });
+        if (!cancelled) setBootstrapState({ status: 'success' });
       });
     return () => {
       cancelled = true;

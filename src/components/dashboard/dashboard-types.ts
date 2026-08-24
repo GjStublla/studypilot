@@ -19,6 +19,12 @@ export type DashboardStudent = {
   email: string;
 };
 
+export type DashboardBootstrapState =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'success' }
+  | { status: 'error'; message?: string };
+
 export type LucideIcon = ComponentType<SVGProps<SVGSVGElement> & { size?: number | string }>;
 
 export const SETTINGS_COACH_MODES = [
