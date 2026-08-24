@@ -44,7 +44,7 @@ Repository-state cautions:
 ## Current status update — 2026-08-24
 
 The historical baseline above is retained for auditability. Local verification
-has since reached web Vitest 17/96, Deno 42, FastAPI pytest 26, Supabase pgTAP
+has since reached web Vitest 19/103, Deno 42, FastAPI pytest 26, Supabase pgTAP
 5 files/291 tests after a fresh reset, web Playwright 4/4, extension Vitest
 17/84, extension Playwright 13/13, production builds, and manifest/built-env
 scans. A clean clone now passes the documented non-hosted gates after
