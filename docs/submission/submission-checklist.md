@@ -4,10 +4,11 @@
 
 This section records what is reproducible in the workspace; it is not a deployment or mentor sign-off.
 
-- Web local evidence baseline: `8db5a40` (with architecture/scaffold commits `7a68341` and `6a08fac`; later documentation commits record submission state).
-- Canonical extension local head: `ea76936`; its worktree is clean.
+- Web local evidence baseline: `d85b27f` (with accessibility/performance, architecture, and scaffold commits `8db5a40`, `7a68341`, and `6a08fac`; later documentation commits record submission state).
+- Canonical extension local head: `933b1ca`; its worktree is clean. The latest slice includes workspace-owned persistence and settled narrow-panel screenshot evidence.
 - Web Vitest: 17 files / 96 tests; web Playwright: 4/4; production build and built-environment scan: passed.
-- Extension typecheck, Vitest (16 files / 74 tests), build, manifest validation, and unpacked Playwright (11/11): passed.
+- Extension typecheck, Vitest (16 files / 74 tests), build, manifest validation, and unpacked Playwright (11/11): passed; the viewport test now emits and visually inspects 360×640 and 390×700 screenshots.
+- FastAPI pytest: 26 passed; Supabase local pgTAP: 5 files / 291 passed after a fresh reset, including the six-table update-policy matrix.
 - Local Lighthouse medians and axe evidence: `context/performance-notes.md`; hosted dashboard performance remains unmeasured.
 - Hosted Supabase allowlist: visibly skipped because the process did not contain `SUPABASE_ACCESS_TOKEN`.
 - Architecture diagram: `docs/architecture/system.png` from `7a68341`.

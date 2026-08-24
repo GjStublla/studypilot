@@ -1359,3 +1359,16 @@ Web: this log only. Phase 5 was not started.
 - Commit `7a68341` adds the inspected 3× `docs/architecture/system.png` render from `system.mmd`; labels are readable at report scale and the diagram shows browser clients, FastAPI CRUD, Supabase Auth/Realtime/Edge, Postgres/Storage, and Vertex AI.
 - The tracked `extension/` audit found no unique production behavior. Its own README marked it non-production and the root `extension:build` script already targeted `../studypilot-extension`; commit `6a08fac` removes the exact tracked scaffold without touching the canonical sibling repository.
 - `npm run extension:build` was re-run after removal and passed; the canonical extension worktree remains clean, and `git ls-files extension` returns no result.
+
+### Phase 6 authorization matrix and Phase 7 protected hosted gate — 2026-08-24
+
+- Web commit `d85b27f` adds an ownership-specific FastAPI regression fixture for `/users/me`. The verified token subject is now asserted to become the profile-row filter, and a different owner returns the existing 404 contract rather than another user's row.
+- The Supabase `rls_ownership.test.sql` matrix now exercises cross-user denial and same-user success for every client-update policy currently exposed by the migrations: profiles, knowledge documents, rubrics, sessions, dashboard chats, and action items. The plan count is 40 and the test was run against a fresh local reset.
+- The hosted function allowlist workflow now uses `github.ref_protected` instead of a hard-coded `main` branch. On a protected branch with no configured Supabase secrets, the step prints an explicit `SKIPPED` message; when both secrets exist, it runs `npm run verify:functions` without printing credentials.
+- Verification: FastAPI pytest passed 26 tests; local Supabase pgTAP passed 5 files / 291 tests; the workflow diff passed `git diff --check`. The hosted check remains unrun locally because no management token was supplied to the process.
+
+### Phase 9A workspace persistence and narrow-panel evidence — 2026-08-24
+
+- Canonical extension commit `fe8d5f5` moves the `STUDYPILOT_SAVE_SESSION` request, single-flight lock, and mounted-response guard into `useDashboardWorkspace.ts`. `FloatingStudyPilot.tsx` retains session construction and user-facing notices but no longer owns the persistence request lifecycle.
+- Canonical extension commit `933b1ca` adds settled screenshots to the 360×640 / 390×700 viewport test, avoids waiting on an external dashboard page during handoff, and adds a short-height responsive layout so the optional Focus row is not hidden behind the footer. The generated screenshots were visually inspected locally; they are test artifacts, not hosted-product evidence.
+- Verification after both commits: typecheck passed; Vitest passed 16 files / 74 tests; production build and manifest validation passed; unpacked Playwright passed 11/11. The full suite includes rapid toggle console/page-error checks, connected chat/reload persistence, and the responsive screenshot-producing test.
