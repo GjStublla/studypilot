@@ -93,4 +93,5 @@ deno.lock
 
 
 tmp/
+test-results/
 
