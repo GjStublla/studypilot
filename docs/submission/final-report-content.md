@@ -42,3 +42,57 @@ StudyPilot keeps one coaching loop across the two surfaces the student already u
 5. If “Save to dashboard” is on, the conversation and action items continue in the dashboard. If it is off, the session is not persisted there.
 
 The solution is a connected coaching workflow, not a claim that students learn more, finish faster, or receive perfectly accurate citations. Those outcomes are out of scope until a later validation phase measures them.
+
+## 4. Development Process
+
+The implementation used characterization-first phases. Existing behavior was tested before boundary changes, then each completed slice was committed independently and re-run through the relevant unit, integration, build, database, or browser checks.
+
+The current evidence includes web Vitest, FastAPI pytest, local Supabase pgTAP, extension Vitest, TypeScript builds, manifest validation, and unpacked extension Playwright. Hosted deployment, production smoke testing, pilot collection, and the final clean-profile golden flow remain explicit release gates rather than implied by local tests.
+
+## 5. Technical Stack
+
+| Layer | Technologies used in the submitted code |
+|---|---|
+| Web UI | React 19, TypeScript, Vite, Framer Motion, Lucide |
+| CRUD API | FastAPI, Python, Supabase client, single-worker-safe rate limiting |
+| Data/auth | Supabase Auth, Postgres/RLS, Realtime, Storage, Edge Functions, Deno tests |
+| Model/live path | Server-brokered Vertex AI/Gemini; Chrome MV3 offscreen live runtime |
+| Extension | Chrome MV3, content panel, service worker, offscreen document, WebSocket/live transport |
+| Verification | Vitest, pytest, pgTAP, Playwright, GitHub Actions, Docker |
+
+## 6. Architectural Design Diagram
+
+The source diagram is `docs/architecture/system.mmd`; its decision record is `docs/adr/0001-runtime-boundaries.md`. FastAPI owns profile/session/rubric/action-item CRUD. Supabase owns Auth, RLS, Realtime, Storage, Edge chat/RAG/live workflows, and cross-surface synchronization. Browser clients never receive model or service-role secrets.
+
+## 7. Features Implemented
+
+- Rubric upload, activation, indexing status, retry, and criteria display.
+- Browser coaching from selected page context and optional screenshot capture.
+- Grounded chat when indexed rubric/document evidence is available.
+- Live microphone coaching through the offscreen runtime and server-brokered token path.
+- Shared chats, sessions, transcripts, screenshots, summaries, and action items.
+- Dashboard session detail, follow-up prompts, citations, usage display, and continuation links.
+- Privacy controls that keep screenshot capture and dashboard persistence independently off by default.
+- Recoverable auth, network, microphone-denial, indexing, and model-error states covered by the current tests.
+
+## 8. Challenges Faced & Solutions
+
+### Cross-surface chat synchronization
+
+The extension and dashboard can observe the same chat through different paths and historical row shapes. The solution uses canonical adapters, Realtime reconciliation, sequence/request identifiers, and pending-message overlays rather than treating local rows as durable truth.
+
+### Privacy-safe live context and persistence
+
+Live audio processing and optional storage are separate decisions. Explicit privacy options, independent settings, server-side propagation, and default-off tests prevent enabling screenshot capture from silently enabling dashboard persistence.
+
+### Grounded rubric retrieval and secure model brokering
+
+Rubric grounding is asynchronous and may fail or remain unavailable. The UI exposes indexing/retry/error states, while model access remains behind authenticated Edge/backend code so the browser bundle contains no model API key.
+
+## 9. Team Contributions
+
+Replace the placeholders below with each member's approved contribution text. Do not infer percentages from Git history.
+
+- **[Member name]:** [approved role and contribution]
+- **[Member name]:** [approved role and contribution]
+- **[Member name]:** [approved role and contribution]
