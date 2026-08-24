@@ -22,6 +22,7 @@
     "verify:functions": "node scripts/verify-function-allowlist.mjs",
     "verify:built-env": "node scripts/verify-built-env.mjs dist",
     "verify:release": "node scripts/verify-release.mjs",
+    "validate:submission": "node scripts/validate-submission-package.mjs",
     "validate:claims": "node scripts/validate-claims.mjs --include-demo-script --require-demo-script",
     "validate:pilot": "node scripts/validate-pilot-results.mjs",
     "extension:build": "npm run build --prefix ../studypilot-extension"

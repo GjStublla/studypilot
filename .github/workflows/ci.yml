@@ -98,6 +98,11 @@ jobs:
           node --test scripts/validate-claims.test.mjs
           npm run validate:claims
 
+      - name: Validate submission artifacts
+        run: |
+          node --test scripts/validate-submission-package.test.mjs
+          npm run validate:submission
+
       - name: Build and scan public bundle
         env:
           VITE_API_BASE_URL: https://api.example.invalid
