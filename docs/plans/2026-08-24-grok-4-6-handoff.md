@@ -15,7 +15,7 @@ The implementation objective is therefore: make the product demonstrably reliabl
 - Canonical Chrome extension: `C:\Users\gjins\Desktop\studypilot-extension`
 - Preserve the untracked web `output/` directory and the existing formal plan.
 - Web remediation commits include `23ab897` (dashboard chat/session/rubric/context extraction), `60fdd2b` (shell and low-coupling view extraction), `7529dd3` (release/database verification repair), and `2ce5667` (implementation log).
-- Extension remediation commits include `d9f9fb1` (remove unreachable browser AI/mock/voice paths), `e281450` (split Supabase facade), `279e91f` (extract pure panel components), `c295320` (live-state derivation and listener cleanup), and `5ea85a0` (history secret-scan CI). The extension worktree is clean at this handoff.
+- Extension remediation commits include `d9f9fb1` (remove unreachable browser AI/mock/voice paths), `e281450` (split Supabase facade), `279e91f` (extract pure panel components), `c295320` (live-state derivation and listener cleanup), `5ea85a0` (history secret-scan CI), and `818a500` (live coaching hook). The extension worktree is clean at this handoff.
 
 ## Verified evidence
 
@@ -56,8 +56,8 @@ Extension:
 
 ### P1 — extension maintainability and narrow-width UX
 
-1. Expand characterization tests for chat reconciliation, save queue, and live start/pause/resume/stop before moving the remaining closures. Pure live-state derivation and several listener cleanups are already covered by `c295320`.
-2. Extract `useLiveCoaching.ts`, `useDashboardWorkspace.ts`, `ExtensionPanel.tsx`, `ContextSettings.tsx`, and `QuickActions.tsx` from `FloatingStudyPilot.tsx`.
+1. Expand characterization tests for chat reconciliation and save queue, plus invalid live-control combinations. Live start/pause/resume/stop now live in `useLiveCoaching.ts`; pure derivation and listener cleanup are covered by `c295320`.
+2. Extract `useDashboardWorkspace.ts`, `ExtensionPanel.tsx`, `ContextSettings.tsx`, and `QuickActions.tsx` from `FloatingStudyPilot.tsx`.
 3. Keep live transitions explicit (`idle | starting | live | paused | stopping | error`) and make invalid control combinations unrenderable.
 4. Add 360x640 and 390x700 screenshots/E2E checks for fully visible quick actions, no header overlap, no horizontal scroll, and no duplicate listeners after rapid open/close.
 5. Keep `studypilotSupabase.ts` as the public facade; its auth/chat modules now exist and must retain the current tests. Extension-specific history secret scanning is now in CI; branch protection remains an admin gate.

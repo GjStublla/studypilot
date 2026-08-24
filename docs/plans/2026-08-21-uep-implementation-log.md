@@ -1150,6 +1150,13 @@ Web: this log only. Phase 5 was not started.
 - Canonical extension commit `5ea85a0` added a full-history Gitleaks job with checksum verification to the extension workflow, alongside the existing typecheck/test/build/manifest/Playwright quality job.
 - Workflow YAML parsed successfully and the current source/browser-secret marker scan is clean. GitHub execution remains a CI/external gate.
 
+### Phase 9A live coaching hook extraction — 2026-08-24
+
+- Canonical extension commit `818a500` moved Live start/stop/pause/resume, microphone fallback/error mapping, runtime status application, and speech-recognition cleanup into `src/content/useLiveCoaching.ts`.
+- `FloatingStudyPilot.tsx` fell from 2,748 to approximately 2,584 lines; the hook exposes the live state/control boundary while preserving the existing panel callbacks and privacy payload.
+- Extension verification: 13 Vitest files / 60 tests, typecheck, production build, manifest validation, and 8/8 unpacked Playwright tests passed.
+- Remaining Phase 9A work: workspace/chat reconciliation hook, focused panel composition, explicit invalid-state rendering, and 360/390px layout tests.
+
 ### Phase 12 architecture/documentation slice — 2026-08-24
 
 - Added `docs/adr/0001-runtime-boundaries.md` documenting the FastAPI versus Supabase ownership decision, alternatives, consequences, and review trigger.
