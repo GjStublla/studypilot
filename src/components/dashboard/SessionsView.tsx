@@ -14,10 +14,8 @@ export const SessionsView = memo(function SessionsView({
     () =>
       q
         ? rows.filter(({ session: s, rubric }) =>
-          [s.title, s.summary, s.mode, s.source, rubric?.title ?? ''].some((f) =>
-            f.toLowerCase().includes(q),
-          ),
-        )
+            [s.title, s.summary, s.mode, s.source, rubric?.title ?? ''].some((f) => f.toLowerCase().includes(q)),
+          )
         : rows,
     [rows, q],
   );
@@ -28,8 +26,8 @@ export const SessionsView = memo(function SessionsView({
         <div>
           <h2 className="ds-h2">Coaching sessions</h2>
           <p className="ds-lede">
-            Every coaching session imported from the extension. Continue any of them in chat — your
-            rubric, transcript, and feedback travel with the conversation.
+            Every coaching session imported from the extension. Continue any of them in chat — your rubric, transcript,
+            and feedback travel with the conversation.
           </p>
         </div>
         <span className="ds-pill ds-pill-quiet">
@@ -51,11 +49,7 @@ export const SessionsView = memo(function SessionsView({
             return (
               <li key={s.id}>
                 <article className="ds-session-card">
-                  <button
-                    type="button"
-                    className="ds-session-body"
-                    onClick={() => onOpenSession(s.id)}
-                  >
+                  <button type="button" className="ds-session-body" onClick={() => onOpenSession(s.id)}>
                     <div className="ds-card-eyebrow">
                       <span className="ds-dot ds-dot-cyan" aria-hidden="true" />
                       <span>{s.when}</span>

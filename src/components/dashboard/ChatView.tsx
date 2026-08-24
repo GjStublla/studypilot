@@ -1,16 +1,23 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ArrowUp, BookOpen, Chrome, Clock, MessageCircle, Mic, MicOff, MoreHorizontal,
-  Paperclip, Plus, ScrollText, ShieldCheck, Sparkles,
+  ArrowUp,
+  BookOpen,
+  Chrome,
+  Clock,
+  MessageCircle,
+  Mic,
+  MicOff,
+  MoreHorizontal,
+  Paperclip,
+  Plus,
+  ScrollText,
+  ShieldCheck,
+  Sparkles,
 } from 'lucide-react';
 import { EmptyState, StudyPilotMark } from './DashboardPrimitives';
-import { FileSearchStatusBadge, getRubricIndexStatus } from './RubricStatus';
-import type {
-  ChatListRowProps,
-  ChatViewProps,
-  CitationItemProps,
-  MessageBubbleProps,
-} from './dashboard-types';
+import { FileSearchStatusBadge } from './RubricStatus';
+import { getRubricIndexStatus } from './rubric-index-status';
+import type { ChatListRowProps, ChatViewProps, CitationItemProps, MessageBubbleProps } from './dashboard-types';
 
 const QUICK_PROMPTS = [
   'What should I revise first?',
@@ -47,16 +54,19 @@ export const ChatView = memo(function ChatView({
   const [micOn, setMicOn] = useState(false);
   const draftKey = activeChatId ?? NEW_CHAT_DRAFT_KEY;
   const input = drafts[draftKey] ?? '';
-  const setInput = useCallback((value: string) => {
-    setDrafts((current) => {
-      if ((current[draftKey] ?? '') === value) return current;
-      if (value) return { ...current, [draftKey]: value };
+  const setInput = useCallback(
+    (value: string) => {
+      setDrafts((current) => {
+        if ((current[draftKey] ?? '') === value) return current;
+        if (value) return { ...current, [draftKey]: value };
 
-      const next = { ...current };
-      delete next[draftKey];
-      return next;
-    });
-  }, [draftKey]);
+        const next = { ...current };
+        delete next[draftKey];
+        return next;
+      });
+    },
+    [draftKey],
+  );
   const limitReached = aiUsage !== null && aiUsage.used >= aiUsage.limit;
   const remainingRequests = aiUsage === null ? null : Math.max(aiUsage.limit - aiUsage.used, 0);
   const composerDisabled = limitReached || activeChatBusy;
@@ -107,34 +117,33 @@ export const ChatView = memo(function ChatView({
     };
   }, [input]);
 
-  const send = useCallback((text?: string) => {
-    if (limitReached) return;
-    const value = (text ?? input).trim();
-    if (!value) return;
-    if (onSendMessage(value, session?.id ?? null)) setInput('');
-  }, [input, limitReached, onSendMessage, session?.id, setInput]);
+  const send = useCallback(
+    (text?: string) => {
+      if (limitReached) return;
+      const value = (text ?? input).trim();
+      if (!value) return;
+      if (onSendMessage(value, session?.id ?? null)) setInput('');
+    },
+    [input, limitReached, onSendMessage, session?.id, setInput],
+  );
 
   const toggleMic = useCallback(() => setMicOn((v) => !v), []);
   const activeChat = chats.find((chat) => chat.id === activeChatId);
   const chatOrigin = activeChat?.origin_surface ?? 'dashboard';
-  const originLabel = chatOrigin === 'extension'
-    ? 'Started in Chrome extension'
-    : chatOrigin === 'legacy'
-      ? 'Imported legacy chat'
-      : 'Started in dashboard';
+  const originLabel =
+    chatOrigin === 'extension'
+      ? 'Started in Chrome extension'
+      : chatOrigin === 'legacy'
+        ? 'Imported legacy chat'
+        : 'Started in dashboard';
   const composerBusy = activeChatBusy || draftCreating;
   // Parent resolves chat rubric; locked-null must never surface the global active rubric.
-  const lockedNull = rubricRemoved
-    || Boolean(activeChat?.rubric_context_locked && activeChat.rubric_id == null);
+  const lockedNull = rubricRemoved || Boolean(activeChat?.rubric_context_locked && activeChat.rubric_id == null);
   const effectiveRubric = lockedNull ? undefined : activeRubric;
   const indexStatus = getRubricIndexStatus(effectiveRubric);
-  const rubricIndexRequestState = effectiveRubric
-    ? rubricIndexRequestStates[effectiveRubric.id]
-    : undefined;
+  const rubricIndexRequestState = effectiveRubric ? rubricIndexRequestStates[effectiveRubric.id] : undefined;
   const rubricIndexing = rubricIndexRequestState?.status === 'loading';
-  const rubricIndexError = rubricIndexRequestState?.status === 'error'
-    ? rubricIndexRequestState.message
-    : undefined;
+  const rubricIndexError = rubricIndexRequestState?.status === 'error' ? rubricIndexRequestState.message : undefined;
 
   return (
     <div className="ds-view ds-view-chat">
@@ -177,14 +186,18 @@ export const ChatView = memo(function ChatView({
               <span className="ds-context-chip ds-chip-muted" data-testid="chat-rubric-chip">
                 <BookOpen size={11} strokeWidth={1.8} />
                 <span>Rubric removed</span>
-                <span className="ds-chip-lock" title="Rubric context locked">locked</span>
+                <span className="ds-chip-lock" title="Rubric context locked">
+                  locked
+                </span>
               </span>
             ) : effectiveRubric ? (
               <span className="ds-context-chip" data-testid="chat-rubric-chip">
                 <BookOpen size={11} strokeWidth={1.8} />
                 <span>{effectiveRubric.title.replace(' Rubric', '')}</span>
                 {activeChat?.rubric_context_locked ? (
-                  <span className="ds-chip-lock" title="Rubric context locked">locked</span>
+                  <span className="ds-chip-lock" title="Rubric context locked">
+                    locked
+                  </span>
                 ) : null}
               </span>
             ) : null}
@@ -200,15 +213,19 @@ export const ChatView = memo(function ChatView({
               />
             )}
             <span className="ds-context-chip">
-              {chatOrigin === 'extension'
-                ? <Chrome size={11} strokeWidth={1.8} />
-                : <MessageCircle size={11} strokeWidth={1.8} />}
+              {chatOrigin === 'extension' ? (
+                <Chrome size={11} strokeWidth={1.8} />
+              ) : (
+                <MessageCircle size={11} strokeWidth={1.8} />
+              )}
               <span>{originLabel}</span>
             </span>
             {session && (
               <span className="ds-context-chip ds-chip-muted">
                 <Clock size={11} strokeWidth={1.8} />
-                <span>{session.duration} · {session.mode}</span>
+                <span>
+                  {session.duration} · {session.mode}
+                </span>
               </span>
             )}
           </div>
@@ -285,25 +302,22 @@ export const ChatView = memo(function ChatView({
               >
                 {micOn ? <Mic size={14} strokeWidth={1.7} /> : <MicOff size={14} strokeWidth={1.7} />}
               </button>
-              <button
-                type="submit"
-                className="ds-send"
-                disabled={composerDisabled || !input.trim()}
-                aria-label="Send"
-              >
+              <button type="submit" className="ds-send" disabled={composerDisabled || !input.trim()} aria-label="Send">
                 <ArrowUp size={14} strokeWidth={2} />
               </button>
             </form>
 
             <p className={`ds-composer-hint ${limitReached ? 'is-limit' : ''}`}>
               {limitReached ? (
-                <>Daily AI limit reached ({aiUsage.used} of {aiUsage.limit}). Resets at midnight UTC.</>
+                <>
+                  Daily AI limit reached ({aiUsage.used} of {aiUsage.limit}). Resets at midnight UTC.
+                </>
               ) : remainingRequests !== null && remainingRequests <= 5 ? (
                 <>{remainingRequests} AI requests left today.</>
               ) : (
                 <>
-                  <ShieldCheck size={11} strokeWidth={1.7} /> StudyPilot will not write your work — it
-                  helps you revise it.
+                  <ShieldCheck size={11} strokeWidth={1.7} /> StudyPilot will not write your work — it helps you revise
+                  it.
                 </>
               )}
             </p>
@@ -426,11 +440,7 @@ const ChatListRow = memo(function ChatListRow({
   );
 });
 
-const MessageBubble = memo(function MessageBubble({
-  message,
-  student,
-  thinking = false,
-}: MessageBubbleProps) {
+const MessageBubble = memo(function MessageBubble({ message, student, thinking = false }: MessageBubbleProps) {
   const citations = message.citations ?? [];
 
   return (
@@ -442,9 +452,7 @@ const MessageBubble = memo(function MessageBubble({
         <div className="ds-msg-meta">
           <b>{message.role === 'ai' ? 'StudyPilot' : student.name}</b>
           <time>{message.time}</time>
-          {message.usedFileSearch ? (
-            <span className="ds-msg-rag-tag">Grounded</span>
-          ) : null}
+          {message.usedFileSearch ? <span className="ds-msg-rag-tag">Grounded</span> : null}
         </div>
         {thinking ? (
           <div className="ds-typing" role="status" aria-label="StudyPilot is thinking">
@@ -453,9 +461,7 @@ const MessageBubble = memo(function MessageBubble({
             <span className="ds-typing-dot" />
           </div>
         ) : (
-          message.lines.map((line, i) => (
-            <p key={i}>{line || ' '}</p>
-          ))
+          message.lines.map((line, i) => <p key={i}>{line || ' '}</p>)
         )}
         {!thinking && citations.length > 0 ? (
           <ul className="ds-citations" aria-label="Sources">

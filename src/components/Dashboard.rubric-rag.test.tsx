@@ -1,14 +1,14 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Session } from '../lib/dashboardApi';
+import type { ActionItem, Rubric, Session, TranscriptLine } from '../lib/dashboard-types';
 import type { DashboardChat, DashboardChatMessage } from '../lib/studypilot-types';
 
 const mocks = vi.hoisted(() => ({
-  fetchSessions: vi.fn(async (): Promise<any[]> => []),
-  fetchRubrics: vi.fn(async (): Promise<any[]> => []),
-  fetchActionItems: vi.fn(async (): Promise<any[]> => []),
-  fetchSessionTranscript: vi.fn(async (): Promise<any[]> => []),
+  fetchSessions: vi.fn(async (): Promise<Session[]> => []),
+  fetchRubrics: vi.fn(async (): Promise<Rubric[]> => []),
+  fetchActionItems: vi.fn(async (): Promise<ActionItem[]> => []),
+  fetchSessionTranscript: vi.fn(async (): Promise<TranscriptLine[]> => []),
   setActionItemDone: vi.fn(),
   activateRubric: vi.fn(async () => undefined),
   getDashboardChats: vi.fn(async (): Promise<DashboardChat[]> => []),
@@ -65,7 +65,7 @@ import Dashboard from './Dashboard';
 const RUBRIC_ID = 'rubric-aaaa-bbbb-cccc-ddddeeee0001';
 const CHAT_ID = '123e4567-e89b-42d3-a456-426614174099';
 
-function makeRubric(overrides: Record<string, unknown> = {}) {
+function makeRubric(overrides: Partial<Rubric> = {}): Rubric {
   return {
     id: RUBRIC_ID,
     title: 'Argument Rubric',
@@ -252,9 +252,12 @@ describe('Dashboard rubric RAG behaviors', () => {
         fileSearchError: 'timeout',
       }),
     ]);
-    mocks.retryRubricIndexing.mockImplementationOnce(() => new Promise((resolve) => {
-      resolveRetry = resolve;
-    }));
+    mocks.retryRubricIndexing.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveRetry = resolve;
+        }),
+    );
 
     render(<Dashboard routeHash={`#dashboard?chat=${CHAT_ID}`} />);
     await user.click(await screen.findByRole('button', { name: 'Retry' }));
@@ -336,9 +339,7 @@ describe('Dashboard rubric RAG behaviors', () => {
     mocks.fetchSessions.mockResolvedValue([makeSession()]);
     mocks.fetchSessionTranscript
       .mockRejectedValueOnce(new Error('Transcript service unavailable'))
-      .mockResolvedValueOnce([
-        { id: 'line-1', who: 'You', text: 'Clarify the thesis', t: '0:01' },
-      ]);
+      .mockResolvedValueOnce([{ id: 'line-1', who: 'You', text: 'Clarify the thesis', t: '0:01' }]);
 
     render(<Dashboard />);
     await user.click(await screen.findByRole('button', { name: /Sessions/i }));

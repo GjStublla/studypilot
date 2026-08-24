@@ -156,9 +156,7 @@ function parseCell(value, rowNumber, column) {
 function median(values) {
   const sorted = [...values].sort((left, right) => left - right);
   const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0
-    ? (sorted[middle - 1] + sorted[middle]) / 2
-    : sorted[middle];
+  return sorted.length % 2 === 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle];
 }
 
 function mean(values) {
@@ -173,7 +171,7 @@ export function validatePilotCsv(text, { requireData = false } = {}) {
   const rows = parseCsv(text);
   if (rows.length === 0) fail('CSV is empty; include the fixed header row');
 
-  const header = rows[0].map(value => value.trim());
+  const header = rows[0].map((value) => value.trim());
   if (header.length !== REQUIRED_COLUMNS.length || header.some((value, index) => value !== REQUIRED_COLUMNS[index])) {
     fail(`header must be exactly: ${REQUIRED_COLUMNS.join(',')}`);
   }
@@ -211,24 +209,24 @@ export function validatePilotCsv(text, { requireData = false } = {}) {
 
   const citationsChecked = records.reduce((sum, record) => sum + record.citations_checked, 0);
   const citationsSupported = records.reduce((sum, record) => sum + record.citations_supported, 0);
-  const beforeScores = records.map(record => record.before_score);
-  const afterScores = records.map(record => record.after_score);
+  const beforeScores = records.map((record) => record.before_score);
+  const afterScores = records.map((record) => record.after_score);
   const metrics = {
     participantCount: records.length,
-    completedCount: records.filter(record => record.completed).length,
-    completionRate: roundMetric(records.filter(record => record.completed).length / records.length),
-    medianTimeToFeedbackSeconds: roundMetric(median(records.map(record => record.time_to_feedback_seconds))),
+    completedCount: records.filter((record) => record.completed).length,
+    completionRate: roundMetric(records.filter((record) => record.completed).length / records.length),
+    medianTimeToFeedbackSeconds: roundMetric(median(records.map((record) => record.time_to_feedback_seconds))),
     meanBeforeScore: roundMetric(mean(beforeScores)),
     meanAfterScore: roundMetric(mean(afterScores)),
     meanScoreChange: roundMetric(mean(afterScores.map((score, index) => score - beforeScores[index]))),
     citationsChecked,
     citationsSupported,
     groundingPrecision: citationsChecked === 0 ? null : roundMetric(citationsSupported / citationsChecked),
-    errorFreeCount: records.filter(record => record.error_free).length,
-    errorFreeRate: roundMetric(records.filter(record => record.error_free).length / records.length),
-    medianResponseLatencyMs: roundMetric(median(records.map(record => record.median_latency_ms))),
-    meanSus: roundMetric(mean(records.map(record => record.sus_score))),
-    approvedQuoteCount: records.filter(record => record.quote_approved).length,
+    errorFreeCount: records.filter((record) => record.error_free).length,
+    errorFreeRate: roundMetric(records.filter((record) => record.error_free).length / records.length),
+    medianResponseLatencyMs: roundMetric(median(records.map((record) => record.median_latency_ms))),
+    meanSus: roundMetric(mean(records.map((record) => record.sus_score))),
+    approvedQuoteCount: records.filter((record) => record.quote_approved).length,
   };
 
   return { status: 'validated', participantCount: records.length, metrics };
@@ -240,14 +238,17 @@ export function formatPilotResult(result) {
   }
 
   const { metrics } = result;
-  const grounding = metrics.groundingPrecision === null
-    ? 'unavailable (no citations checked)'
-    : `${metrics.groundingPrecision} (${metrics.citationsSupported}/${metrics.citationsChecked})`;
+  const grounding =
+    metrics.groundingPrecision === null
+      ? 'unavailable (no citations checked)'
+      : `${metrics.groundingPrecision} (${metrics.citationsSupported}/${metrics.citationsChecked})`;
   return [
     `validate-pilot-results: ${metrics.participantCount} participant row(s) validated`,
-    `sample_target: ${metrics.participantCount >= TARGET_PARTICIPANT_MIN && metrics.participantCount <= TARGET_PARTICIPANT_MAX
-      ? 'within target (10–15)'
-      : 'outside target (10–15); report limitation'}`,
+    `sample_target: ${
+      metrics.participantCount >= TARGET_PARTICIPANT_MIN && metrics.participantCount <= TARGET_PARTICIPANT_MAX
+        ? 'within target (10–15)'
+        : 'outside target (10–15); report limitation'
+    }`,
     `completion_rate: ${metrics.completionRate} (${metrics.completedCount}/${metrics.participantCount})`,
     `median_time_to_feedback_seconds: ${metrics.medianTimeToFeedbackSeconds}`,
     `mean_before_score: ${metrics.meanBeforeScore}`,
@@ -275,13 +276,14 @@ export function formatPilotSummary(result, { source = 'docs/validation/pilot-res
   }
 
   const { metrics } = result;
-  const grounding = metrics.groundingPrecision === null
-    ? 'Unavailable'
-    : `${metrics.groundingPrecision} (${metrics.citationsSupported}/${metrics.citationsChecked})`;
-  const sampleTarget = metrics.participantCount >= TARGET_PARTICIPANT_MIN
-    && metrics.participantCount <= TARGET_PARTICIPANT_MAX
-    ? 'within 10–15 target'
-    : 'outside 10–15 target; report limitation';
+  const grounding =
+    metrics.groundingPrecision === null
+      ? 'Unavailable'
+      : `${metrics.groundingPrecision} (${metrics.citationsSupported}/${metrics.citationsChecked})`;
+  const sampleTarget =
+    metrics.participantCount >= TARGET_PARTICIPANT_MIN && metrics.participantCount <= TARGET_PARTICIPANT_MAX
+      ? 'within 10–15 target'
+      : 'outside 10–15 target; report limitation';
 
   return [
     '# StudyPilot pilot metrics',

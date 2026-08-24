@@ -115,7 +115,7 @@ function queryId(url: URL, field: string): string | null {
   return raw?.startsWith('eq.') ? raw.slice(3) : null;
 }
 
-function makeChat(state: FixtureState): ChatRow {
+function makeChat(_state: FixtureState): ChatRow {
   const now = new Date().toISOString();
   return {
     id: CHAT_ID,
@@ -203,7 +203,7 @@ async function handleSupabase(route: Route, state: FixtureState) {
     if (request.method() === 'PATCH') {
       const id = queryId(url, 'id');
       const updates = JSON.parse(request.postData() ?? '{}') as Partial<RubricRow>;
-      state.rubrics = state.rubrics.map((row) => row.id === id ? { ...row, ...updates } : row);
+      state.rubrics = state.rubrics.map((row) => (row.id === id ? { ...row, ...updates } : row));
       return json(route, []);
     }
   }
@@ -251,7 +251,7 @@ async function handleSupabase(route: Route, state: FixtureState) {
 
   if (path === '/rest/v1/dashboard_chat_messages') {
     const chatId = queryId(url, 'chat_id');
-    return json(route, clone(chatId ? state.messagesByChat.get(chatId) ?? [] : []));
+    return json(route, clone(chatId ? (state.messagesByChat.get(chatId) ?? []) : []));
   }
 
   if (path === '/functions/v1/socratic-coach') {
@@ -293,24 +293,28 @@ async function handleSupabase(route: Route, state: FixtureState) {
         used_file_search: true,
         file_search_store_name: 'e2e-store',
         grounding_metadata: null,
-        citations: [{
-          title: 'Argumentative Essay Rubric',
-          uri: 'https://example.com/rubric',
-          snippet: 'Evidence supports the thesis with relevant sources.',
-        }],
+        citations: [
+          {
+            title: 'Argumentative Essay Rubric',
+            uri: 'https://example.com/rubric',
+            snippet: 'Evidence supports the thesis with relevant sources.',
+          },
+        ],
         created_at: now,
       },
     ]);
-    state.actionItems = [{
-      id: ACTION_ID,
-      user_id: USER_ID,
-      session_id: null,
-      rubric_id: RUBRIC_ID,
-      text: 'Compare each claim with primary evidence before revising.',
-      done: false,
-      created_at: now,
-      updated_at: now,
-    }];
+    state.actionItems = [
+      {
+        id: ACTION_ID,
+        user_id: USER_ID,
+        session_id: null,
+        rubric_id: RUBRIC_ID,
+        text: 'Compare each claim with primary evidence before revising.',
+        done: false,
+        created_at: now,
+        updated_at: now,
+      },
+    ];
     const stream = [
       `data: ${JSON.stringify({ text: 'Start with the rubric’s evidence criterion. ' })}`,
       `data: ${JSON.stringify({ text: 'Compare your claim with the source before revising.' })}`,
@@ -343,24 +347,30 @@ async function handleApi(route: Route, state: FixtureState) {
     return json(route, []);
   }
   if (request.method() === 'GET' && url.pathname === '/rubrics') {
-    return json(route, state.rubrics.map((rubric) => ({
-      ...rubric,
-      criteria: rubric.criteria.map((criterion) => ({
-        id: criterion.id,
-        name: criterion.name,
-        score: criterion.score,
-        max_score: criterion.max_score,
+    return json(
+      route,
+      state.rubrics.map((rubric) => ({
+        ...rubric,
+        criteria: rubric.criteria.map((criterion) => ({
+          id: criterion.id,
+          name: criterion.name,
+          score: criterion.score,
+          max_score: criterion.max_score,
+        })),
       })),
-    })));
+    );
   }
   if (request.method() === 'GET' && url.pathname === '/action-items') {
-    return json(route, state.actionItems.map((item) => ({
-      id: item.id,
-      text: item.text,
-      session_id: item.session_id,
-      rubric_id: item.rubric_id,
-      done: item.done,
-    })));
+    return json(
+      route,
+      state.actionItems.map((item) => ({
+        id: item.id,
+        text: item.text,
+        session_id: item.session_id,
+        rubric_id: item.rubric_id,
+        done: item.done,
+      })),
+    );
   }
   if (url.pathname === '/users/me') {
     if (request.method() === 'PATCH') {
@@ -372,12 +382,15 @@ async function handleApi(route: Route, state: FixtureState) {
 }
 
 async function installFixture(page: Page, state: FixtureState) {
-  await page.addInitScript(({ accessToken, userId, email }) => {
-    localStorage.setItem('sp_access_token', accessToken);
-    localStorage.setItem('sp_refresh_token', 'e2e-refresh-token');
-    localStorage.setItem('sp_user_id', userId);
-    localStorage.setItem('sp_email', email);
-  }, { accessToken: ACCESS_TOKEN, userId: USER_ID, email: state.profile.email });
+  await page.addInitScript(
+    ({ accessToken, userId, email }) => {
+      localStorage.setItem('sp_access_token', accessToken);
+      localStorage.setItem('sp_refresh_token', 'e2e-refresh-token');
+      localStorage.setItem('sp_user_id', userId);
+      localStorage.setItem('sp_email', email);
+    },
+    { accessToken: ACCESS_TOKEN, userId: USER_ID, email: state.profile.email },
+  );
 
   await page.route('https://api.example.com/**', (route) => handleApi(route, state));
   await page.route('https://supabase.example.com/**', (route) => handleSupabase(route, state));

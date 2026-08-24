@@ -1,23 +1,10 @@
 import type { ComponentType, MouseEvent, ReactNode, SVGProps } from 'react';
 import { BookOpen, Home, ListTodo, MessageCircle, ScrollText, Settings as SettingsIcon } from 'lucide-react';
-import type {
-  ActionItem,
-  FileSearchStatus,
-  Rubric,
-  Session,
-  TranscriptLine,
-} from '../../lib/dashboardApi';
+import type { ActionItem, FileSearchStatus, Rubric, Session, TranscriptLine } from '../../lib/dashboard-types';
 import type { ChatViewMessage } from '../../lib/dashboard-chat-state';
 import type { DashboardChat, GroundingCitation } from '../../lib/studypilot-types';
 
-export type View =
-  | 'home'
-  | 'chat'
-  | 'sessions'
-  | 'session-detail'
-  | 'rubrics'
-  | 'action-items'
-  | 'settings';
+export type View = 'home' | 'chat' | 'sessions' | 'session-detail' | 'rubrics' | 'action-items' | 'settings';
 
 export type Theme = 'dark' | 'light';
 
@@ -33,10 +20,7 @@ export type DashboardAiUsage = {
 };
 
 export type DashboardRequestState =
-  | { status: 'idle' }
-  | { status: 'loading' }
-  | { status: 'success' }
-  | { status: 'error'; message?: string };
+  { status: 'idle' } | { status: 'loading' } | { status: 'success' } | { status: 'error'; message?: string };
 
 export type DashboardBootstrapState = DashboardRequestState;
 

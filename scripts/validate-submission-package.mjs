@@ -72,8 +72,7 @@ function seconds(timestamp) {
 }
 
 export function validateReportSections(text) {
-  const headings = [...String(text).matchAll(/^##\s+(.+?)\s*$/gm)]
-    .map(match => match[1].trim());
+  const headings = [...String(text).matchAll(/^##\s+(.+?)\s*$/gm)].map((match) => match[1].trim());
   const failures = [];
 
   if (headings.length !== REQUIRED_REPORT_SECTIONS.length) {
@@ -93,8 +92,7 @@ export function validateReportSections(text) {
 
 export function validateDemoTimeline(text) {
   const source = String(text);
-  const ranges = [...source.matchAll(/(\d+:\d{2})\s*[–-]\s*(\d+:\d{2})/g)]
-    .map(match => [match[1], match[2]]);
+  const ranges = [...source.matchAll(/(\d+:\d{2})\s*[–-]\s*(\d+:\d{2})/g)].map((match) => [match[1], match[2]]);
   const failures = [];
 
   if (!/Target length:\s*(?:\*{2})?\s*1:58\s*maximum/i.test(source)) {
@@ -127,45 +125,45 @@ export function validateDemoTimeline(text) {
 
 export function validateChecklistMarkers(text) {
   const source = String(text);
-  const failures = CHECKLIST_ARTIFACT_MARKERS
-    .filter(marker => !source.includes(marker))
-    .map(marker => `checklist is missing the "${marker}" marker`);
+  const failures = CHECKLIST_ARTIFACT_MARKERS.filter((marker) => !source.includes(marker)).map(
+    (marker) => `checklist is missing the "${marker}" marker`,
+  );
   return { ok: failures.length === 0, failures };
 }
 
 export function validateChecklistOwnership(text) {
   const failures = String(text)
     .split(/\r?\n/)
-    .filter(line => /^\s*-\s*\[ \]/.test(line) && HUMAN_OWNED_CHECKLIST_ITEM.test(line))
-    .filter(line => !/\bOwner\s*:\s*\S/i.test(line))
-    .map(line => `pending checklist item needs an owner: ${line.trim()}`);
+    .filter((line) => /^\s*-\s*\[ \]/.test(line) && HUMAN_OWNED_CHECKLIST_ITEM.test(line))
+    .filter((line) => !/\bOwner\s*:\s*\S/i.test(line))
+    .map((line) => `pending checklist item needs an owner: ${line.trim()}`);
 
   return { ok: failures.length === 0, failures };
 }
 
 export function validateHostedGoldenFlow(text) {
   const source = String(text).toLowerCase();
-  const failures = HOSTED_FLOW_MARKERS
-    .filter(marker => !source.includes(marker.toLowerCase()))
-    .map(marker => `hosted golden-flow checklist is missing "${marker}"`);
+  const failures = HOSTED_FLOW_MARKERS.filter((marker) => !source.includes(marker.toLowerCase())).map(
+    (marker) => `hosted golden-flow checklist is missing "${marker}"`,
+  );
 
   return { ok: failures.length === 0, failures };
 }
 
 export function validateContributionTemplate(text) {
   const source = String(text).toLowerCase();
-  const failures = CONTRIBUTION_TEMPLATE_MARKERS
-    .filter(marker => !source.includes(marker))
-    .map(marker => `team-contributions template is missing "${marker}"`);
+  const failures = CONTRIBUTION_TEMPLATE_MARKERS.filter((marker) => !source.includes(marker)).map(
+    (marker) => `team-contributions template is missing "${marker}"`,
+  );
 
   return { ok: failures.length === 0, failures };
 }
 
 export function validateReproductionRecord(text) {
   const source = String(text).toLowerCase();
-  const failures = REPRODUCTION_RECORD_MARKERS
-    .filter(marker => !source.includes(marker))
-    .map(marker => `teammate-reproduction record is missing "${marker}"`);
+  const failures = REPRODUCTION_RECORD_MARKERS.filter((marker) => !source.includes(marker)).map(
+    (marker) => `teammate-reproduction record is missing "${marker}"`,
+  );
 
   return { ok: failures.length === 0, failures };
 }
@@ -180,7 +178,10 @@ export function findPendingFinalInputs({ report, checklist }) {
   }
 
   for (const line of checklistLines) {
-    if (/^\s*-\s*\[ \]/.test(line) && /(Historical|Chrome|Demo|Backup|Pilot|Team members|Mentor|Deployed)/i.test(line)) {
+    if (
+      /^\s*-\s*\[ \]/.test(line) &&
+      /(Historical|Chrome|Demo|Backup|Pilot|Team members|Mentor|Deployed)/i.test(line)
+    ) {
       pending.push(line.trim());
     }
   }
@@ -188,7 +189,14 @@ export function findPendingFinalInputs({ report, checklist }) {
   return pending;
 }
 
-export function validateSubmissionArtifacts({ report, demo, checklist, hostedFlow, contributionTemplate, reproductionRecord }) {
+export function validateSubmissionArtifacts({
+  report,
+  demo,
+  checklist,
+  hostedFlow,
+  contributionTemplate,
+  reproductionRecord,
+}) {
   const reportResult = validateReportSections(report);
   const demoResult = validateDemoTimeline(demo);
   const checklistResult = validateChecklistMarkers(checklist);
@@ -240,8 +248,12 @@ function readArtifact(root, relativePath) {
 
 function printHelp() {
   console.log('Usage: node scripts/validate-submission-package.mjs [--require-final-inputs]');
-  console.log('Checks report section order, demo timing/fallback structure, hosted-flow preparation, human-owned templates, and checklist markers.');
-  console.log('--require-final-inputs also fails while human-owned links, pilot, contribution, or approval inputs remain.');
+  console.log(
+    'Checks report section order, demo timing/fallback structure, hosted-flow preparation, human-owned templates, and checklist markers.',
+  );
+  console.log(
+    '--require-final-inputs also fails while human-owned links, pilot, contribution, or approval inputs remain.',
+  );
 }
 
 export function run(argv = process.argv.slice(2), root = process.cwd()) {
@@ -267,7 +279,9 @@ export function run(argv = process.argv.slice(2), root = process.cwd()) {
     return 1;
   }
 
-  console.log('validate:submission: report sections, demo timeline, hosted-flow preparation, human-owned templates, and checklist markers passed');
+  console.log(
+    'validate:submission: report sections, demo timeline, hosted-flow preparation, human-owned templates, and checklist markers passed',
+  );
   if (result.pendingInputs.length > 0) {
     if (options.requireFinalInputs) {
       for (const pending of result.pendingInputs) {
@@ -282,8 +296,7 @@ export function run(argv = process.argv.slice(2), root = process.cwd()) {
   return 0;
 }
 
-const isMain = process.argv[1]
-  && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
 
 if (isMain) {
   try {

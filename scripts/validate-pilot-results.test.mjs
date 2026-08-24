@@ -26,10 +26,7 @@ test('accepts the checked-in empty template without claiming pilot evidence', ()
 
 test('calculates protocol metrics with explicit denominators', () => {
   const result = validatePilotCsv(
-    csv([
-      'P001,true,12,40,55,4,3,true,800,70,false',
-      'P002,false,18,50,50,0,0,true,1000,80,true',
-    ]),
+    csv(['P001,true,12,40,55,4,3,true,800,70,false', 'P002,false,18,50,50,0,0,true,1000,80,true']),
   );
 
   assert.equal(result.status, 'validated');
@@ -67,10 +64,7 @@ test('requires participant data only when explicitly requested', () => {
 });
 
 test('rejects malformed rows and impossible citation counts', () => {
-  assert.throws(
-    () => validatePilotCsv(csv(['Alice,true,12,40,55,1,1,true,800,70,false'])),
-    /anonymous P### format/,
-  );
+  assert.throws(() => validatePilotCsv(csv(['Alice,true,12,40,55,1,1,true,800,70,false'])), /anonymous P### format/);
   assert.throws(
     () => validatePilotCsv(csv(['P001,true,12,40,55,1,2,true,800,70,false'])),
     /citations_supported cannot exceed citations_checked/,
@@ -109,8 +103,5 @@ test('rejects identifying, credential, and draft-content values', () => {
 });
 
 test('requires the fixed header in the documented order', () => {
-  assert.throws(
-    () => validatePilotCsv('participant_id,completed\n'),
-    /header must be exactly/,
-  );
+  assert.throws(() => validatePilotCsv('participant_id,completed\n'), /header must be exactly/);
 });

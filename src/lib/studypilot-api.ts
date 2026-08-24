@@ -24,7 +24,7 @@ import type {
   ActionItem as DashboardActionItem,
   Rubric as DashboardRubric,
   Session as DashboardSession,
-} from './dashboardApi';
+} from './dashboard-types';
 
 // Re-export types for convenience
 export type {
@@ -177,15 +177,10 @@ export async function fetchSessionTranscript(sessionId: string): Promise<Transcr
 
 export async function createSessionCaptureSignedUrl(path: string): Promise<string> {
   await injectStoredToken();
-  const { data, error } = await supabase
-    .storage
-    .from('session-captures')
-    .createSignedUrl(path, 60 * 60);
+  const { data, error } = await supabase.storage.from('session-captures').createSignedUrl(path, 60 * 60);
 
   if (error) throw error;
-  return data.signedUrl.startsWith('/')
-    ? `${import.meta.env.VITE_SUPABASE_URL}${data.signedUrl}`
-    : data.signedUrl;
+  return data.signedUrl.startsWith('/') ? `${import.meta.env.VITE_SUPABASE_URL}${data.signedUrl}` : data.signedUrl;
 }
 
 // ─── Dashboard-compatible wrappers ─────────────────────────────────────────────────
@@ -215,29 +210,24 @@ export async function setActionItemDone(id: string, done: boolean): Promise<void
 
 export async function getProfile(): Promise<Profile | null> {
   await injectStoredToken();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single();
+  const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
 
   if (error) throw error;
   return data;
 }
 
 export async function updateProfile(updates: Partial<Profile>): Promise<Profile> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
-  const { data, error } = await supabase
-    .from('profiles')
-    .update(updates)
-    .eq('id', user.id)
-    .select()
-    .single();
+  const { data, error } = await supabase.from('profiles').update(updates).eq('id', user.id).select().single();
 
   if (error) throw error;
   return data;
@@ -292,40 +282,29 @@ export async function setActiveRubric(activeId: string): Promise<void> {
   if (!rpcError) return;
 
   // Fallback for environments where the migration is not applied yet.
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) throw new Error(rpcError.message || 'Not authenticated');
 
-  const { error: clearActive } = await supabase
-    .from('rubrics')
-    .update({ active: false })
-    .eq('user_id', user.id);
+  const { error: clearActive } = await supabase.from('rubrics').update({ active: false }).eq('user_id', user.id);
 
   if (clearActive) throw clearActive;
 
-  const { error: setActive } = await supabase
-    .from('rubrics')
-    .update({ active: true })
-    .eq('id', activeId);
+  const { error: setActive } = await supabase.from('rubrics').update({ active: true }).eq('id', activeId);
 
   if (setActive) throw setActive;
 }
 
 export async function createRubric(rubric: Omit<Rubric, 'id' | 'created_at' | 'updated_at'>): Promise<Rubric> {
-  const { data, error } = await supabase
-    .from('rubrics')
-    .insert(rubric)
-    .select()
-    .single();
+  const { data, error } = await supabase.from('rubrics').insert(rubric).select().single();
 
   if (error) throw error;
   return data;
 }
 
 export async function deleteRubric(rubricId: string): Promise<void> {
-  const { error } = await supabase
-    .from('rubrics')
-    .delete()
-    .eq('id', rubricId);
+  const { error } = await supabase.from('rubrics').delete().eq('id', rubricId);
 
   if (error) throw error;
 }
@@ -353,14 +332,12 @@ export type RubricUploadResult = {
  * Accepts any file type — the extract-rubric function reads text content
  * from plain text files and PDFs directly.
  */
-export async function uploadRubricFile(
-  file: File,
-  title: string,
-  course: string,
-): Promise<RubricUploadResult> {
+export async function uploadRubricFile(file: File, title: string, course: string): Promise<RubricUploadResult> {
   await injectStoredToken();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
   const { count: existingCount } = await supabase
@@ -391,9 +368,7 @@ export async function uploadRubricFile(
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const storagePath = `${user.id}/${rubric.id}/${safeName}`;
 
-  const { error: uploadError } = await supabase.storage
-    .from('rubrics')
-    .upload(storagePath, file, { upsert: true });
+  const { error: uploadError } = await supabase.storage.from('rubrics').upload(storagePath, file, { upsert: true });
 
   if (uploadError) {
     await supabase.from('rubrics').delete().eq('id', rubric.id);
@@ -426,7 +401,9 @@ export async function uploadRubricFile(
   }
 
   const fileSearchStatus: Rubric['file_search_status'] = knowledgeDocumentId
-    ? (extracted.indexingStarted ? 'indexing' : 'pending')
+    ? extracted.indexingStarted
+      ? 'indexing'
+      : 'pending'
     : 'not_indexed';
 
   if (knowledgeDocumentId) {
@@ -463,9 +440,7 @@ export async function uploadRubricFile(
 }
 
 /** Re-run File Search indexing for a knowledge document linked to a rubric. */
-export async function retryRubricIndexing(
-  knowledgeDocumentId: string,
-): Promise<IndexKnowledgeDocumentResponse> {
+export async function retryRubricIndexing(knowledgeDocumentId: string): Promise<IndexKnowledgeDocumentResponse> {
   await injectStoredToken();
   try {
     await ensureFileSearchStore();
@@ -488,11 +463,7 @@ export async function getKnowledgeDocuments(): Promise<KnowledgeDocument[]> {
 }
 
 export async function getKnowledgeDocumentById(documentId: string): Promise<KnowledgeDocument | null> {
-  const { data, error } = await supabase
-    .from('knowledge_documents')
-    .select('*')
-    .eq('id', documentId)
-    .single();
+  const { data, error } = await supabase.from('knowledge_documents').select('*').eq('id', documentId).single();
 
   if (error) {
     if (error.code === 'PGRST116') return null;
@@ -502,13 +473,9 @@ export async function getKnowledgeDocumentById(documentId: string): Promise<Know
 }
 
 export async function createKnowledgeDocument(
-  document: Omit<KnowledgeDocument, 'id' | 'created_at' | 'updated_at'>
+  document: Omit<KnowledgeDocument, 'id' | 'created_at' | 'updated_at'>,
 ): Promise<KnowledgeDocument> {
-  const { data, error } = await supabase
-    .from('knowledge_documents')
-    .insert(document)
-    .select()
-    .single();
+  const { data, error } = await supabase.from('knowledge_documents').insert(document).select().single();
 
   if (error) throw error;
   return data;
@@ -516,7 +483,7 @@ export async function createKnowledgeDocument(
 
 export async function updateKnowledgeDocument(
   documentId: string,
-  updates: Partial<KnowledgeDocument>
+  updates: Partial<KnowledgeDocument>,
 ): Promise<KnowledgeDocument> {
   const { data, error } = await supabase
     .from('knowledge_documents')
@@ -530,10 +497,7 @@ export async function updateKnowledgeDocument(
 }
 
 export async function deleteKnowledgeDocument(documentId: string): Promise<void> {
-  const { error } = await supabase
-    .from('knowledge_documents')
-    .delete()
-    .eq('id', documentId);
+  const { error } = await supabase.from('knowledge_documents').delete().eq('id', documentId);
 
   if (error) throw error;
 }
@@ -546,7 +510,9 @@ export async function deleteKnowledgeDocument(documentId: string): Promise<void>
  * (FastAPI-managed JWT in localStorage). Both are valid Supabase JWTs.
  */
 async function getEdgeFunctionToken(): Promise<string> {
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
   if (session?.access_token) return session.access_token;
   const raw = localStorage.getItem('sp_access_token');
   if (raw) return raw;
@@ -555,31 +521,24 @@ async function getEdgeFunctionToken(): Promise<string> {
 
 // ─── Edge Function: Index Knowledge Document ─────────────────────────────────────
 
-export async function indexKnowledgeDocument(
-  knowledgeDocumentId: string
-): Promise<IndexKnowledgeDocumentResponse> {
+export async function indexKnowledgeDocument(knowledgeDocumentId: string): Promise<IndexKnowledgeDocumentResponse> {
   const token = await getEdgeFunctionToken();
 
-  const response = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/index-knowledge-document`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-      },
-      body: JSON.stringify({ knowledgeDocumentId }),
-    }
-  );
+  const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/index-knowledge-document`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({ knowledgeDocumentId }),
+  });
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
     const message = (errorBody as { error?: unknown }).error;
     throw new Error(
-      typeof message === 'string' && message.trim()
-        ? message
-        : `Indexing failed: ${response.statusText}`,
+      typeof message === 'string' && message.trim() ? message : `Indexing failed: ${response.statusText}`,
     );
   }
 
@@ -592,10 +551,12 @@ export async function getSessions(): Promise<SessionListRow[]> {
   await injectStoredToken();
   const { data, error } = await supabase
     .from('sessions')
-    .select(`
+    .select(
+      `
       id, title, source, mode, duration_seconds, summary, when_timestamp, rubric_id, chat_id, screenshot_path,
       action_items(id, done)
-    `)
+    `,
+    )
     .order('when_timestamp', { ascending: false });
 
   if (error) throw error;
@@ -652,13 +613,9 @@ export async function getSessionDetails(sessionId: string): Promise<SessionDetai
 }
 
 export async function createSession(
-  session: Omit<Session, 'id' | 'created_at' | 'session_messages'>
+  session: Omit<Session, 'id' | 'created_at' | 'session_messages'>,
 ): Promise<Session> {
-  const { data, error } = await supabase
-    .from('sessions')
-    .insert(session)
-    .select()
-    .single();
+  const { data, error } = await supabase.from('sessions').insert(session).select().single();
 
   if (error) throw error;
   return data;
@@ -668,23 +625,16 @@ export async function createSession(
 
 export async function getActionItems(): Promise<ActionItem[]> {
   await injectStoredToken();
-  const { data, error } = await supabase
-    .from('action_items')
-    .select('*')
-    .order('created_at', { ascending: false });
+  const { data, error } = await supabase.from('action_items').select('*').order('created_at', { ascending: false });
 
   if (error) throw error;
   return data || [];
 }
 
 export async function createActionItem(
-  item: Omit<ActionItem, 'id' | 'created_at' | 'updated_at'>
+  item: Omit<ActionItem, 'id' | 'created_at' | 'updated_at'>,
 ): Promise<ActionItem> {
-  const { data, error } = await supabase
-    .from('action_items')
-    .insert(item)
-    .select()
-    .single();
+  const { data, error } = await supabase.from('action_items').insert(item).select().single();
 
   if (error) throw error;
   return data;
@@ -701,7 +651,9 @@ export async function toggleActionItem(id: string, currentDone: boolean): Promis
 
   if (error) throw error;
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (user) {
     await supabase.from('activity_logs').insert({
@@ -715,10 +667,7 @@ export async function toggleActionItem(id: string, currentDone: boolean): Promis
 }
 
 export async function deleteActionItem(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('action_items')
-    .delete()
-    .eq('id', id);
+  const { error } = await supabase.from('action_items').delete().eq('id', id);
 
   if (error) throw error;
 }
@@ -729,7 +678,9 @@ async function getDashboardChatUserId(): Promise<string> {
   const storedUserId = localStorage.getItem('sp_user_id');
   if (storedUserId) return storedUserId;
 
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
   if (session?.user.id) return session.user.id;
 
   throw new Error('Not authenticated');
@@ -739,10 +690,12 @@ export async function getDashboardChats(): Promise<DashboardChat[]> {
   await injectStoredToken();
   const { data, error } = await supabase
     .from('dashboard_chats')
-    .select(`
+    .select(
+      `
       id, user_id, session_id, rubric_id, rubric_context_locked, context_summary,
       summary_through_sequence, title, origin_surface, client_key, created_at, updated_at
-    `)
+    `,
+    )
     .order('updated_at', { ascending: false })
     .order('id', { ascending: false });
 
@@ -759,10 +712,7 @@ export async function getDashboardChats(): Promise<DashboardChat[]> {
   return data || [];
 }
 
-export async function createDashboardChat(
-  title: string,
-  sessionId?: string | null,
-): Promise<DashboardChat> {
+export async function createDashboardChat(title: string, sessionId?: string | null): Promise<DashboardChat> {
   await injectStoredToken();
   const userId = await getDashboardChatUserId();
   const { data, error } = await supabase
@@ -786,10 +736,7 @@ export async function createDashboardChat(
  * necessary. The RPC derives ownership from auth.uid() and serializes
  * concurrent dashboard/extension callers in Postgres.
  */
-export async function getOrCreateSessionChat(
-  sessionId: string,
-  title = 'New chat',
-): Promise<DashboardChat> {
+export async function getOrCreateSessionChat(sessionId: string, title = 'New chat'): Promise<DashboardChat> {
   await injectStoredToken();
   const { data, error } = await supabase.rpc('get_or_create_session_chat', {
     p_session_id: sessionId,
@@ -826,12 +773,7 @@ export async function updateDashboardChat(
   updates: Pick<DashboardChat, 'title'>,
 ): Promise<DashboardChat> {
   await injectStoredToken();
-  const { data, error } = await supabase
-    .from('dashboard_chats')
-    .update(updates)
-    .eq('id', chatId)
-    .select()
-    .single();
+  const { data, error } = await supabase.from('dashboard_chats').update(updates).eq('id', chatId).select().single();
 
   if (error) throw error;
   return data;
@@ -839,10 +781,7 @@ export async function updateDashboardChat(
 
 export async function deleteDashboardChat(chatId: string): Promise<void> {
   await injectStoredToken();
-  const { error } = await supabase
-    .from('dashboard_chats')
-    .delete()
-    .eq('id', chatId);
+  const { error } = await supabase.from('dashboard_chats').delete().eq('id', chatId);
 
   if (error) throw error;
 }
@@ -851,11 +790,13 @@ export async function getDashboardChatMessages(chatId: string): Promise<Dashboar
   await injectStoredToken();
   const { data, error } = await supabase
     .from('dashboard_chat_messages')
-    .select(`
+    .select(
+      `
       id, user_id, chat_id, session_id, role, text, origin_surface, request_id,
       server_sequence, used_file_search, file_search_store_name, grounding_metadata,
       citations, created_at
-    `)
+    `,
+    )
     .eq('chat_id', chatId)
     .order('server_sequence', { ascending: true })
     .order('id', { ascending: true });
@@ -887,14 +828,8 @@ export async function getActivityLogs(limit: number = 50): Promise<ActivityLog[]
   return data || [];
 }
 
-export async function createActivityLog(
-  log: Omit<ActivityLog, 'id' | 'created_at'>
-): Promise<ActivityLog> {
-  const { data, error } = await supabase
-    .from('activity_logs')
-    .insert(log)
-    .select()
-    .single();
+export async function createActivityLog(log: Omit<ActivityLog, 'id' | 'created_at'>): Promise<ActivityLog> {
+  const { data, error } = await supabase.from('activity_logs').insert(log).select().single();
 
   if (error) throw error;
   return data;
@@ -905,26 +840,21 @@ export async function createActivityLog(
 export async function summarizeSession(sessionId: string): Promise<SummarizeSessionResponse> {
   const token = await getEdgeFunctionToken();
 
-  const response = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/summarize-session`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-      },
-      body: JSON.stringify({ sessionId }),
-    }
-  );
+  const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/summarize-session`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({ sessionId }),
+  });
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
     const message = (errorBody as { error?: unknown }).error;
     throw new Error(
-      typeof message === 'string' && message.trim()
-        ? message
-        : `Summarization failed: ${response.statusText}`,
+      typeof message === 'string' && message.trim() ? message : `Summarization failed: ${response.statusText}`,
     );
   }
 
@@ -936,26 +866,21 @@ export async function summarizeSession(sessionId: string): Promise<SummarizeSess
 export async function extractRubric(rubricId: string, filePath?: string): Promise<ExtractRubricResponse> {
   const token = await getEdgeFunctionToken();
 
-  const response = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/extract-rubric`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-      },
-      body: JSON.stringify({ rubricId, filePath }),
-    }
-  );
+  const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/extract-rubric`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({ rubricId, filePath }),
+  });
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
     const message = (errorBody as { error?: unknown }).error;
     throw new Error(
-      typeof message === 'string' && message.trim()
-        ? message
-        : `Rubric extraction failed: ${response.statusText}`,
+      typeof message === 'string' && message.trim() ? message : `Rubric extraction failed: ${response.statusText}`,
     );
   }
 
@@ -967,18 +892,15 @@ export async function extractRubric(rubricId: string, filePath?: string): Promis
 export async function ensureFileSearchStore() {
   const token = await getEdgeFunctionToken();
 
-  const response = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ensure-file-search-store`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-      },
-      body: JSON.stringify({}),
-    }
-  );
+  const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ensure-file-search-store`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({}),
+  });
 
   if (!response.ok) {
     throw new Error(`Failed to ensure file search store: ${response.statusText}`);
@@ -992,18 +914,15 @@ export async function ensureFileSearchStore() {
 export async function getLiveToken(sessionId?: string) {
   const token = await getEdgeFunctionToken();
 
-  const response = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/live-token`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-      },
-      body: JSON.stringify({ sessionId }),
-    }
-  );
+  const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/live-token`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({ sessionId }),
+  });
 
   if (!response.ok) {
     throw new Error(`Failed to get live token: ${response.statusText}`);

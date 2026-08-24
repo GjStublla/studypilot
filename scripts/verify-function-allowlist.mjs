@@ -32,15 +32,12 @@ if (!TOKEN) {
 
 let response;
 try {
-  response = await fetch(
-    `https://api.supabase.com/v1/projects/${PROJECT_REF}/functions`,
-    {
-      headers: {
-        Authorization: `Bearer ${TOKEN}`,
-        'Content-Type': 'application/json',
-      },
+  response = await fetch(`https://api.supabase.com/v1/projects/${PROJECT_REF}/functions`, {
+    headers: {
+      Authorization: `Bearer ${TOKEN}`,
+      'Content-Type': 'application/json',
     },
-  );
+  });
 } catch (err) {
   console.error('verify:functions: network failure');
   console.error(`Reason: Could not reach Supabase Management API (${err?.message || err}).`);

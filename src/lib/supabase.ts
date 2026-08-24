@@ -24,8 +24,8 @@ if (!configuredSupabaseUrl || !configuredSupabaseAnonKey) {
   // who only use email/password auth should still be able to log in.
   console.error(
     '[StudyPilot] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY.\n' +
-    'Copy .env.example to .env at the project root and fill in the values.\n' +
-    'Google sign-in will not work until these are set.',
+      'Copy .env.example to .env at the project root and fill in the values.\n' +
+      'Google sign-in will not work until these are set.',
   );
 }
 

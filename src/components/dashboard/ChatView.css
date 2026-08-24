@@ -23,19 +23,27 @@
   font-size: 11.5px;
   font-weight: 450;
   cursor: default;
-  transition: background 120ms ease, border-color 120ms ease;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
 }
-.app-dashboard .ds-context-chip svg { color: var(--ds-quiet); }
+.app-dashboard .ds-context-chip svg {
+  color: var(--ds-quiet);
+}
 .app-dashboard .ds-context-chip.ds-chip-accent {
   border-color: rgba(91, 184, 255, 0.32);
   background: rgba(91, 184, 255, 0.06);
   cursor: pointer;
 }
-.app-dashboard .ds-context-chip.ds-chip-accent svg { color: var(--ds-accent); }
+.app-dashboard .ds-context-chip.ds-chip-accent svg {
+  color: var(--ds-accent);
+}
 .app-dashboard .ds-context-chip.ds-chip-accent:hover {
   background: rgba(91, 184, 255, 0.12);
 }
-.app-dashboard .ds-context-chip.ds-chip-muted { color: var(--ds-muted); }
+.app-dashboard .ds-context-chip.ds-chip-muted {
+  color: var(--ds-muted);
+}
 
 .app-dashboard .ds-messages {
   flex: 1;
@@ -100,8 +108,12 @@
   font-size: 14px;
   line-height: 1.6;
 }
-.app-dashboard .ds-msg-body p + p { margin-top: 6px; }
-.app-dashboard .ds-msg-body p:empty { height: 6px; }
+.app-dashboard .ds-msg-body p + p {
+  margin-top: 6px;
+}
+.app-dashboard .ds-msg-body p:empty {
+  height: 6px;
+}
 
 .app-dashboard .ds-msg-rag-tag {
   margin-left: 4px;
@@ -243,12 +255,22 @@
   background: var(--ds-muted);
   animation: ds-typing-pulse 1.1s ease-in-out infinite;
 }
-.app-dashboard .ds-typing-dot:nth-child(2) { animation-delay: 0.18s; }
-.app-dashboard .ds-typing-dot:nth-child(3) { animation-delay: 0.36s; }
+.app-dashboard .ds-typing-dot:nth-child(2) {
+  animation-delay: 0.18s;
+}
+.app-dashboard .ds-typing-dot:nth-child(3) {
+  animation-delay: 0.36s;
+}
 
 @keyframes ds-typing-pulse {
-  0%, 60%, 100% { opacity: 0.3; }
-  30% { opacity: 1; }
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+  }
+  30% {
+    opacity: 1;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -283,9 +305,14 @@
   background: var(--ds-surface);
   color: var(--ds-muted);
   font-size: 12px;
-  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
 }
-.app-dashboard .ds-quick-prompt svg { color: var(--ds-quiet); }
+.app-dashboard .ds-quick-prompt svg {
+  color: var(--ds-quiet);
+}
 .app-dashboard .ds-quick-prompt:hover {
   background: var(--ds-surface-2);
   color: var(--ds-ink);
@@ -308,7 +335,9 @@
   border: 1px solid var(--ds-line-strong);
   border-radius: 12px;
   background: var(--ds-surface);
-  transition: border-color 140ms ease, background 140ms ease;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease;
 }
 .app-dashboard .ds-composer:focus-within {
   border-color: rgba(232, 234, 252, 0.3);
@@ -329,7 +358,9 @@
   resize: none;
   outline: none;
 }
-.app-dashboard .ds-composer textarea::placeholder { color: var(--ds-quiet); }
+.app-dashboard .ds-composer textarea::placeholder {
+  color: var(--ds-quiet);
+}
 .app-dashboard .ds-composer .ds-icon-btn {
   width: 30px;
   height: 30px;
@@ -344,7 +375,10 @@
   border-radius: 7px;
   background: var(--ds-ink);
   color: var(--ds-deep);
-  transition: opacity 140ms ease, background 140ms ease, transform 120ms ease;
+  transition:
+    opacity 140ms ease,
+    background 140ms ease,
+    transform 120ms ease;
 }
 .app-dashboard .ds-send:hover:not(:disabled) {
   background: #ffffff;
@@ -365,9 +399,12 @@
   letter-spacing: 0.08em;
   color: var(--ds-quiet);
 }
-.app-dashboard .ds-composer-hint svg { color: var(--ds-quiet); }
+.app-dashboard .ds-composer-hint svg {
+  color: var(--ds-quiet);
+}
 .app-dashboard .ds-composer-hint.is-limit {
   color: var(--ds-warning);
 }
-.app-dashboard .ds-composer-hint.is-limit svg { color: var(--ds-warning); }
-
+.app-dashboard .ds-composer-hint.is-limit svg {
+  color: var(--ds-warning);
+}

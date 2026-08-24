@@ -17,15 +17,18 @@ const REQUEST_ID = '123e4567-e89b-42d3-a456-426614174001';
 
 function streamResponse(chunks: string[]): Response {
   const encoder = new TextEncoder();
-  return new Response(new ReadableStream({
-    start(controller) {
-      for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
-      controller.close();
+  return new Response(
+    new ReadableStream({
+      start(controller) {
+        for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+        controller.close();
+      },
+    }),
+    {
+      status: 200,
+      headers: { 'Content-Type': 'text/event-stream' },
     },
-  }), {
-    status: 200,
-    headers: { 'Content-Type': 'text/event-stream' },
-  });
+  );
 }
 
 describe('sendCoachingMessage', () => {
@@ -43,12 +46,12 @@ describe('sendCoachingMessage', () => {
       userSequence: 10,
       assistantSequence: 11,
     } as const;
-    vi.stubGlobal('fetch', vi.fn(async () => streamResponse([
-      'data: {"te',
-      'xt":"Hello"}\n\n',
-      `data: ${JSON.stringify(commit)}\n\n`,
-      'data: [DONE]\n\n',
-    ])));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        streamResponse(['data: {"te', 'xt":"Hello"}\n\n', `data: ${JSON.stringify(commit)}\n\n`, 'data: [DONE]\n\n']),
+      ),
+    );
     const tokens: string[] = [];
 
     const result = await sendCoachingMessage(
@@ -70,29 +73,36 @@ describe('sendCoachingMessage', () => {
   });
 
   it('surfaces an SSE error instead of reporting completion', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => streamResponse([
-      'data: {"type":"error","error":"request is already in progress"}\n\n',
-      'data: [DONE]\n\n',
-    ])));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        streamResponse(['data: {"type":"error","error":"request is already in progress"}\n\n', 'data: [DONE]\n\n']),
+      ),
+    );
 
-    await expect(sendCoachingMessage(
-      CHAT_ID,
-      'Question',
-      { requestId: REQUEST_ID, originSurface: 'dashboard' },
-      { onTokenReceived: () => undefined },
-    )).rejects.toThrow('request is already in progress');
+    await expect(
+      sendCoachingMessage(
+        CHAT_ID,
+        'Question',
+        { requestId: REQUEST_ID, originSurface: 'dashboard' },
+        { onTokenReceived: () => undefined },
+      ),
+    ).rejects.toThrow('request is already in progress');
   });
 
   it('rejects a stream that closes without DONE', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => streamResponse([
-      'data: {"text":"partial"}\n\n',
-    ])));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => streamResponse(['data: {"text":"partial"}\n\n'])),
+    );
 
-    await expect(sendCoachingMessage(
-      CHAT_ID,
-      'Question',
-      { requestId: REQUEST_ID, originSurface: 'dashboard' },
-      { onTokenReceived: () => undefined },
-    )).rejects.toThrow('ended before completion');
+    await expect(
+      sendCoachingMessage(
+        CHAT_ID,
+        'Question',
+        { requestId: REQUEST_ID, originSurface: 'dashboard' },
+        { onTokenReceived: () => undefined },
+      ),
+    ).rejects.toThrow('ended before completion');
   });
 });

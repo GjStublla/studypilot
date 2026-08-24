@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Rubric } from './dashboardApi';
+import type { Rubric } from './dashboard-types';
 import { normalizeIndexStatus, resolveChatRubricContext } from './chat-rubric-context';
 import type { DashboardChat } from './studypilot-types';
 

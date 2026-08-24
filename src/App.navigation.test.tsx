@@ -2,11 +2,7 @@ import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import App, { PROCESSING_DISCLOSURE } from './App';
-import {
-  BETA_ACCESS_MAILTO,
-  parseChromeWebStoreUrl,
-  parseLegalHash,
-} from './lib/productLinks';
+import { BETA_ACCESS_MAILTO, parseChromeWebStoreUrl, parseLegalHash } from './lib/productLinks';
 
 const chromeStore = vi.hoisted(() => ({ url: null as string | null }));
 
@@ -97,15 +93,9 @@ vi.mock('./components/Dashboard.css', () => ({}));
 
 import Dashboard from './components/Dashboard';
 
-const VALID_STORE_URL =
-  'https://chromewebstore.google.com/detail/studypilot-test/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const VALID_STORE_URL = 'https://chromewebstore.google.com/detail/studypilot-test/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
-const FORBIDDEN_PHRASES = [
-  'tab audio',
-  'exact second',
-  'stay on your device',
-  'no account',
-] as const;
+const FORBIDDEN_PHRASES = ['tab audio', 'exact second', 'stay on your device', 'no account'] as const;
 
 class FakeObserver {
   observe() {}
@@ -149,9 +139,7 @@ describe('Chrome store URL validation', () => {
         'https://user:pass@chromewebstore.google.com/detail/studypilot-test/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       ),
     ).toBeNull();
-    expect(
-      parseChromeWebStoreUrl('https://chromewebstore.google.com.evil.example/'),
-    ).toBeNull();
+    expect(parseChromeWebStoreUrl('https://chromewebstore.google.com.evil.example/')).toBeNull();
     expect(parseChromeWebStoreUrl('javascript:alert(1)')).toBeNull();
     expect(parseChromeWebStoreUrl('/detail/studypilot')).toBeNull();
     expect(parseChromeWebStoreUrl('chromewebstore.google.com/detail/x')).toBeNull();
@@ -243,9 +231,7 @@ describe('landing and legal navigation', () => {
       expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
     }
 
-    expect(
-      screen.queryByRole('button', { name: /chrome beta — invite only/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /chrome beta — invite only/i })).not.toBeInTheDocument();
   });
 
   it.each([
@@ -270,13 +256,11 @@ describe('landing and legal navigation', () => {
     const cookies = render(<App />);
     expect(cookies.container.textContent).toContain(PROCESSING_DISCLOSURE);
     expect(cookies.container.textContent?.toLowerCase()).toContain('essential');
-    expect(cookies.container.textContent?.toLowerCase()).toContain(
-      'no advertising cookies',
-    );
+    expect(cookies.container.textContent?.toLowerCase()).toContain('no advertising cookies');
     expect(
-      cookies.getAllByRole('link', { name: 'Privacy Policy' }).some(
-        (link) => link.getAttribute('href') === '#/privacy',
-      ),
+      cookies
+        .getAllByRole('link', { name: 'Privacy Policy' })
+        .some((link) => link.getAttribute('href') === '#/privacy'),
     ).toBe(true);
   });
 
@@ -296,16 +280,12 @@ describe('landing and legal navigation', () => {
     render(<App />);
 
     await user.click(screen.getAllByRole('link', { name: 'Privacy Policy' })[0]);
-    expect(
-      await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Privacy Policy' })).toBeInTheDocument();
 
     act(() => {
       setHash('');
     });
-    expect(
-      screen.queryByRole('heading', { level: 1, name: 'Privacy Policy' }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: 'Privacy Policy' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /log in/i })).toBeInTheDocument();
   });
 

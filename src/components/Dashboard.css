@@ -8,14 +8,16 @@
   gap: 20px;
   padding: 18px 18px 16px;
   border-left: 1px solid var(--ds-line);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.014), rgba(0, 0, 0, 0)),
-    var(--ds-canvas);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.014), rgba(0, 0, 0, 0)), var(--ds-canvas);
   overflow-y: auto;
-  transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    opacity 200ms ease, border-left-color 200ms ease;
+  transition:
+    transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 200ms ease,
+    border-left-color 200ms ease;
 }
-.app-dashboard .ds-context-head { padding: 4px 2px 0; }
+.app-dashboard .ds-context-head {
+  padding: 4px 2px 0;
+}
 .app-dashboard .ds-context-section {
   display: flex;
   flex-direction: column;
@@ -41,7 +43,9 @@
 }
 .app-dashboard .ds-context-block-button {
   cursor: pointer;
-  transition: background 160ms ease, border-color 160ms ease;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease;
 }
 .app-dashboard .ds-context-block-button:hover {
   background: var(--ds-surface-2);
@@ -133,7 +137,9 @@
   border-radius: var(--ds-radius);
   overflow: hidden;
 }
-.app-dashboard .ds-context-prompts li + li { border-top: 1px solid var(--ds-line-soft); }
+.app-dashboard .ds-context-prompts li + li {
+  border-top: 1px solid var(--ds-line-soft);
+}
 .app-dashboard .ds-context-prompts button {
   display: flex;
   align-items: center;
@@ -144,13 +150,17 @@
   text-align: left;
   font-size: 12.5px;
   color: var(--ds-muted);
-  transition: background 120ms ease, color 120ms ease;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
 }
 .app-dashboard .ds-context-prompts button:hover {
   background: var(--ds-surface-2);
   color: var(--ds-ink);
 }
-.app-dashboard .ds-context-prompts svg { color: var(--ds-quiet); }
+.app-dashboard .ds-context-prompts svg {
+  color: var(--ds-quiet);
+}
 
 .app-dashboard .ds-context-foot {
   margin-top: auto;
@@ -185,11 +195,16 @@
 .app-dashboard .ds-sidebar::-webkit-scrollbar,
 .app-dashboard .ds-canvas::-webkit-scrollbar,
 .app-dashboard .ds-messages::-webkit-scrollbar,
-.app-dashboard .ds-context::-webkit-scrollbar { width: 6px; }
+.app-dashboard .ds-context::-webkit-scrollbar {
+  width: 6px;
+}
 .app-dashboard .ds-sidebar::-webkit-scrollbar-track,
 .app-dashboard .ds-canvas::-webkit-scrollbar-track,
 .app-dashboard .ds-messages::-webkit-scrollbar-track,
-.app-dashboard .ds-context::-webkit-scrollbar-track { background: transparent; border: 0; }
+.app-dashboard .ds-context::-webkit-scrollbar-track {
+  background: transparent;
+  border: 0;
+}
 .app-dashboard .ds-sidebar::-webkit-scrollbar-thumb,
 .app-dashboard .ds-canvas::-webkit-scrollbar-thumb,
 .app-dashboard .ds-messages::-webkit-scrollbar-thumb,
@@ -221,17 +236,28 @@
 
 /* ---------- SVG mark (theme-aware fill / stroke) ---------- */
 
-.app-dashboard .ds-spmark { display: block; }
-.app-dashboard .ds-spmark-bg { fill: var(--ds-ink); }
-.app-dashboard .ds-spmark-arrow { stroke: var(--ds-canvas); fill: none; }
+.app-dashboard .ds-spmark {
+  display: block;
+}
+.app-dashboard .ds-spmark-bg {
+  fill: var(--ds-ink);
+}
+.app-dashboard .ds-spmark-arrow {
+  stroke: var(--ds-canvas);
+  fill: none;
+}
 
 /* ---------- Theme toggle button ---------- */
 
 .app-dashboard .ds-theme-toggle svg {
   transition: transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-.app-dashboard .ds-theme-toggle:hover svg { transform: rotate(-15deg); }
-.app-dashboard.is-light .ds-theme-toggle:hover svg { transform: rotate(15deg); }
+.app-dashboard .ds-theme-toggle:hover svg {
+  transform: rotate(-15deg);
+}
+.app-dashboard.is-light .ds-theme-toggle:hover svg {
+  transform: rotate(15deg);
+}
 
 /* ---------- Light theme — warm paper editorial ---------- */
 /* Cream canvas, ink-dark text, restrained darker accents. Tokens flip in
@@ -283,8 +309,7 @@
 
 /* Sidebar wash — dark tint on cream instead of light tint on dark */
 .app-dashboard.is-light .ds-sidebar {
-  background: linear-gradient(180deg, rgba(20, 17, 12, 0.012), rgba(0, 0, 0, 0)),
-    var(--ds-canvas);
+  background: linear-gradient(180deg, rgba(20, 17, 12, 0.012), rgba(0, 0, 0, 0)), var(--ds-canvas);
 }
 
 /* Cards — invert the linear-gradient tint */
@@ -349,8 +374,7 @@
 
 /* Context panel surface */
 .app-dashboard.is-light .ds-context {
-  background: linear-gradient(180deg, rgba(20, 17, 12, 0.012), rgba(0, 0, 0, 0)),
-    var(--ds-canvas);
+  background: linear-gradient(180deg, rgba(20, 17, 12, 0.012), rgba(0, 0, 0, 0)), var(--ds-canvas);
 }
 
 /* Context strip accent chip */
@@ -408,19 +432,38 @@
   .app-dashboard.is-collapsed.is-context-collapsed {
     grid-template-columns: 0 minmax(0, 1fr);
   }
-  .app-dashboard .ds-context { display: none; }
-  .app-dashboard .ds-topbar-context-toggle { display: none; }
-  .app-dashboard .ds-search { width: 220px; }
+  .app-dashboard .ds-context {
+    display: none;
+  }
+  .app-dashboard .ds-topbar-context-toggle {
+    display: none;
+  }
+  .app-dashboard .ds-search {
+    width: 220px;
+  }
 }
 
 @media (max-width: 880px) {
   .app-dashboard .ds-row-2,
-  .app-dashboard .ds-row-2-1 { grid-template-columns: minmax(0, 1fr); }
-  .app-dashboard .ds-view { padding: 28px 20px 56px; gap: 22px; }
-  .app-dashboard .ds-display { font-size: 34px; }
-  .app-dashboard .ds-h1 { font-size: 28px; }
-  .app-dashboard .ds-session-actions { flex-wrap: wrap; }
-  .app-dashboard .ds-chat-layout { flex-direction: column; }
+  .app-dashboard .ds-row-2-1 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app-dashboard .ds-view {
+    padding: 28px 20px 56px;
+    gap: 22px;
+  }
+  .app-dashboard .ds-display {
+    font-size: 34px;
+  }
+  .app-dashboard .ds-h1 {
+    font-size: 28px;
+  }
+  .app-dashboard .ds-session-actions {
+    flex-wrap: wrap;
+  }
+  .app-dashboard .ds-chat-layout {
+    flex-direction: column;
+  }
   .app-dashboard .ds-chat-rail {
     flex: 0 0 auto;
     flex-direction: row;
@@ -429,14 +472,21 @@
     border-inline-end: 0;
     border-bottom: 1px solid var(--ds-line);
   }
-  .app-dashboard .ds-chat-new { flex: 0 0 auto; }
+  .app-dashboard .ds-chat-new {
+    flex: 0 0 auto;
+  }
   .app-dashboard .ds-chat-list {
     flex-direction: row;
     overflow-x: auto;
     overflow-y: hidden;
   }
-  .app-dashboard .ds-chat-row { flex: 0 0 auto; max-width: 190px; }
-  .app-dashboard .ds-chat-actions { opacity: 1; }
+  .app-dashboard .ds-chat-row {
+    flex: 0 0 auto;
+    max-width: 190px;
+  }
+  .app-dashboard .ds-chat-actions {
+    opacity: 1;
+  }
 }
 
 @media (max-width: 760px) {
@@ -463,12 +513,24 @@
   .app-dashboard:not(.is-collapsed) .ds-sidebar {
     transform: translateX(0);
   }
-  .app-dashboard .ds-topbar { padding: 0 14px; }
-  .app-dashboard .ds-search { display: none; }
-  .app-dashboard .ds-view { padding: 22px 16px 56px; }
-  .app-dashboard .ds-context-strip { padding: 14px 18px; }
-  .app-dashboard .ds-composer-wrap { padding: 12px 18px 16px; }
-  .app-dashboard .ds-msg { padding: 12px 18px; }
+  .app-dashboard .ds-topbar {
+    padding: 0 14px;
+  }
+  .app-dashboard .ds-search {
+    display: none;
+  }
+  .app-dashboard .ds-view {
+    padding: 22px 16px 56px;
+  }
+  .app-dashboard .ds-context-strip {
+    padding: 14px 18px;
+  }
+  .app-dashboard .ds-composer-wrap {
+    padding: 12px 18px 16px;
+  }
+  .app-dashboard .ds-msg {
+    padding: 12px 18px;
+  }
 }
 
 /* ---------- Reduced motion ---------- */
@@ -489,11 +551,21 @@
 }
 
 /* Light theme overrides */
-.app-dashboard.is-light .ds-modal-backdrop { background: rgba(240,235,224,0.72); }
-.app-dashboard.is-light .ds-modal {
-  background: linear-gradient(180deg, rgba(20,17,12,0.03), rgba(20,17,12,0.008)), var(--ds-canvas);
-  box-shadow: 0 40px 80px -24px rgba(20,17,12,0.3), 0 0 0 1px rgba(20,17,12,0.06);
+.app-dashboard.is-light .ds-modal-backdrop {
+  background: rgba(240, 235, 224, 0.72);
 }
-.app-dashboard.is-light .ds-modal-field input:focus { border-color: rgba(90,48,197,0.45); background: rgba(90,48,197,0.04); }
+.app-dashboard.is-light .ds-modal {
+  background: linear-gradient(180deg, rgba(20, 17, 12, 0.03), rgba(20, 17, 12, 0.008)), var(--ds-canvas);
+  box-shadow:
+    0 40px 80px -24px rgba(20, 17, 12, 0.3),
+    0 0 0 1px rgba(20, 17, 12, 0.06);
+}
+.app-dashboard.is-light .ds-modal-field input:focus {
+  border-color: rgba(90, 48, 197, 0.45);
+  background: rgba(90, 48, 197, 0.04);
+}
 .app-dashboard.is-light .ds-dropzone:hover,
-.app-dashboard.is-light .ds-dropzone.is-over { border-color: rgba(90,48,197,0.4); background: rgba(90,48,197,0.05); }
+.app-dashboard.is-light .ds-dropzone.is-over {
+  border-color: rgba(90, 48, 197, 0.4);
+  background: rgba(90, 48, 197, 0.05);
+}

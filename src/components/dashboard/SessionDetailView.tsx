@@ -1,8 +1,6 @@
 import { memo, useEffect, useState } from 'react';
 import { ArrowRight, ChevronRight, Sparkles } from 'lucide-react';
-import {
-  createSessionCaptureSignedUrl,
-} from '../../lib/studypilot-api';
+import { createSessionCaptureSignedUrl } from '../../lib/studypilot-api';
 import { DsButton, EmptyState, ScoreDots, TodoRow } from './DashboardPrimitives';
 import type { SessionDetailViewProps } from './dashboard-types';
 
@@ -32,9 +30,10 @@ export const SessionDetailView = memo(function SessionDetailView({
     setScreenshotUrl(null);
     setScreenshotError(false);
 
-    if (!session?.screenshotPath) return () => {
-      cancelled = true;
-    };
+    if (!session?.screenshotPath)
+      return () => {
+        cancelled = true;
+      };
 
     createSessionCaptureSignedUrl(session.screenshotPath)
       .then((url) => {
@@ -135,10 +134,7 @@ export const SessionDetailView = memo(function SessionDetailView({
                 action={onRetryTranscript ? { label: 'Try again', onClick: onRetryTranscript } : undefined}
               />
             ) : transcript.length === 0 ? (
-              <EmptyState
-                title="No transcript."
-                body="This session didn't capture any messages."
-              />
+              <EmptyState title="No transcript." body="This session didn't capture any messages." />
             ) : (
               <ul className="ds-transcript">
                 {transcript.map((t) => (

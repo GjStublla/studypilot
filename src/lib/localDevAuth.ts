@@ -1,10 +1,6 @@
 import type { Session } from '@supabase/supabase-js';
 import { clearAuth, storeAuth } from './api';
-import {
-  LOCAL_DEV_EMAIL,
-  LOCAL_DEV_MODE,
-  LOCAL_DEV_PASSWORD,
-} from './localDev';
+import { LOCAL_DEV_EMAIL, LOCAL_DEV_MODE, LOCAL_DEV_PASSWORD } from './localDev';
 import { supabase } from './supabaseClient';
 
 let bootstrapInFlight: Promise<Session> | null = null;
@@ -28,9 +24,7 @@ async function createLocalSession(): Promise<Session> {
   } = await supabase.auth.getSession();
 
   if (existingSession?.user.email === LOCAL_DEV_EMAIL) {
-    const { data: verified, error } = await supabase.auth.getUser(
-      existingSession.access_token,
-    );
+    const { data: verified, error } = await supabase.auth.getUser(existingSession.access_token);
     if (!error && verified.user?.email === LOCAL_DEV_EMAIL) {
       return storeLocalSession(existingSession);
     }
@@ -71,11 +65,7 @@ async function createLocalSession(): Promise<Session> {
     return storeLocalSession(signUp.data.session);
   }
 
-  if (
-    signUp.error &&
-    typeof signUp.error.status === 'number' &&
-    signUp.error.status >= 500
-  ) {
+  if (signUp.error && typeof signUp.error.status === 'number' && signUp.error.status >= 500) {
     throw new Error(signUp.error.message);
   }
 

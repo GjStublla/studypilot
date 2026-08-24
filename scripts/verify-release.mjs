@@ -37,9 +37,7 @@ run('built-env scan', 'node', ['scripts/verify-built-env.mjs', 'dist']);
 if (!process.env.SUPABASE_ACCESS_TOKEN) {
   console.log('verify:release: hosted function allowlist SKIPPED');
   console.log('Reason: SUPABASE_ACCESS_TOKEN is not set.');
-  console.log(
-    'This is not a hosted allowlist pass. Do not treat this skip as verify:functions success.',
-  );
+  console.log('This is not a hosted allowlist pass. Do not treat this skip as verify:functions success.');
   process.exit(0);
 }
 

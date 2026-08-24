@@ -10,24 +10,12 @@ import {
   Target,
 } from 'lucide-react';
 import { Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react';
-import {
-  LazyMotion,
-  domAnimation,
-  m,
-  useReducedMotion,
-  useScroll,
-  useTransform,
-  type Variants,
-} from 'framer-motion';
+import { LazyMotion, domAnimation, m, useReducedMotion, useScroll, useTransform, type Variants } from 'framer-motion';
 import { Button } from './components/ui/button';
 import AuthPage from './components/AuthPage';
 import LegalPage from './components/LegalPage';
 import { clearAuth, storeAuth, apiFetch, type AuthTokens } from './lib/api';
-import {
-  BETA_ACCESS_MAILTO,
-  getChromeWebStoreUrl,
-  parseLegalHash,
-} from './lib/productLinks';
+import { BETA_ACCESS_MAILTO, getChromeWebStoreUrl, parseLegalHash } from './lib/productLinks';
 import { AUTH_REQUIRED } from './lib/authConfig';
 import { LOCAL_DEV_MODE } from './lib/localDev';
 import { ensureLocalDevAuth } from './lib/localDevAuth';
@@ -53,26 +41,22 @@ const modes = [
   {
     icon: AudioLines,
     title: 'Listen',
-    body:
-      'Uses your microphone and the page context you choose to share.',
+    body: 'Uses your microphone and the page context you choose to share.',
   },
   {
     icon: AlignLeft,
     title: 'Summarize',
-    body:
-      'Compresses the last few minutes of class into a checkpoint you can scan between slides.',
+    body: 'Compresses the last few minutes of class into a checkpoint you can scan between slides.',
   },
   {
     icon: Target,
     title: 'Quiz',
-    body:
-      'Three questions on what just happened. Catch the gap before the next topic buries it.',
+    body: 'Three questions on what just happened. Catch the gap before the next topic buries it.',
   },
   {
     icon: MessageSquareText,
     title: 'Ask',
-    body:
-      'Type a follow-up. Answers can cite retrieved rubric or uploaded-document evidence when grounding is available.',
+    body: 'Type a follow-up. Answers can cite retrieved rubric or uploaded-document evidence when grounding is available.',
   },
 ] as const;
 
@@ -80,20 +64,17 @@ const steps = [
   {
     n: '01',
     title: 'Pin it once.',
-    body:
-      'Lives quietly in the corner of every tab. One shortcut to open, one to close.',
+    body: 'Lives quietly in the corner of every tab. One shortcut to open, one to close.',
   },
   {
     n: '02',
     title: "Open whatever you're studying.",
-    body:
-      'Lectures, articles, PDFs, recorded calls — StudyPilot reads the page you are already on.',
+    body: 'Lectures, articles, PDFs, recorded calls — StudyPilot reads the page you are already on.',
   },
   {
     n: '03',
     title: 'Talk, type, or quiz yourself.',
-    body:
-      'Voice when your hands are busy. Text when the lecturer talks fast. Quiz when you want to be honest.',
+    body: 'Voice when your hands are busy. Text when the lecturer talks fast. Quiz when you want to be honest.',
   },
 ] as const;
 
@@ -140,7 +121,12 @@ function getStoredUser() {
       .split('@')[0]
       .replace(/[._]/g, ' ')
       .replace(/\b\w/g, (c) => c.toUpperCase());
-    const initials = name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
+    const initials = name
+      .split(' ')
+      .map((n: string) => n[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
     return { token, email, name, initials };
   } catch {
     return null;
@@ -166,9 +152,7 @@ function App() {
       .catch((error) => {
         if (cancelled) return;
         const detail = error instanceof Error ? error.message : String(error);
-        setLocalDevAuthError(
-          `Could not connect to local Supabase: ${detail}`,
-        );
+        setLocalDevAuthError(`Could not connect to local Supabase: ${detail}`);
       });
 
     return () => {
@@ -221,10 +205,12 @@ function App() {
         email: data.session.user.email ?? '',
       } satisfies AuthTokens);
 
-      supabase.auth.setSession({
-        access_token: data.session.access_token,
-        refresh_token: data.session.refresh_token,
-      }).catch((e) => console.warn('[OAuth] supabase.auth.setSession failed:', e));
+      supabase.auth
+        .setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        })
+        .catch((e) => console.warn('[OAuth] supabase.auth.setSession failed:', e));
 
       window.location.hash = '#dashboard';
     });
@@ -232,7 +218,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // intentionally empty — only run on the initial mount of this route
 
   // Render nothing while the async session exchange completes
@@ -248,8 +234,7 @@ function App() {
             {localDevAuthError}
           </p>
           <p>
-            Start the local Supabase stack, then reload this page. Local mode
-            never falls back to the hosted project.
+            Start the local Supabase stack, then reload this page. Local mode never falls back to the hosted project.
           </p>
           <button className="auth-submit" type="button" onClick={() => window.location.reload()}>
             Retry
@@ -292,17 +277,20 @@ function App() {
   return (
     <LazyMotion features={domAnimation}>
       <div className="site-shell">
-        <Hero user={user} onLogout={async () => {
-          // Invalidate the session server-side first (best-effort),
-          // then clear local tokens regardless of whether it succeeded.
-          try {
-            await apiFetch('/auth/logout', { method: 'POST' });
-          } catch {
-            /* session may already be expired — clear locally regardless */
-          }
-          clearAuth();
-          setUser(null);
-        }} />
+        <Hero
+          user={user}
+          onLogout={async () => {
+            // Invalidate the session server-side first (best-effort),
+            // then clear local tokens regardless of whether it succeeded.
+            try {
+              await apiFetch('/auth/logout', { method: 'POST' });
+            } catch {
+              /* session may already be expired — clear locally regardless */
+            }
+            clearAuth();
+            setUser(null);
+          }}
+        />
         <Compatibility />
         <Capabilities />
         <Workflow />
@@ -314,11 +302,7 @@ function App() {
   );
 }
 
-function ChromeInstallCta({
-  variant = 'button',
-}: {
-  variant?: 'button' | 'nav' | 'footer';
-}) {
+function ChromeInstallCta({ variant = 'button' }: { variant?: 'button' | 'nav' | 'footer' }) {
   const storeUrl = getChromeWebStoreUrl();
 
   if (storeUrl) {
@@ -336,8 +320,7 @@ function ChromeInstallCta({
     );
   }
 
-  const disabledClass =
-    variant === 'button' ? 'button button-primary chrome-cta-button' : 'chrome-cta-disabled';
+  const disabledClass = variant === 'button' ? 'button button-primary chrome-cta-button' : 'chrome-cta-disabled';
 
   return (
     <span className={`chrome-cta chrome-cta-${variant}`}>
@@ -393,136 +376,132 @@ function Hero({ user, onLogout }: { user: ReturnType<typeof getStoredUser>; onLo
 
   return (
     <div ref={scrollRef} className="hero-scroll-container">
-    <section className="hero">
-      <div className="hero-bg" aria-hidden="true">
-        {!isSmallViewport && (
-          <Suspense fallback={null}>
-            <GradientBlinds
-              gradientColors={heroGradientColors}
-              angle={18}
-              noise={0.12}
-              blindCount={18}
-              blindMinWidth={72}
-              spotlightRadius={0.58}
-              spotlightSoftness={1.25}
-              spotlightOpacity={0.62}
-              mouseDampening={0.16}
-              mirrorGradient
-              distortAmount={0.35}
-              shineDirection="left"
-              mixBlendMode={undefined}
-            />
-          </Suspense>
-        )}
-      </div>
-      <div className="hero-mask" aria-hidden="true" />
-      <div className="hero-grain" aria-hidden="true" />
-
-      <HeroNav user={user} onLogout={onLogout} />
-
-      <div className="hero-frame">
-        <div className="hero-grid">
-          <m.div
-            className="hero-copy"
-            initial="hidden"
-            animate="visible"
-            variants={{
-              hidden: {},
-              visible: { transition: { staggerChildren: 0.055, delayChildren: 0.06 } },
-            }}
-          >
-            <m.h1
-              className="hero-headline"
-              variants={{ hidden: { opacity: 0, y: 14 }, visible: { opacity: 1, y: 0 } }}
-              transition={{ duration: 0.48, ease: [0.23, 1, 0.32, 1] }}
-            >
-              <span className="line">
-                Study from{' '}
-                <i>any</i>{' '}
-                tab.
-              </span>
-              <span className="line">
-                Ask questions without{' '}
-                <i>leaving</i>{' '}
-                the page.
-              </span>
-            </m.h1>
-
-            <m.div
-              className="hero-actions"
-              variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
-              transition={{ duration: 0.36, ease: [0.23, 1, 0.32, 1] }}
-            >
-              <ChromeInstallCta />
-              <Button href="#workflow" variant="secondary">
-                See the flow <ArrowUpRight size={14} />
-              </Button>
-            </m.div>
-
-            <m.dl
-              className="hero-meta"
-              variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }}
-              transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
-            >
-              <div>
-                <dt>Built by</dt>
-                <dd>
-                  <span>Edion Islami</span>, <span>Gjin Stublla</span>, <span>Leona Selishta</span>
-                </dd>
-              </div>
-            </m.dl>
-          </m.div>
-
-          <m.div
-            className="hero-stage"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, ease: [0.23, 1, 0.32, 1], delay: 0.12 }}
-            style={{ perspective: 1600 }}
-          >
-            <m.div
-              className="hero-product"
-              style={{
-                rotateY: prefersReducedMotion ? 0 : rotateY,
-                rotateX: prefersReducedMotion ? 0 : rotateX,
-                rotateZ: prefersReducedMotion ? 0 : rotateZ,
-                scale: prefersReducedMotion ? 1 : productScale,
-                x: prefersReducedMotion ? 0 : productX,
-                y: prefersReducedMotion ? 0 : productY,
-                z: 0, // Forces translateZ(0px) in output inline style to lock in hardware acceleration
-                opacity: prefersReducedMotion ? 1 : productOpacity,
-              }}
-            >
-              <img
-                src={productSvg}
-                width="448"
-                height="820"
-                fetchPriority="high"
-                alt="StudyPilot study panel showing voice listening, quick actions, and a summary card"
+      <section className="hero">
+        <div className="hero-bg" aria-hidden="true">
+          {!isSmallViewport && (
+            <Suspense fallback={null}>
+              <GradientBlinds
+                gradientColors={heroGradientColors}
+                angle={18}
+                noise={0.12}
+                blindCount={18}
+                blindMinWidth={72}
+                spotlightRadius={0.58}
+                spotlightSoftness={1.25}
+                spotlightOpacity={0.62}
+                mouseDampening={0.16}
+                mirrorGradient
+                distortAmount={0.35}
+                shineDirection="left"
+                mixBlendMode={undefined}
               />
-              <div className="hero-product-shadow" aria-hidden="true" />
-            </m.div>
+            </Suspense>
+          )}
+        </div>
+        <div className="hero-mask" aria-hidden="true" />
+        <div className="hero-grain" aria-hidden="true" />
 
-            {/* Appears after the product flies away */}
+        <HeroNav user={user} onLogout={onLogout} />
+
+        <div className="hero-frame">
+          <div className="hero-grid">
             <m.div
-              className="hero-installed"
-              style={{
-                opacity: prefersReducedMotion ? 0 : installedOpacity,
-                scale: prefersReducedMotion ? 1 : installedScale,
-                y: prefersReducedMotion ? 0 : installedY,
-                z: 0, // Forces translateZ(0px) to hardware accelerate this block as well
+              className="hero-copy"
+              initial="hidden"
+              animate="visible"
+              variants={{
+                hidden: {},
+                visible: { transition: { staggerChildren: 0.055, delayChildren: 0.06 } },
               }}
             >
-              <div className="hero-installed-ring">
-                <StudyPilotMark size={48} />
-              </div>
-              <p className="hero-installed-text">Pinned &amp; ready.</p>
-              <ChromeInstallCta />
+              <m.h1
+                className="hero-headline"
+                variants={{ hidden: { opacity: 0, y: 14 }, visible: { opacity: 1, y: 0 } }}
+                transition={{ duration: 0.48, ease: [0.23, 1, 0.32, 1] }}
+              >
+                <span className="line">
+                  Study from <i>any</i> tab.
+                </span>
+                <span className="line">
+                  Ask questions without <i>leaving</i> the page.
+                </span>
+              </m.h1>
+
+              <m.div
+                className="hero-actions"
+                variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
+                transition={{ duration: 0.36, ease: [0.23, 1, 0.32, 1] }}
+              >
+                <ChromeInstallCta />
+                <Button href="#workflow" variant="secondary">
+                  See the flow <ArrowUpRight size={14} />
+                </Button>
+              </m.div>
+
+              <m.dl
+                className="hero-meta"
+                variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }}
+                transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+              >
+                <div>
+                  <dt>Built by</dt>
+                  <dd>
+                    <span>Edion Islami</span>, <span>Gjin Stublla</span>, <span>Leona Selishta</span>
+                  </dd>
+                </div>
+              </m.dl>
             </m.div>
-          </m.div>
+
+            <m.div
+              className="hero-stage"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.55, ease: [0.23, 1, 0.32, 1], delay: 0.12 }}
+              style={{ perspective: 1600 }}
+            >
+              <m.div
+                className="hero-product"
+                style={{
+                  rotateY: prefersReducedMotion ? 0 : rotateY,
+                  rotateX: prefersReducedMotion ? 0 : rotateX,
+                  rotateZ: prefersReducedMotion ? 0 : rotateZ,
+                  scale: prefersReducedMotion ? 1 : productScale,
+                  x: prefersReducedMotion ? 0 : productX,
+                  y: prefersReducedMotion ? 0 : productY,
+                  z: 0, // Forces translateZ(0px) in output inline style to lock in hardware acceleration
+                  opacity: prefersReducedMotion ? 1 : productOpacity,
+                }}
+              >
+                <img
+                  src={productSvg}
+                  width="448"
+                  height="820"
+                  fetchPriority="high"
+                  alt="StudyPilot study panel showing voice listening, quick actions, and a summary card"
+                />
+                <div className="hero-product-shadow" aria-hidden="true" />
+              </m.div>
+
+              {/* Appears after the product flies away */}
+              <m.div
+                className="hero-installed"
+                style={{
+                  opacity: prefersReducedMotion ? 0 : installedOpacity,
+                  scale: prefersReducedMotion ? 1 : installedScale,
+                  y: prefersReducedMotion ? 0 : installedY,
+                  z: 0, // Forces translateZ(0px) to hardware accelerate this block as well
+                }}
+              >
+                <div className="hero-installed-ring">
+                  <StudyPilotMark size={48} />
+                </div>
+                <p className="hero-installed-text">Pinned &amp; ready.</p>
+                <ChromeInstallCta />
+              </m.div>
+            </m.div>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
     </div>
   );
 }
@@ -535,7 +514,9 @@ function HeroNav({ user, onLogout }: { user: ReturnType<typeof getStoredUser>; o
         <span className="brand-text">studypilot.</span>
       </a>
       <nav aria-label="Primary">
-        <a className="active" href="#">Home</a>
+        <a className="active" href="#">
+          Home
+        </a>
         <a href="#capabilities">Features</a>
         <a href="#workflow">How it works</a>
         <ChromeInstallCta variant="nav" />
@@ -556,13 +537,11 @@ function HeroNav({ user, onLogout }: { user: ReturnType<typeof getStoredUser>; o
 
       {user ? (
         <div className="nav-user">
-          <span className="nav-user-avatar" aria-hidden="true">{user.initials}</span>
+          <span className="nav-user-avatar" aria-hidden="true">
+            {user.initials}
+          </span>
           <span className="nav-user-name">{user.name}</span>
-          <button
-            className="nav-user-logout"
-            onClick={onLogout}
-            aria-label="Sign out"
-          >
+          <button className="nav-user-logout" onClick={onLogout} aria-label="Sign out">
             Sign out
           </button>
         </div>
@@ -630,7 +609,13 @@ const surfaces: { name: string; logo: React.ReactNode }[] = [
     name: 'Wikipedia',
     logo: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-        <path d="M3 4h3M18 4h3M6 4l6 16 6-16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        <path
+          d="M3 4h3M18 4h3M6 4l6 16 6-16"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
         <circle cx="12" cy="4" r="1.2" fill="currentColor" />
       </svg>
     ),
@@ -639,7 +624,12 @@ const surfaces: { name: string; logo: React.ReactNode }[] = [
     name: 'PDFs',
     logo: (
       <svg width="22" height="26" viewBox="0 0 22 26" fill="none">
-        <path d="M4 1h10l5 5v18a1 1 0 01-1 1H4a1 1 0 01-1-1V2a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+        <path
+          d="M4 1h10l5 5v18a1 1 0 01-1 1H4a1 1 0 01-1-1V2a1 1 0 011-1z"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinejoin="round"
+        />
         <path d="M14 1v5h5" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
         <path d="M7 13h8M7 17h5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
       </svg>
@@ -649,7 +639,12 @@ const surfaces: { name: string; logo: React.ReactNode }[] = [
     name: 'Google Docs',
     logo: (
       <svg width="22" height="26" viewBox="0 0 22 26" fill="none">
-        <path d="M4 1h10l5 5v18a1 1 0 01-1 1H4a1 1 0 01-1-1V2a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+        <path
+          d="M4 1h10l5 5v18a1 1 0 01-1 1H4a1 1 0 01-1-1V2a1 1 0 011-1z"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinejoin="round"
+        />
         <path d="M14 1v5h5" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
         <path d="M7 11h8M7 15h8M7 19h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
       </svg>
@@ -668,10 +663,9 @@ function Compatibility() {
       return;
     }
 
-    const observer = new IntersectionObserver(
-      ([entry]) => setIsVisible(entry.isIntersecting),
-      { rootMargin: '160px 0px' },
-    );
+    const observer = new IntersectionObserver(([entry]) => setIsVisible(entry.isIntersecting), {
+      rootMargin: '160px 0px',
+    });
 
     observer.observe(marquee);
     return () => observer.disconnect();
@@ -828,7 +822,8 @@ function Install() {
           Pin it once. <i>Use</i> it everywhere.
         </h2>
         <p>
-          Free during beta. Live microphone audio is processed by Google Vertex AI while a session is active. Screenshots and dashboard history stay off unless you turn them on.
+          Free during beta. Live microphone audio is processed by Google Vertex AI while a session is active.
+          Screenshots and dashboard history stay off unless you turn them on.
         </p>
         <div className="install-actions">
           <ChromeInstallCta />
@@ -845,14 +840,7 @@ function Footer() {
         <div className="footer-main">
           <div className="footer-brand-col">
             <a href="#" className="footer-brand" aria-label="StudyPilot home">
-              <img
-                src={footerLockupWebp}
-                width="1100"
-                height="330"
-                loading="lazy"
-                decoding="async"
-                alt="StudyPilot"
-              />
+              <img src={footerLockupWebp} width="1100" height="330" loading="lazy" decoding="async" alt="StudyPilot" />
             </a>
           </div>
 
@@ -899,13 +887,7 @@ function Footer() {
   );
 }
 
-function SectionIntro({
-  title,
-  body,
-}: {
-  title: ReactNode;
-  body?: string;
-}) {
+function SectionIntro({ title, body }: { title: ReactNode; body?: string }) {
   return (
     <m.div className="section-intro" variants={fadeUp}>
       <h2>{title}</h2>
@@ -930,14 +912,25 @@ function StudyPilotMark({ size = 28 }: { size?: number }) {
           <stop offset="1" stopColor="#F04CFF" />
         </linearGradient>
       </defs>
-      <path d="M34 72V38c0-9.9 8.1-18 18-18h96c9.9 0 18 8.1 18 18v34" stroke="#5A6273" strokeWidth="4" strokeLinecap="round" />
+      <path
+        d="M34 72V38c0-9.9 8.1-18 18-18h96c9.9 0 18 8.1 18 18v34"
+        stroke="#5A6273"
+        strokeWidth="4"
+        strokeLinecap="round"
+      />
       <path d="M34 48h132" stroke="#3A4154" strokeWidth="3" />
       <circle cx="52" cy="34" r="4.5" fill="#7A8290" />
       <circle cx="66" cy="34" r="4.5" fill="#7A8290" opacity="0.8" />
       <circle cx="80" cy="34" r="4.5" fill="#7A8290" opacity="0.6" />
       <path d="M132 28l3 8 8 3-8 3-3 8-3-8-8-3 8-3 3-8z" fill="#fff" />
       <circle cx="100" cy="92" r="44" fill={`url(#markOrb${size})`} />
-      <path d="M100 61l19 58-19-13-19 13 19-58z" stroke="#fff" strokeWidth="4" strokeLinejoin="round" strokeLinecap="round" />
+      <path
+        d="M100 61l19 58-19-13-19 13 19-58z"
+        stroke="#fff"
+        strokeWidth="4"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
       <path d="M100 155c-23-16-49-22-86-22" stroke={`url(#markLine${size})`} strokeWidth="4" strokeLinecap="round" />
       <path d="M100 155c23-16 49-22 86-22" stroke={`url(#markLine${size})`} strokeWidth="4" strokeLinecap="round" />
     </svg>

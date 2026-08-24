@@ -1,11 +1,6 @@
 import { memo, useEffect, useRef } from 'react';
 import { ArrowUpRight, Chrome, MoreHorizontal, Moon, PanelLeft, PanelRight, Search, Sun } from 'lucide-react';
-import {
-  SIDEBAR_NAV_ITEMS,
-  VIEW_TITLES,
-  type SidebarProps,
-  type TopBarProps,
-} from './dashboard-types';
+import { SIDEBAR_NAV_ITEMS, VIEW_TITLES, type SidebarProps, type TopBarProps } from './dashboard-types';
 
 export const Sidebar = memo(function Sidebar({
   student,
@@ -25,16 +20,15 @@ export const Sidebar = memo(function Sidebar({
   return (
     <aside className="ds-sidebar" aria-label="Dashboard navigation">
       <div className="ds-brand">
-        <svg
-          viewBox="0 0 200 180"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          role="img"
-          className="ds-brand-logo"
-        >
+        <svg viewBox="0 0 200 180" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" className="ds-brand-logo">
           <title>StudyPilot</title>
           <g strokeLinecap="round" strokeLinejoin="round">
-            <path d="M34 72V38c0-9.9 8.1-18 18-18h96c9.9 0 18 8.1 18 18v34" fill="none" stroke="currentColor" strokeWidth="4" />
+            <path
+              d="M34 72V38c0-9.9 8.1-18 18-18h96c9.9 0 18 8.1 18 18v34"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
             <path d="M34 48h132" fill="none" stroke="currentColor" strokeWidth="3" opacity="0.6" />
             <circle cx="52" cy="34" r="4.5" fill="currentColor" />
             <circle cx="66" cy="34" r="4.5" fill="currentColor" opacity="0.82" />
@@ -70,11 +64,7 @@ export const Sidebar = memo(function Sidebar({
       <div className="ds-side-spacer" />
 
       <div className="ds-side-foot">
-        <button
-          type="button"
-          className="ds-ext-pill"
-          onClick={onOpenExtension}
-        >
+        <button type="button" className="ds-ext-pill" onClick={onOpenExtension}>
           <Chrome size={13} strokeWidth={1.6} />
           <span>Open extension</span>
           <ArrowUpRight size={12} strokeWidth={1.6} />
@@ -97,7 +87,6 @@ export const Sidebar = memo(function Sidebar({
 /* ============================================================================
    Top bar — view title, search, sidebar toggle
    ============================================================================ */
-
 
 export const TopBar = memo(function TopBar({
   view,
@@ -127,12 +116,7 @@ export const TopBar = memo(function TopBar({
 
   return (
     <header className="ds-topbar">
-      <button
-        type="button"
-        className="ds-icon-btn"
-        onClick={onToggleSidebar}
-        aria-label="Toggle sidebar"
-      >
+      <button type="button" className="ds-icon-btn" onClick={onToggleSidebar} aria-label="Toggle sidebar">
         <PanelLeft size={15} strokeWidth={1.6} />
       </button>
 

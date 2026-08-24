@@ -1,5 +1,5 @@
 import { memo, useMemo } from 'react';
-import { ArrowRight, BookOpen, Chrome, ChevronRight } from 'lucide-react';
+import { ArrowRight, ChevronRight } from 'lucide-react';
 import { DsButton, EmptyState, ScoreDots, TodoRow } from './DashboardPrimitives';
 import type { HomeViewProps } from './dashboard-types';
 
@@ -124,10 +124,7 @@ export const HomeView = memo(function HomeView({
               </div>
             </>
           ) : (
-            <EmptyState
-              title="No rubric yet."
-              body="Upload a rubric to anchor your coaching feedback."
-            />
+            <EmptyState title="No rubric yet." body="Upload a rubric to anchor your coaching feedback." />
           )}
         </article>
       </section>
@@ -143,10 +140,7 @@ export const HomeView = memo(function HomeView({
           </div>
 
           {openActionItems.length === 0 ? (
-            <EmptyState
-              title="All clear."
-              body="New action items from your next coaching session will land here."
-            />
+            <EmptyState title="All clear." body="New action items from your next coaching session will land here." />
           ) : (
             <ul className="ds-todo">
               {openActionItems.map((a) => (
@@ -167,10 +161,7 @@ export const HomeView = memo(function HomeView({
             <span>Recent activity</span>
           </div>
           {recentActivity.length === 0 ? (
-            <EmptyState
-              title="No activity yet."
-              body="Imported coaching sessions will show up here."
-            />
+            <EmptyState title="No activity yet." body="Imported coaching sessions will show up here." />
           ) : (
             <ul className="ds-activity">
               {recentActivity.map((a) => (

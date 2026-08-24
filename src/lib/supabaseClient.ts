@@ -26,7 +26,7 @@ const supabaseAnonKey = configuredSupabaseAnonKey || FALLBACK_SUPABASE_ANON_KEY;
 if (!configuredSupabaseUrl || !configuredSupabaseAnonKey) {
   console.warn(
     '[StudyPilot] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY.\n' +
-    'Copy .env.example to .env at the project root and fill in the values.',
+      'Copy .env.example to .env at the project root and fill in the values.',
   );
 }
 
@@ -51,7 +51,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
  */
 export async function injectStoredToken(): Promise<boolean> {
   // If Supabase already has a valid session (OAuth user), nothing to do.
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
   if (session?.access_token) return true;
 
   // Fall back to the token stored by the FastAPI auth flow.

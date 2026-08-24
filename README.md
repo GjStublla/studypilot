@@ -8,6 +8,21 @@ Live microphone audio is processed by Google Vertex AI while a session is active
 
 Built with React, TypeScript, and Vite.
 
+## Local quality gate
+
+Run the full non-hosted quality baseline before opening a pull request:
+
+```bash
+npm ci
+npm run quality
+```
+
+The command checks Prettier formatting, ESLint, TypeScript, unit tests, a
+production build with public placeholder values, and the built-environment
+scan. It deliberately does not contact Supabase or run the hosted function
+allowlist; use `npm run verify:release` in an authorized release environment
+when those hosted checks are required.
+
 The canonical Chrome extension lives in the sibling repo
 [`../studypilot-extension`](../studypilot-extension). The repository-local
 legacy scaffold is not part of releases. `npm run extension:build` builds the

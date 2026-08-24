@@ -1,16 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type {
-  DashboardProps,
-  View,
-  Theme,
-  CoachMode,
-  SessionRow,
-} from './dashboard/dashboard-types';
+import type { DashboardProps, View, Theme, CoachMode, SessionRow } from './dashboard/dashboard-types';
 import { Sidebar, TopBar } from './dashboard/DashboardShell';
 import { ActionItemsView } from './dashboard/ActionItemsView';
 import { HomeView } from './dashboard/HomeView';
 import { SettingsView } from './dashboard/SettingsView';
-import { StudyPilotMark } from './dashboard/DashboardPrimitives';
 import { SessionsView } from './dashboard/SessionsView';
 import { RubricsView } from './dashboard/RubricsView';
 import type { UploadedRubric } from './dashboard/dashboard-types';
@@ -30,26 +23,13 @@ import {
   retryRubricIndexing,
   updateDashboardChat,
 } from '../lib/studypilot-api';
-import {
-  fetchActionItems,
-  fetchSessionTranscript,
-  setActionItemDone,
-  activateRubric,
-  type Rubric,
-  type Session,
-} from '../lib/dashboardApi';
+import { fetchActionItems, fetchSessionTranscript, setActionItemDone, activateRubric } from '../lib/dashboardApi';
+import type { Rubric, Session } from '../lib/dashboard-types';
 import { sendCoachingMessage } from '../lib/socraticCoach';
 import type { DashboardChat } from '../lib/studypilot-types';
-import {
-  isChatBusy,
-  isChatHistoryLoading,
-  selectChatMessages,
-} from '../lib/dashboard-chat-state';
+import { isChatBusy, isChatHistoryLoading, selectChatMessages } from '../lib/dashboard-chat-state';
 import { formatDashboardRoute, parseDashboardRoute } from '../lib/dashboard-route';
-import {
-  resolveChatRubricContext,
-  normalizeIndexStatus,
-} from '../lib/chat-rubric-context';
+import { resolveChatRubricContext, normalizeIndexStatus } from '../lib/chat-rubric-context';
 import './dashboard/DashboardShell.css';
 import './dashboard/ChatView.css';
 import './dashboard/ContentViews.css';
@@ -61,7 +41,6 @@ import './Dashboard.css';
    Renders inside #dashboard hash route (lazy-loaded from App.tsx).
    ============================================================================ */
 
-
 const THEME_STORAGE_KEY = 'studypilot.dashboard-theme';
 
 function getInitialTheme(): Theme {
@@ -72,13 +51,11 @@ function getInitialTheme(): Theme {
   } catch {
     /* localStorage unavailable */
   }
-  if (typeof window.matchMedia === 'function' &&
-      window.matchMedia('(prefers-color-scheme: light)').matches) {
+  if (typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: light)').matches) {
     return 'light';
   }
   return 'dark';
 }
-
 
 /* ---------- Mock data ---------- */
 
@@ -87,8 +64,16 @@ function getInitialTheme(): Theme {
 function getLoggedInStudent() {
   try {
     const email = localStorage.getItem('sp_email') ?? 'student@university.edu';
-    const name = email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-    const initials = name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
+    const name = email
+      .split('@')[0]
+      .replace(/[._]/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+    const initials = name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
     return { name, initials, email };
   } catch {
     return { name: 'Student', initials: 'S', email: '' };
@@ -114,9 +99,7 @@ function replaceDashboardHash(chatId?: string | null): void {
 export default function Dashboard({
   routeHash = typeof window === 'undefined' ? '#dashboard' : window.location.hash,
 }: DashboardProps) {
-  const [view, setView] = useState<View>(() => (
-    parseDashboardRoute(routeHash).chatId ? 'chat' : 'home'
-  ));
+  const [view, setView] = useState<View>(() => (parseDashboardRoute(routeHash).chatId ? 'chat' : 'home'));
 
   const [activeRubricId, setActiveRubricId] = useState<string>('');
   const [selectedSessionId, setSelectedSessionId] = useState<string>('');
@@ -171,8 +154,7 @@ export default function Dashboard({
   const [extensionHelpOpen, setExtensionHelpOpen] = useState(false);
 
   useEffect(() => {
-    const chatRequestSettled = chatRequestState.status === 'success'
-      || chatRequestState.status === 'error';
+    const chatRequestSettled = chatRequestState.status === 'success' || chatRequestState.status === 'error';
     if (!chatRequestSettled) return;
     const requestedChatId = parseDashboardRoute(routeHash).chatId;
     if (!requestedChatId) return;
@@ -182,7 +164,7 @@ export default function Dashboard({
     setView('chat');
     setActiveChatId(fallback?.id ?? null);
     if (!target) replaceChatRoute(fallback?.id ?? null);
-  }, [chatRequestState.status, replaceChatRoute, routeHash]);
+  }, [chatRequestState.status, chatsRef, replaceChatRoute, routeHash, setActiveChatId]);
 
   useEffect(() => {
     if (activeChatId) void loadChatMessages(activeChatId);
@@ -211,14 +193,8 @@ export default function Dashboard({
   // Global search query — filters the sessions, rubrics, and action-items lists.
   const [query, setQuery] = useState('');
 
-  const rubricsById = useMemo(
-    () => new Map(rubrics.map((rubric) => [rubric.id, rubric])),
-    [rubrics],
-  );
-  const sessionsById = useMemo(
-    () => new Map(sessions.map((session) => [session.id, session])),
-    [sessions],
-  );
+  const rubricsById = useMemo(() => new Map(rubrics.map((rubric) => [rubric.id, rubric])), [rubrics]);
+  const sessionsById = useMemo(() => new Map(sessions.map((session) => [session.id, session])), [sessions]);
   const activeRubric = useMemo<Rubric | undefined>(
     () => rubricsById.get(activeRubricId) ?? rubrics.find((r) => r.active) ?? rubrics[0],
     [activeRubricId, rubricsById, rubrics],
@@ -237,22 +213,18 @@ export default function Dashboard({
     [activeChat, sessionsById],
   );
   const chatRubricContext = useMemo(
-    () => resolveChatRubricContext({
-      chat: activeChat,
-      session: chatSession,
-      rubricsById,
-      activeRubric,
-    }),
+    () =>
+      resolveChatRubricContext({
+        chat: activeChat,
+        session: chatSession,
+        rubricsById,
+        activeRubric,
+      }),
     [activeChat, chatSession, rubricsById, activeRubric],
   );
   const chatRubric = chatRubricContext.rubric;
-  const activeChatMessages = useMemo(
-    () => selectChatMessages(chatState, activeChatId),
-    [activeChatId, chatState],
-  );
-  const activeChatBusy = activeChatId
-    ? isChatBusy(chatState, activeChatId)
-    : draftCreating;
+  const activeChatMessages = useMemo(() => selectChatMessages(chatState, activeChatId), [activeChatId, chatState]);
+  const activeChatBusy = activeChatId ? isChatBusy(chatState, activeChatId) : draftCreating;
   const activeChatHistoryLoading = isChatHistoryLoading(chatState, activeChatId);
 
   const openActionItems = useMemo(() => actionItems.filter((a) => !a.done), [actionItems]);
@@ -268,10 +240,7 @@ export default function Dashboard({
   );
   const homeActionItems = useMemo(() => openActionItems.slice(0, 4), [openActionItems]);
   const latestSessionOpenCount = useMemo(
-    () =>
-      latestSession
-        ? actionItems.filter((a) => a.sessionId === latestSession.id && !a.done).length
-        : 0,
+    () => (latestSession ? actionItems.filter((a) => a.sessionId === latestSession.id && !a.done).length : 0),
     [latestSession, actionItems],
   );
   const selectedSessionActionItems = useMemo(
@@ -279,15 +248,14 @@ export default function Dashboard({
     [actionItems, selectedSession],
   );
   const selectedSessionRubric =
-    selectedSession && selectedSession.rubricId
-      ? rubricsById.get(selectedSession.rubricId)
-      : undefined;
-  const selectedTranscript = selectedSession ? transcripts[selectedSession.id] ?? [] : [];
+    selectedSession && selectedSession.rubricId ? rubricsById.get(selectedSession.rubricId) : undefined;
+  const selectedTranscript = selectedSession ? (transcripts[selectedSession.id] ?? []) : [];
   const selectedTranscriptState = selectedSession ? transcriptStates[selectedSession.id] : undefined;
   const selectedTranscriptLoading = selectedTranscriptState?.status === 'loading';
-  const selectedTranscriptError = selectedTranscriptState?.status === 'error'
-    ? selectedTranscriptState.message ?? 'StudyPilot could not load this transcript.'
-    : null;
+  const selectedTranscriptError =
+    selectedTranscriptState?.status === 'error'
+      ? (selectedTranscriptState.message ?? 'StudyPilot could not load this transcript.')
+      : null;
   // Memoized so the reference is stable between unrelated renders — the ChatView
   // effect that seeds messages from it depends on this not changing every render.
   // "Recent activity" derived from the user's real sessions (most recent first).
@@ -304,12 +272,10 @@ export default function Dashboard({
       // Optimistic flip; revert if the PATCH fails so the UI never lies.
       setActionItems((items) => items.map((a) => (a.id === id ? { ...a, done: nextDone } : a)));
       setActionItemDone(id, nextDone).catch(() => {
-        setActionItems((items) =>
-          items.map((a) => (a.id === id ? { ...a, done: current.done } : a)),
-        );
+        setActionItems((items) => items.map((a) => (a.id === id ? { ...a, done: current.done } : a)));
       });
     },
-    [actionItems],
+    [actionItems, setActionItems],
   );
 
   // Fetch a session's transcript the first time it's needed, then cache it.
@@ -317,11 +283,17 @@ export default function Dashboard({
   // doesn't re-create (and cascade to openInChat / openSessionDetail) every
   // time a transcript is fetched.
   const transcriptsRef = useRef(transcripts);
-  useEffect(() => { transcriptsRef.current = transcripts; });
+  useEffect(() => {
+    transcriptsRef.current = transcripts;
+  });
   const transcriptStatesRef = useRef(transcriptStates);
-  useEffect(() => { transcriptStatesRef.current = transcriptStates; });
+  useEffect(() => {
+    transcriptStatesRef.current = transcriptStates;
+  });
   const sessionsRef = useRef(sessions);
-  useEffect(() => { sessionsRef.current = sessions; }, [sessions]);
+  useEffect(() => {
+    sessionsRef.current = sessions;
+  }, [sessions]);
 
   const ensureTranscript = useCallback(
     (sessionId: string, force = false) => {
@@ -332,18 +304,14 @@ export default function Dashboard({
       setTranscriptStates((current) => ({ ...current, [sessionId]: { status: 'loading' } }));
       fetchSessionTranscript(sessionId)
         .then((lines) => {
-          if (
-            !dashboardMountedRef.current
-            || transcriptRequestVersionsRef.current.get(sessionId) !== requestVersion
-          ) return;
+          if (!dashboardMountedRef.current || transcriptRequestVersionsRef.current.get(sessionId) !== requestVersion)
+            return;
           setTranscripts((prev) => ({ ...prev, [sessionId]: lines }));
           setTranscriptStates((current) => ({ ...current, [sessionId]: { status: 'success' } }));
         })
         .catch((error) => {
-          if (
-            !dashboardMountedRef.current
-            || transcriptRequestVersionsRef.current.get(sessionId) !== requestVersion
-          ) return;
+          if (!dashboardMountedRef.current || transcriptRequestVersionsRef.current.get(sessionId) !== requestVersion)
+            return;
           setTranscripts((prev) => ({ ...prev, [sessionId]: [] }));
           setTranscriptStates((current) => ({
             ...current,
@@ -354,221 +322,249 @@ export default function Dashboard({
           }));
         });
     },
-    [], // stable — reads transcripts via ref, not closure
+    [dashboardMountedRef, setTranscriptStates, setTranscripts, transcriptRequestVersionsRef],
   );
 
-  const navigateToView = useCallback((nextView: View) => {
-    setView(nextView);
-    replaceChatRoute(nextView === 'chat' ? activeChatIdRef.current : null);
-  }, [replaceChatRoute]);
+  const navigateToView = useCallback(
+    (nextView: View) => {
+      setView(nextView);
+      replaceChatRoute(nextView === 'chat' ? activeChatIdRef.current : null);
+    },
+    [activeChatIdRef, replaceChatRoute],
+  );
 
-  const selectChat = useCallback((chatId: string) => {
-    activeChatIdRef.current = chatId;
-    setActiveChatId(chatId);
-    setView('chat');
-    replaceChatRoute(chatId);
-  }, [replaceChatRoute]);
+  const selectChat = useCallback(
+    (chatId: string) => {
+      activeChatIdRef.current = chatId;
+      setActiveChatId(chatId);
+      setView('chat');
+      replaceChatRoute(chatId);
+    },
+    [activeChatIdRef, replaceChatRoute, setActiveChatId],
+  );
 
   const startNewChat = useCallback(() => {
     activeChatIdRef.current = null;
     setActiveChatId(null);
     setView('chat');
     replaceChatRoute(null);
-  }, [replaceChatRoute]);
+  }, [activeChatIdRef, replaceChatRoute, setActiveChatId]);
 
-  const createChat = useCallback(async (title: string, sessionId?: string | null) => {
-    const chat = sessionId
-      ? await getOrCreateSessionChat(sessionId, title)
-      : await createDashboardChat(title, null);
-    if (!dashboardMountedRef.current) return chat;
-    setChats((current) => {
-      const next = [chat, ...current.filter((item) => item.id !== chat.id)];
-      chatsRef.current = next;
-      return next;
-    });
-    activeChatIdRef.current = chat.id;
-    setActiveChatId(chat.id);
-    replaceChatRoute(chat.id);
-    return chat;
-  }, [replaceChatRoute]);
-
-  const renameChat = useCallback((chatId: string, title: string) => {
-    const previous = chatsRef.current.find((chat) => chat.id === chatId);
-    if (!previous) return;
-
-    const nextTitle = title.trim() || previous.title;
-    setChats((current) =>
-      current.map((chat) => (chat.id === chatId ? { ...chat, title: nextTitle } : chat)),
-    );
-    updateDashboardChat(chatId, { title: nextTitle })
-      .then((updated) => {
-        if (!dashboardMountedRef.current) return;
-        setChats((current) =>
-          current.map((chat) => (chat.id === chatId ? updated : chat)),
-        );
-      })
-      .catch(() => {
-        if (!dashboardMountedRef.current) return;
-        setChats((current) =>
-          current.map((chat) => (chat.id === chatId ? previous : chat)),
-        );
+  const createChat = useCallback(
+    async (title: string, sessionId?: string | null) => {
+      const chat = sessionId ? await getOrCreateSessionChat(sessionId, title) : await createDashboardChat(title, null);
+      if (!dashboardMountedRef.current) return chat;
+      setChats((current) => {
+        const next = [chat, ...current.filter((item) => item.id !== chat.id)];
+        chatsRef.current = next;
+        return next;
       });
-  }, []);
+      activeChatIdRef.current = chat.id;
+      setActiveChatId(chat.id);
+      replaceChatRoute(chat.id);
+      return chat;
+    },
+    [activeChatIdRef, chatsRef, dashboardMountedRef, replaceChatRoute, setActiveChatId, setChats],
+  );
 
-  const deleteChat = useCallback((chatId: string) => {
-    const previousChats = chatsRef.current;
-    const nextChats = previousChats.filter((chat) => chat.id !== chatId);
-    if (nextChats.length === previousChats.length) return;
+  const renameChat = useCallback(
+    (chatId: string, title: string) => {
+      const previous = chatsRef.current.find((chat) => chat.id === chatId);
+      if (!previous) return;
 
-    const previousActiveChatId = activeChatIdRef.current;
-    const nextActiveChatId = previousActiveChatId === chatId ? nextChats[0]?.id ?? null : previousActiveChatId;
-    chatsRef.current = nextChats;
-    setChats(nextChats);
-    dispatchChat({ type: 'chat-deleted', chatId });
-    if (previousActiveChatId === chatId) {
-      activeChatIdRef.current = nextActiveChatId;
-      setActiveChatId(nextActiveChatId);
-      replaceChatRoute(nextActiveChatId);
-    }
-
-    deleteDashboardChat(chatId).catch(() => {
-      if (!dashboardMountedRef.current) return;
-      chatsRef.current = previousChats;
-      setChats(previousChats);
-      if (activeChatIdRef.current === nextActiveChatId) {
-        setActiveChatId(previousActiveChatId);
-        activeChatIdRef.current = previousActiveChatId;
-        replaceChatRoute(previousActiveChatId);
-      }
-    });
-  }, [replaceChatRoute]);
-
-  const touchChat = useCallback((chatId: string) => {
-    setChats((current) => {
-      const chat = current.find((item) => item.id === chatId);
-      if (!chat) return current;
-      return [
-        { ...chat, updated_at: new Date().toISOString() },
-        ...current.filter((item) => item.id !== chatId),
-      ];
-    });
-  }, []);
-
-  const sendChatMessage = useCallback((text: string, sessionId?: string | null): boolean => {
-    const value = text.trim();
-    if (
-      !dashboardMountedRef.current
-      || !value
-      || (aiUsage !== null && aiUsage.used >= aiUsage.limit)
-    ) return false;
-
-    const currentChatId = activeChatIdRef.current;
-    if (currentChatId) {
-      if (inFlightChatIdsRef.current.has(currentChatId)) return false;
-      inFlightChatIdsRef.current.add(currentChatId);
-    } else {
-      if (draftCreatingRef.current) return false;
-      draftCreatingRef.current = true;
-      setDraftCreating(true);
-    }
-
-    void (async () => {
-      let chatId = currentChatId;
-      try {
-        if (!chatId) {
-          const chat = await createChat(titleFromFirstMessage(value), sessionId ?? null);
+      const nextTitle = title.trim() || previous.title;
+      setChats((current) => current.map((chat) => (chat.id === chatId ? { ...chat, title: nextTitle } : chat)));
+      updateDashboardChat(chatId, { title: nextTitle })
+        .then((updated) => {
           if (!dashboardMountedRef.current) return;
-          chatId = chat.id;
-          if (inFlightChatIdsRef.current.has(chatId)) return;
-          inFlightChatIdsRef.current.add(chatId);
-        }
-      } catch (error) {
-        if (!dashboardMountedRef.current) return;
-        console.error('Failed to create chat:', error);
-        return;
-      } finally {
-        if (!currentChatId) {
-          draftCreatingRef.current = false;
-          if (dashboardMountedRef.current) setDraftCreating(false);
-        }
+          setChats((current) => current.map((chat) => (chat.id === chatId ? updated : chat)));
+        })
+        .catch(() => {
+          if (!dashboardMountedRef.current) return;
+          setChats((current) => current.map((chat) => (chat.id === chatId ? previous : chat)));
+        });
+    },
+    [chatsRef, dashboardMountedRef, setChats],
+  );
+
+  const deleteChat = useCallback(
+    (chatId: string) => {
+      const previousChats = chatsRef.current;
+      const nextChats = previousChats.filter((chat) => chat.id !== chatId);
+      if (nextChats.length === previousChats.length) return;
+
+      const previousActiveChatId = activeChatIdRef.current;
+      const nextActiveChatId = previousActiveChatId === chatId ? (nextChats[0]?.id ?? null) : previousActiveChatId;
+      chatsRef.current = nextChats;
+      setChats(nextChats);
+      dispatchChat({ type: 'chat-deleted', chatId });
+      if (previousActiveChatId === chatId) {
+        activeChatIdRef.current = nextActiveChatId;
+        setActiveChatId(nextActiveChatId);
+        replaceChatRoute(nextActiveChatId);
       }
 
-      if (!chatId || !dashboardMountedRef.current) return;
-      const requestId = crypto.randomUUID();
-      dispatchChat({
-        type: 'turn-started',
-        chatId,
-        requestId,
-        userText: value,
-        createdAt: new Date().toISOString(),
-        originSurface: 'dashboard',
+      deleteDashboardChat(chatId).catch(() => {
+        if (!dashboardMountedRef.current) return;
+        chatsRef.current = previousChats;
+        setChats(previousChats);
+        if (activeChatIdRef.current === nextActiveChatId) {
+          setActiveChatId(previousActiveChatId);
+          activeChatIdRef.current = previousActiveChatId;
+          replaceChatRoute(previousActiveChatId);
+        }
       });
+    },
+    [activeChatIdRef, chatsRef, dashboardMountedRef, dispatchChat, replaceChatRoute, setActiveChatId, setChats],
+  );
 
-      try {
-        const result = await sendCoachingMessage(
-          chatId,
-          value,
-          { requestId, originSurface: 'dashboard' },
-          {
-            onTokenReceived: (token) => {
-              if (!dashboardMountedRef.current) return;
-              dispatchChat({ type: 'token-received', chatId, requestId, token });
-            },
-          },
-        );
-        if (!dashboardMountedRef.current) return;
-        if (result.commit) {
-          dispatchChat({ type: 'turn-committed', chatId, requestId, commit: result.commit });
-        } else {
-          dispatchChat({ type: 'turn-completed', chatId, requestId });
-        }
-        touchChat(chatId);
-      } catch (error) {
-        if (!dashboardMountedRef.current) return;
-        console.error('Chat stream error:', error);
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        dispatchChat({ type: 'turn-failed', chatId, requestId, error: message });
-      } finally {
-        inFlightChatIdsRef.current.delete(chatId);
-        if (!dashboardMountedRef.current) return;
-        refreshAiUsage();
-        void fetchActionItems().then((rows) => {
-          if (dashboardMountedRef.current) setActionItems(rows);
-        }).catch(() => undefined);
-        dispatchChat({ type: 'invalidate', chatId });
-        void loadChatMessages(chatId);
-        void refreshChats().catch(() => undefined);
+  const touchChat = useCallback(
+    (chatId: string) => {
+      setChats((current) => {
+        const chat = current.find((item) => item.id === chatId);
+        if (!chat) return current;
+        return [{ ...chat, updated_at: new Date().toISOString() }, ...current.filter((item) => item.id !== chatId)];
+      });
+    },
+    [setChats],
+  );
+
+  const sendChatMessage = useCallback(
+    (text: string, sessionId?: string | null): boolean => {
+      const value = text.trim();
+      if (!dashboardMountedRef.current || !value || (aiUsage !== null && aiUsage.used >= aiUsage.limit)) return false;
+
+      const currentChatId = activeChatIdRef.current;
+      if (currentChatId) {
+        if (inFlightChatIdsRef.current.has(currentChatId)) return false;
+        inFlightChatIdsRef.current.add(currentChatId);
+      } else {
+        if (draftCreatingRef.current) return false;
+        draftCreatingRef.current = true;
+        setDraftCreating(true);
       }
-    })();
 
-    return true;
-  }, [aiUsage, createChat, loadChatMessages, refreshAiUsage, refreshChats, touchChat]);
+      void (async () => {
+        let chatId = currentChatId;
+        try {
+          if (!chatId) {
+            const chat = await createChat(titleFromFirstMessage(value), sessionId ?? null);
+            if (!dashboardMountedRef.current) return;
+            chatId = chat.id;
+            if (inFlightChatIdsRef.current.has(chatId)) return;
+            inFlightChatIdsRef.current.add(chatId);
+          }
+        } catch (error) {
+          if (!dashboardMountedRef.current) return;
+          console.error('Failed to create chat:', error);
+          return;
+        } finally {
+          if (!currentChatId) {
+            draftCreatingRef.current = false;
+            if (dashboardMountedRef.current) setDraftCreating(false);
+          }
+        }
 
-  const openInChat = useCallback((sessionId: string) => {
-    setView('chat');
-    const session = sessionsRef.current.find((item) => item.id === sessionId);
-    const linkedChatId = session?.chatId ?? session?.chat_id ?? null;
+        if (!chatId || !dashboardMountedRef.current) return;
+        const requestId = crypto.randomUUID();
+        dispatchChat({
+          type: 'turn-started',
+          chatId,
+          requestId,
+          userText: value,
+          createdAt: new Date().toISOString(),
+          originSurface: 'dashboard',
+        });
 
-    if (typeof linkedChatId === 'string' && linkedChatId) {
-      const byChatId = chatsRef.current.find((chat) => chat.id === linkedChatId);
-      if (byChatId) {
-        selectChat(byChatId.id);
+        try {
+          const result = await sendCoachingMessage(
+            chatId,
+            value,
+            { requestId, originSurface: 'dashboard' },
+            {
+              onTokenReceived: (token) => {
+                if (!dashboardMountedRef.current) return;
+                dispatchChat({ type: 'token-received', chatId, requestId, token });
+              },
+            },
+          );
+          if (dashboardMountedRef.current) {
+            if (result.commit) {
+              dispatchChat({ type: 'turn-committed', chatId, requestId, commit: result.commit });
+            } else {
+              dispatchChat({ type: 'turn-completed', chatId, requestId });
+            }
+            touchChat(chatId);
+          }
+        } catch (error) {
+          if (dashboardMountedRef.current) {
+            console.error('Chat stream error:', error);
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            dispatchChat({ type: 'turn-failed', chatId, requestId, error: message });
+          }
+        } finally {
+          inFlightChatIdsRef.current.delete(chatId);
+          if (dashboardMountedRef.current) {
+            refreshAiUsage();
+            void fetchActionItems()
+              .then((rows) => {
+                if (dashboardMountedRef.current) setActionItems(rows);
+              })
+              .catch(() => undefined);
+            dispatchChat({ type: 'invalidate', chatId });
+            void loadChatMessages(chatId);
+            void refreshChats().catch(() => undefined);
+          }
+        }
+      })();
+
+      return true;
+    },
+    [
+      activeChatIdRef,
+      aiUsage,
+      createChat,
+      dashboardMountedRef,
+      dispatchChat,
+      draftCreatingRef,
+      inFlightChatIdsRef,
+      loadChatMessages,
+      refreshAiUsage,
+      refreshChats,
+      setActionItems,
+      setDraftCreating,
+      touchChat,
+    ],
+  );
+
+  const openInChat = useCallback(
+    (sessionId: string) => {
+      setView('chat');
+      const session = sessionsRef.current.find((item) => item.id === sessionId);
+      const linkedChatId = session?.chatId ?? session?.chat_id ?? null;
+
+      if (typeof linkedChatId === 'string' && linkedChatId) {
+        const byChatId = chatsRef.current.find((chat) => chat.id === linkedChatId);
+        if (byChatId) {
+          selectChat(byChatId.id);
+          return;
+        }
+      }
+
+      const existing = chatsRef.current.find((chat) => chat.session_id === sessionId);
+      if (existing) {
+        selectChat(existing.id);
         return;
       }
-    }
 
-    const existing = chatsRef.current.find((chat) => chat.session_id === sessionId);
-    if (existing) {
-      selectChat(existing.id);
-      return;
-    }
-
-    activeChatIdRef.current = null;
-    setActiveChatId(null);
-    void createChat(session?.title ?? 'Session chat', sessionId).catch(() => {
-      /* Leave the user in a fresh rubric-only draft if the chat could not be created. */
-    });
-  }, [createChat, selectChat]);
+      activeChatIdRef.current = null;
+      setActiveChatId(null);
+      void createChat(session?.title ?? 'Session chat', sessionId).catch(() => {
+        /* Leave the user in a fresh rubric-only draft if the chat could not be created. */
+      });
+    },
+    [activeChatIdRef, chatsRef, createChat, selectChat, setActiveChatId],
+  );
 
   const openSessionDetail = useCallback(
     (sessionId: string) => {
@@ -596,10 +592,7 @@ export default function Dashboard({
       /* best-effort — the local theme is already applied */
     });
   }, []);
-  const toggleTheme = useCallback(
-    () => applyTheme(theme === 'dark' ? 'light' : 'dark'),
-    [applyTheme, theme],
-  );
+  const toggleTheme = useCallback(() => applyTheme(theme === 'dark' ? 'light' : 'dark'), [applyTheme, theme]);
   const continueLatestInChat = useCallback(() => {
     if (latestSession) openInChat(latestSession.id);
   }, [latestSession, openInChat]);
@@ -613,18 +606,21 @@ export default function Dashboard({
     if (chatSession) openInChat(chatSession.id);
   }, [chatSession, openInChat]);
   const backToSessions = useCallback(() => navigateToView('sessions'), [navigateToView]);
-  const setActiveRubricOnServer = useCallback(async (rubricId: string) => {
-    const previousId = activeRubricId;
-    setRubrics((prev) => prev.map((r) => ({ ...r, active: r.id === rubricId })));
-    setActiveRubricId(rubricId);
-    try {
-      await activateRubric(rubricId);
-    } catch (error) {
-      console.error('Failed to activate rubric:', error);
-      setRubrics((prev) => prev.map((r) => ({ ...r, active: r.id === previousId })));
-      setActiveRubricId(previousId);
-    }
-  }, [activeRubricId]);
+  const setActiveRubricOnServer = useCallback(
+    async (rubricId: string) => {
+      const previousId = activeRubricId;
+      setRubrics((prev) => prev.map((r) => ({ ...r, active: r.id === rubricId })));
+      setActiveRubricId(rubricId);
+      try {
+        await activateRubric(rubricId);
+      } catch (error) {
+        console.error('Failed to activate rubric:', error);
+        setRubrics((prev) => prev.map((r) => ({ ...r, active: r.id === previousId })));
+        setActiveRubricId(previousId);
+      }
+    },
+    [activeRubricId, setRubrics],
+  );
 
   const askAboutRubric = useCallback(
     async (rubricId: string) => {
@@ -646,77 +642,76 @@ export default function Dashboard({
         startNewChat();
       }
     },
-    [loadChatMessages, replaceChatRoute, startNewChat],
+    [activeChatIdRef, chatsRef, loadChatMessages, replaceChatRoute, setActiveChatId, setChats, startNewChat],
   );
 
-  const retryIndexRubric = useCallback(async (rubricId: string) => {
-    const rubric = rubrics.find((r) => r.id === rubricId);
-    const knowledgeDocumentId = rubric?.knowledgeDocumentId ?? rubric?.knowledge_document_id;
-    if (!knowledgeDocumentId) return;
+  const retryIndexRubric = useCallback(
+    async (rubricId: string) => {
+      const rubric = rubrics.find((r) => r.id === rubricId);
+      const knowledgeDocumentId = rubric?.knowledgeDocumentId ?? rubric?.knowledge_document_id;
+      if (!knowledgeDocumentId) return;
 
-    const requestVersion = (rubricIndexRequestVersionsRef.current.get(rubricId) ?? 0) + 1;
-    rubricIndexRequestVersionsRef.current.set(rubricId, requestVersion);
-    setRubricIndexRequestStates((current) => ({
-      ...current,
-      [rubricId]: { status: 'loading' },
-    }));
+      const requestVersion = (rubricIndexRequestVersionsRef.current.get(rubricId) ?? 0) + 1;
+      rubricIndexRequestVersionsRef.current.set(rubricId, requestVersion);
+      setRubricIndexRequestStates((current) => ({
+        ...current,
+        [rubricId]: { status: 'loading' },
+      }));
 
-    setRubrics((prev) =>
-      prev.map((r) =>
-        r.id === rubricId
-          ? { ...r, file_search_status: 'indexing', fileSearchStatus: 'indexing', fileSearchError: null }
-          : r,
-      ),
-    );
-    try {
-      const result = await retryRubricIndexing(knowledgeDocumentId);
-      if (
-        !dashboardMountedRef.current
-        || rubricIndexRequestVersionsRef.current.get(rubricId) !== requestVersion
-      ) return;
-      const status = normalizeIndexStatus(result.status);
       setRubrics((prev) =>
         prev.map((r) =>
           r.id === rubricId
-            ? {
-              ...r,
-              file_search_status: status,
-              fileSearchStatus: status,
-              fileSearchError: status === 'failed' ? (result.error ?? null) : null,
-            }
+            ? { ...r, file_search_status: 'indexing', fileSearchStatus: 'indexing', fileSearchError: null }
             : r,
         ),
       );
-      setRubricIndexRequestStates((current) => ({
-        ...current,
-        [rubricId]: { status: 'success' },
-      }));
-    } catch (error) {
-      if (
-        !dashboardMountedRef.current
-        || rubricIndexRequestVersionsRef.current.get(rubricId) !== requestVersion
-      ) return;
-      setRubrics((prev) =>
-        prev.map((r) =>
-          r.id === rubricId
-            ? {
-              ...r,
-              file_search_status: 'failed',
-              fileSearchStatus: 'failed',
-              fileSearchError: error instanceof Error ? error.message : 'Indexing failed',
-            }
-            : r,
-        ),
-      );
-      setRubricIndexRequestStates((current) => ({
-        ...current,
-        [rubricId]: {
-          status: 'error',
-          message: error instanceof Error ? error.message : 'Indexing failed',
-        },
-      }));
-    }
-  }, [rubrics]);
+      try {
+        const result = await retryRubricIndexing(knowledgeDocumentId);
+        if (!dashboardMountedRef.current || rubricIndexRequestVersionsRef.current.get(rubricId) !== requestVersion)
+          return;
+        const status = normalizeIndexStatus(result.status);
+        setRubrics((prev) =>
+          prev.map((r) =>
+            r.id === rubricId
+              ? {
+                  ...r,
+                  file_search_status: status,
+                  fileSearchStatus: status,
+                  fileSearchError: status === 'failed' ? (result.error ?? null) : null,
+                }
+              : r,
+          ),
+        );
+        setRubricIndexRequestStates((current) => ({
+          ...current,
+          [rubricId]: { status: 'success' },
+        }));
+      } catch (error) {
+        if (!dashboardMountedRef.current || rubricIndexRequestVersionsRef.current.get(rubricId) !== requestVersion)
+          return;
+        setRubrics((prev) =>
+          prev.map((r) =>
+            r.id === rubricId
+              ? {
+                  ...r,
+                  file_search_status: 'failed',
+                  fileSearchStatus: 'failed',
+                  fileSearchError: error instanceof Error ? error.message : 'Indexing failed',
+                }
+              : r,
+          ),
+        );
+        setRubricIndexRequestStates((current) => ({
+          ...current,
+          [rubricId]: {
+            status: 'error',
+            message: error instanceof Error ? error.message : 'Indexing failed',
+          },
+        }));
+      }
+    },
+    [dashboardMountedRef, rubricIndexRequestVersionsRef, rubrics, setRubricIndexRequestStates, setRubrics],
+  );
   const openExtension = useCallback(() => {
     setExtensionHelpOpen(true);
   }, []);
@@ -849,9 +844,7 @@ export default function Dashboard({
                   onToggleAction={toggleAction}
                   onBack={backToSessions}
                   onContinueInChat={continueSelectedInChat}
-                  onRetryTranscript={
-                    selectedSession ? () => ensureTranscript(selectedSession.id, true) : undefined
-                  }
+                  onRetryTranscript={selectedSession ? () => ensureTranscript(selectedSession.id, true) : undefined}
                 />
               )}
 
@@ -930,9 +923,7 @@ export default function Dashboard({
         onOpenExtension={openExtension}
       />
 
-      {extensionHelpOpen && (
-        <ExtensionHelpModal onClose={() => setExtensionHelpOpen(false)} />
-      )}
+      {extensionHelpOpen && <ExtensionHelpModal onClose={() => setExtensionHelpOpen(false)} />}
     </main>
   );
 }

@@ -6,9 +6,7 @@ export type PublicDeploymentEnv = {
   VITE_SUPABASE_ANON_KEY?: string | undefined;
 };
 
-export type DeploymentValidationResult =
-  | { ok: true }
-  | { ok: false; error: string };
+export type DeploymentValidationResult = { ok: true } | { ok: false; error: string };
 
 const LOCAL_VITE_MODE = 'studypilot-local';
 
@@ -68,10 +66,7 @@ export function validatePublicDeploymentEnv(
   return { ok: true };
 }
 
-export function assertPublicDeploymentEnv(
-  env: PublicDeploymentEnv,
-  mode: DeploymentMode,
-): void {
+export function assertPublicDeploymentEnv(env: PublicDeploymentEnv, mode: DeploymentMode): void {
   const result = validatePublicDeploymentEnv(env, mode);
   if (result.ok === false) {
     throw new Error(result.error);
@@ -84,11 +79,7 @@ export function isPublicAnonKeyShape(value: string): boolean {
   return ANON_KEY_SHAPE.test(key);
 }
 
-function validatePublicUrl(
-  key: string,
-  value: string,
-  mode: DeploymentMode,
-): DeploymentValidationResult {
+function validatePublicUrl(key: string, value: string, mode: DeploymentMode): DeploymentValidationResult {
   let url: URL;
   try {
     url = new URL(value);

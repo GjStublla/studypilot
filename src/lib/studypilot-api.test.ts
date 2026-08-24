@@ -54,9 +54,7 @@ describe('StudyPilot dashboard adapters', () => {
       criteria: [{ name: 'Thesis', max_score: 5 }],
     } as Rubric;
 
-    expect(adaptRubric(rubric).criteria).toEqual([
-      { id: 'rubric-1-criterion-0', name: 'Thesis', score: 0, max: 5 },
-    ]);
+    expect(adaptRubric(rubric).criteria).toEqual([{ id: 'rubric-1-criterion-0', name: 'Thesis', score: 0, max: 5 }]);
   });
 
   it('converts nullable relation IDs to dashboard nulls', () => {

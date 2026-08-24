@@ -3,13 +3,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Registration = {
   config: { table: string; event: string };
-  callback: (payload: any) => void;
+  callback: (payload: unknown) => void;
+};
+
+type MockChannel = {
+  on: ReturnType<typeof vi.fn>;
+  subscribe: ReturnType<typeof vi.fn>;
 };
 
 const mocks = vi.hoisted(() => {
   const registrations: Registration[] = [];
   let statusCallback: ((status: string) => void) | null = null;
-  const channel: any = {};
+  const channel = {} as MockChannel;
   channel.on = vi.fn((_kind: string, config: Registration['config'], callback: Registration['callback']) => {
     registrations.push({ config, callback });
     return channel;
@@ -22,7 +27,9 @@ const mocks = vi.hoisted(() => {
     registrations,
     channel,
     getStatusCallback: () => statusCallback,
-    resetStatusCallback: () => { statusCallback = null; },
+    resetStatusCallback: () => {
+      statusCallback = null;
+    },
     setAuth: vi.fn(async () => undefined),
     removeChannel: vi.fn(async () => undefined),
     getSession: vi.fn(async () => ({
@@ -62,9 +69,7 @@ describe('useStudyPilotRealtime', () => {
 
     expect(mocks.injectStoredToken).toHaveBeenCalledOnce();
     expect(mocks.setAuth).toHaveBeenCalledWith('realtime-token');
-    expect(mocks.setAuth.mock.invocationCallOrder[0]).toBeLessThan(
-      mocks.channel.subscribe.mock.invocationCallOrder[0],
-    );
+    expect(mocks.setAuth.mock.invocationCallOrder[0]).toBeLessThan(mocks.channel.subscribe.mock.invocationCallOrder[0]);
   });
 
   it('registers chat, message, session, and transcript invalidations', async () => {
@@ -88,18 +93,17 @@ describe('useStudyPilotRealtime', () => {
     const latest = vi.fn();
     const subscribed = vi.fn();
     const { rerender, unmount } = renderHook(
-      ({ onChanged }) => useStudyPilotRealtime('user-1', {
-        onDashboardChatMessageChanged: onChanged,
-        onSubscribed: subscribed,
-      }),
+      ({ onChanged }) =>
+        useStudyPilotRealtime('user-1', {
+          onDashboardChatMessageChanged: onChanged,
+          onSubscribed: subscribed,
+        }),
       { initialProps: { onChanged: first } },
     );
     await waitFor(() => expect(mocks.channel.subscribe).toHaveBeenCalledOnce());
     rerender({ onChanged: latest });
 
-    const messageRegistration = mocks.registrations.find(
-      ({ config }) => config.table === 'dashboard_chat_messages',
-    );
+    const messageRegistration = mocks.registrations.find(({ config }) => config.table === 'dashboard_chat_messages');
     act(() => {
       messageRegistration?.callback({ new: { chat_id: 'chat-a' } });
       mocks.getStatusCallback()?.('SUBSCRIBED');

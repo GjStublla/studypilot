@@ -10,9 +10,7 @@ describe('extractCitations', () => {
       },
     });
 
-    expect(citations).toEqual([
-      { title: 'Thesis clarity', uri: null, snippet: 'Clear claim', sourceIndex: 0 },
-    ]);
+    expect(citations).toEqual([{ title: 'Thesis clarity', uri: null, snippet: 'Clear claim', sourceIndex: 0 }]);
   });
 
   it('normalizes groundingChunks into citations', () => {

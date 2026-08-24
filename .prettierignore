@@ -1,0 +1,17 @@
+.git/
+.plan/
+.playwright-cli/
+.pytest_cache/
+backend/
+coverage/
+dist/
+node_modules/
+output/
+public/
+supabase/functions/
+test-results/
+tmp/
+design.tar.gz
+lh-home.json
+package-lock.json
+tsconfig.*.tsbuildinfo

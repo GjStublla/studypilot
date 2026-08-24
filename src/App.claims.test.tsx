@@ -52,14 +52,10 @@ describe('landing page claims', () => {
     expect(lower).not.toContain('stay on your device');
     expect(lower).not.toContain('no account');
     expect(text).toContain(PROCESSING_DISCLOSURE);
-    expect(lower).toContain(
-      'uses your microphone and the page context you choose to share',
-    );
+    expect(lower).toContain('uses your microphone and the page context you choose to share');
     expect(lower).toContain(
       'answers can cite retrieved rubric or uploaded-document evidence when grounding is available',
     );
-    expect(lower).toContain(
-      'sign in once to connect the extension and dashboard',
-    );
+    expect(lower).toContain('sign in once to connect the extension and dashboard');
   });
 });

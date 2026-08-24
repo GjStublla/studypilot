@@ -3,7 +3,6 @@ import { ArrowRight, Eye, EyeOff, Loader } from 'lucide-react';
 import { apiPost, storeAuth, type AuthTokens } from '../lib/api';
 import { supabase } from '../lib/supabase';
 
-
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type Mode = 'login' | 'signup';
@@ -59,11 +58,7 @@ export default function AuthPage() {
         </div>
 
         {/* Forms — each one owns its own divider + Google button placement */}
-        {mode === 'login' ? (
-          <LoginForm />
-        ) : (
-          <SignupForm onSuccess={() => setMode('login')} />
-        )}
+        {mode === 'login' ? <LoginForm /> : <SignupForm onSuccess={() => setMode('login')} />}
 
         <nav className="auth-legal-nav" aria-label="Legal">
           <a href="#/privacy">Privacy Policy</a>
@@ -122,11 +117,7 @@ function GoogleButton() {
         disabled={loading}
         aria-label="Continue with Google"
       >
-        {loading ? (
-          <Loader size={16} className="auth-spinner" />
-        ) : (
-          <GoogleLogo />
-        )}
+        {loading ? <Loader size={16} className="auth-spinner" /> : <GoogleLogo />}
         Continue with Google
       </button>
       {error && (
@@ -166,9 +157,9 @@ function GoogleLogo() {
 type PasswordRule = { label: string; test: (p: string) => boolean };
 
 const PASSWORD_RULES: PasswordRule[] = [
-  { label: 'At least 8 characters',      test: (p) => p.length >= 8 },
+  { label: 'At least 8 characters', test: (p) => p.length >= 8 },
   { label: 'One uppercase letter (A–Z)', test: (p) => /[A-Z]/.test(p) },
-  { label: 'One number (0–9)',           test: (p) => /\d/.test(p) },
+  { label: 'One number (0–9)', test: (p) => /\d/.test(p) },
 ];
 
 function passwordValid(p: string): boolean {
@@ -183,7 +174,9 @@ function PasswordStrength({ password }: { password: string }) {
         const ok = rule.test(password);
         return (
           <li key={rule.label} className={`auth-pw-rule ${ok ? 'is-met' : 'is-unmet'}`}>
-            <span className="auth-pw-rule-icon" aria-hidden="true">{ok ? '✓' : '·'}</span>
+            <span className="auth-pw-rule-icon" aria-hidden="true">
+              {ok ? '✓' : '·'}
+            </span>
             {rule.label}
           </li>
         );
@@ -215,7 +208,10 @@ function LoginForm() {
       if (!res.ok) {
         const message = typeof data.detail === 'string' ? data.detail : 'Login failed.';
         // Backend sends a specific message when the account is Google-only
-        if (message.toLowerCase().includes('google sign-in') || message.toLowerCase().includes('continue with google')) {
+        if (
+          message.toLowerCase().includes('google sign-in') ||
+          message.toLowerCase().includes('continue with google')
+        ) {
           setSuggestGoogle(true);
         } else {
           setError(message);
@@ -298,7 +294,9 @@ function LoginForm() {
         )}
       </button>
 
-      <div className="auth-divider" aria-hidden="true"><span>or</span></div>
+      <div className="auth-divider" aria-hidden="true">
+        <span>or</span>
+      </div>
       <GoogleButton />
     </form>
   );
@@ -333,7 +331,7 @@ function SignupForm({ onSuccess }: { onSuccess: () => void }) {
     setLoading(true);
 
     try {
-      const res = await apiPost("/auth/signup", { name, email, password });
+      const res = await apiPost('/auth/signup', { name, email, password });
       const data = await res.json();
 
       if (!res.ok) {
@@ -416,9 +414,7 @@ function SignupForm({ onSuccess }: { onSuccess: () => void }) {
       </div>
 
       <div className="auth-field">
-        <label htmlFor="signup-password">
-          Password
-        </label>
+        <label htmlFor="signup-password">Password</label>
         <div className="auth-input-wrap">
           <input
             id="signup-password"
@@ -462,12 +458,13 @@ function SignupForm({ onSuccess }: { onSuccess: () => void }) {
         )}
       </button>
 
-      <div className="auth-divider" aria-hidden="true"><span>or</span></div>
+      <div className="auth-divider" aria-hidden="true">
+        <span>or</span>
+      </div>
       <GoogleButton />
 
       <p className="auth-legal">
-        By creating an account you agree to our{' '}
-        <a href="#/terms">Terms of Use</a> and{' '}
+        By creating an account you agree to our <a href="#/terms">Terms of Use</a> and{' '}
         <a href="#/privacy">Privacy Policy</a>.
       </p>
     </form>
@@ -492,15 +489,31 @@ function StudyPilotMark({ size = 28 }: { size?: number }) {
           <stop offset="1" stopColor="#F04CFF" />
         </linearGradient>
       </defs>
-      <path d="M34 72V38c0-9.9 8.1-18 18-18h96c9.9 0 18 8.1 18 18v34" stroke="#5A6273" strokeWidth="4" strokeLinecap="round" />
+      <path
+        d="M34 72V38c0-9.9 8.1-18 18-18h96c9.9 0 18 8.1 18 18v34"
+        stroke="#5A6273"
+        strokeWidth="4"
+        strokeLinecap="round"
+      />
       <path d="M34 48h132" stroke="#3A4154" strokeWidth="3" />
       <circle cx="52" cy="34" r="4.5" fill="#7A8290" />
       <circle cx="66" cy="34" r="4.5" fill="#7A8290" opacity="0.8" />
       <circle cx="80" cy="34" r="4.5" fill="#7A8290" opacity="0.6" />
       <path d="M132 28l3 8 8 3-8 3-3 8-3-8-8-3 8-3 3-8z" fill="#fff" />
       <circle cx="100" cy="92" r="44" fill={`url(#authMarkOrb${size})`} />
-      <path d="M100 61l19 58-19-13-19 13 19-58z" stroke="#fff" strokeWidth="4" strokeLinejoin="round" strokeLinecap="round" />
-      <path d="M100 155c-23-16-49-22-86-22" stroke={`url(#authMarkLine${size})`} strokeWidth="4" strokeLinecap="round" />
+      <path
+        d="M100 61l19 58-19-13-19 13 19-58z"
+        stroke="#fff"
+        strokeWidth="4"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      <path
+        d="M100 155c-23-16-49-22-86-22"
+        stroke={`url(#authMarkLine${size})`}
+        strokeWidth="4"
+        strokeLinecap="round"
+      />
       <path d="M100 155c23-16 49-22 86-22" stroke={`url(#authMarkLine${size})`} strokeWidth="4" strokeLinecap="round" />
     </svg>
   );

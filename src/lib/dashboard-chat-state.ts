@@ -1,9 +1,4 @@
-import type {
-  DashboardChatMessage,
-  GroundingCitation,
-  OriginSurface,
-  SocraticCoachCommit,
-} from './studypilot-types';
+import type { DashboardChatMessage, GroundingCitation, OriginSurface, SocraticCoachCommit } from './studypilot-types';
 import { extractCitations } from './groundingCitations';
 
 export type PendingTurnStatus = 'thinking' | 'streaming' | 'complete' | 'error';
@@ -47,13 +42,13 @@ export type DashboardChatAction =
   | { type: 'load-failed'; chatId: string; version: number }
   | { type: 'invalidate'; chatId: string }
   | {
-    type: 'turn-started';
-    chatId: string;
-    requestId: string;
-    userText: string;
-    createdAt: string;
-    originSurface: OriginSurface;
-  }
+      type: 'turn-started';
+      chatId: string;
+      requestId: string;
+      userText: string;
+      createdAt: string;
+      originSurface: OriginSurface;
+    }
   | { type: 'token-received'; chatId: string; requestId: string; token: string }
   | { type: 'turn-committed'; chatId: string; requestId: string; commit: SocraticCoachCommit }
   | { type: 'turn-completed'; chatId: string; requestId: string }
@@ -81,8 +76,7 @@ function updateThread(
 }
 
 function compareCanonical(a: DashboardChatMessage, b: DashboardChatMessage): number {
-  const bySequence = (a.server_sequence ?? Number.MAX_SAFE_INTEGER)
-    - (b.server_sequence ?? Number.MAX_SAFE_INTEGER);
+  const bySequence = (a.server_sequence ?? Number.MAX_SAFE_INTEGER) - (b.server_sequence ?? Number.MAX_SAFE_INTEGER);
   if (bySequence !== 0) return bySequence;
   return a.id.localeCompare(b.id);
 }
@@ -91,9 +85,9 @@ function isNearTurn(row: DashboardChatMessage, turn: PendingChatTurn): boolean {
   const rowTime = Date.parse(row.created_at);
   const turnTime = Date.parse(turn.createdAt);
   return (
-    Number.isFinite(rowTime)
-    && Number.isFinite(turnTime)
-    && Math.abs(rowTime - turnTime) <= LEGACY_RECONCILIATION_WINDOW_MS
+    Number.isFinite(rowTime) &&
+    Number.isFinite(turnTime) &&
+    Math.abs(rowTime - turnTime) <= LEGACY_RECONCILIATION_WINDOW_MS
   );
 }
 
@@ -107,49 +101,33 @@ function findLegacyRow(
   const expectedText = role === 'user' ? turn.userText : turn.assistantText;
   if (!expectedText) return undefined;
 
-  return canonical.find((row) => (
-    row.request_id == null
-    && row.role === role
-    && row.text === expectedText
-    && !claimedIds?.has(row.id)
-    && isNearTurn(row, turn)
-    && (
-      afterSequence === undefined
-      || row.server_sequence === undefined
-      || row.server_sequence > afterSequence
-    )
-  ));
-}
-
-function hasLegacyCompletePair(
-  turn: PendingChatTurn,
-  canonical: DashboardChatMessage[],
-): boolean {
-  const userRow = findLegacyRow(turn, canonical, 'user');
-  return Boolean(
-    userRow
-    && findLegacyRow(turn, canonical, 'ai', undefined, userRow.server_sequence),
+  return canonical.find(
+    (row) =>
+      row.request_id == null &&
+      row.role === role &&
+      row.text === expectedText &&
+      !claimedIds?.has(row.id) &&
+      isNearTurn(row, turn) &&
+      (afterSequence === undefined || row.server_sequence === undefined || row.server_sequence > afterSequence),
   );
 }
 
-function reconcilePending(
-  pending: PendingChatTurn[],
-  canonical: DashboardChatMessage[],
-): PendingChatTurn[] {
+function hasLegacyCompletePair(turn: PendingChatTurn, canonical: DashboardChatMessage[]): boolean {
+  const userRow = findLegacyRow(turn, canonical, 'user');
+  return Boolean(userRow && findLegacyRow(turn, canonical, 'ai', undefined, userRow.server_sequence));
+}
+
+function reconcilePending(pending: PendingChatTurn[], canonical: DashboardChatMessage[]): PendingChatTurn[] {
   return pending.filter((turn) => {
     const rows = canonical.filter((row) => row.request_id === turn.requestId);
-    const hasCompletePair = (
-      rows.some((row) => row.role === 'user')
-      && rows.some((row) => row.role === 'ai')
-    ) || hasLegacyCompletePair(turn, canonical);
+    const hasCompletePair =
+      (rows.some((row) => row.role === 'user') && rows.some((row) => row.role === 'ai')) ||
+      hasLegacyCompletePair(turn, canonical);
     return !hasCompletePair || turn.status === 'thinking' || turn.status === 'streaming';
   });
 }
 
-export function dashboardChatReducer(
-  state: DashboardChatState,
-  action: DashboardChatAction,
-): DashboardChatState {
+export function dashboardChatReducer(state: DashboardChatState, action: DashboardChatAction): DashboardChatState {
   switch (action.type) {
     case 'load-started':
       return updateThread(state, action.chatId, (thread) => ({
@@ -170,11 +148,9 @@ export function dashboardChatReducer(
         };
       });
     case 'load-failed':
-      return updateThread(state, action.chatId, (thread) => (
-        action.version === thread.loadVersion
-          ? { ...thread, loadStatus: 'error', stale: true }
-          : thread
-      ));
+      return updateThread(state, action.chatId, (thread) =>
+        action.version === thread.loadVersion ? { ...thread, loadStatus: 'error', stale: true } : thread,
+      );
     case 'invalidate':
       return updateThread(state, action.chatId, (thread) => ({ ...thread, stale: true }));
     case 'turn-started':
@@ -196,45 +172,41 @@ export function dashboardChatReducer(
     case 'token-received':
       return updateThread(state, action.chatId, (thread) => ({
         ...thread,
-        pending: thread.pending.map((turn) => (
+        pending: thread.pending.map((turn) =>
           turn.requestId === action.requestId
             ? {
-              ...turn,
-              assistantText: turn.assistantText + action.token,
-              status: 'streaming',
-            }
-            : turn
-        )),
+                ...turn,
+                assistantText: turn.assistantText + action.token,
+                status: 'streaming',
+              }
+            : turn,
+        ),
       }));
     case 'turn-committed':
       return updateThread(state, action.chatId, (thread) => ({
         ...thread,
         stale: true,
-        pending: thread.pending.map((turn) => (
-          turn.requestId === action.requestId
-            ? { ...turn, status: 'complete', commit: action.commit }
-            : turn
-        )),
+        pending: thread.pending.map((turn) =>
+          turn.requestId === action.requestId ? { ...turn, status: 'complete', commit: action.commit } : turn,
+        ),
       }));
     case 'turn-completed':
       return updateThread(state, action.chatId, (thread) => ({
         ...thread,
         stale: true,
-        pending: thread.pending.map((turn) => (
-          turn.requestId === action.requestId
-            ? { ...turn, status: 'complete' }
-            : turn
-        )),
+        pending: thread.pending.map((turn) =>
+          turn.requestId === action.requestId ? { ...turn, status: 'complete' } : turn,
+        ),
       }));
     case 'turn-failed':
       return updateThread(state, action.chatId, (thread) => ({
         ...thread,
         stale: true,
-        pending: thread.pending.map((turn) => (
+        pending: thread.pending.map((turn) =>
           turn.requestId === action.requestId
             ? { ...turn, assistantText: `Error: ${action.error}`, status: 'error' }
-            : turn
-        )),
+            : turn,
+        ),
       }));
     case 'chat-deleted': {
       const next = { ...state };
@@ -246,15 +218,10 @@ export function dashboardChatReducer(
 
 function displayTime(createdAt: string): string {
   const date = new Date(createdAt);
-  return Number.isNaN(date.getTime())
-    ? ''
-    : date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
-export function selectChatMessages(
-  state: DashboardChatState,
-  chatId: string | null,
-): ChatViewMessage[] {
+export function selectChatMessages(state: DashboardChatState, chatId: string | null): ChatViewMessage[] {
   if (!chatId) return [];
   const thread = state[chatId];
   if (!thread) return [];
@@ -271,22 +238,21 @@ export function selectChatMessages(
       originSurface: row.origin_surface,
       status: 'persisted' as const,
       usedFileSearch: Boolean(row.used_file_search),
-      citations: row.role === 'ai'
-        ? extractCitations({
-          citations: row.citations,
-          grounding_metadata: row.grounding_metadata,
-          used_file_search: row.used_file_search,
-        })
-        : undefined,
+      citations:
+        row.role === 'ai'
+          ? extractCitations({
+              citations: row.citations,
+              grounding_metadata: row.grounding_metadata,
+              used_file_search: row.used_file_search,
+            })
+          : undefined,
     }));
 
   const claimedLegacyRowIds = new Set<string>();
 
   for (const turn of thread.pending) {
     const persistedRoles = new Set(
-      thread.canonical
-        .filter((row) => row.request_id === turn.requestId)
-        .map((row) => row.role),
+      thread.canonical.filter((row) => row.request_id === turn.requestId).map((row) => row.role),
     );
     const legacyUser = persistedRoles.has('user')
       ? undefined
@@ -297,13 +263,7 @@ export function selectChatMessages(
     }
     const legacyAssistant = persistedRoles.has('ai')
       ? undefined
-      : findLegacyRow(
-        turn,
-        thread.canonical,
-        'ai',
-        claimedLegacyRowIds,
-        legacyUser?.server_sequence,
-      );
+      : findLegacyRow(turn, thread.canonical, 'ai', claimedLegacyRowIds, legacyUser?.server_sequence);
     if (legacyAssistant) {
       persistedRoles.add('ai');
       claimedLegacyRowIds.add(legacyAssistant.id);
@@ -340,9 +300,7 @@ export function selectChatMessages(
 
 export function isChatBusy(state: DashboardChatState, chatId: string | null): boolean {
   if (!chatId) return false;
-  return (state[chatId]?.pending ?? []).some(
-    (turn) => turn.status === 'thinking' || turn.status === 'streaming',
-  );
+  return (state[chatId]?.pending ?? []).some((turn) => turn.status === 'thinking' || turn.status === 'streaming');
 }
 
 export function isChatHistoryLoading(state: DashboardChatState, chatId: string | null): boolean {

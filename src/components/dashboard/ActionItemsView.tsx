@@ -18,7 +18,7 @@ export const ActionItemsView = memo(function ActionItemsView({
     const base = tab === 'open' ? open : done;
     if (!q) return base;
     return base.filter((a) => {
-      const sessionTitle = a.sessionId ? sessionsById.get(a.sessionId)?.title ?? '' : '';
+      const sessionTitle = a.sessionId ? (sessionsById.get(a.sessionId)?.title ?? '') : '';
       return [a.text, sessionTitle].some((f) => f.toLowerCase().includes(q));
     });
   }, [tab, open, done, q, sessionsById]);
@@ -29,8 +29,7 @@ export const ActionItemsView = memo(function ActionItemsView({
         <div>
           <h2 className="ds-h2">Action items</h2>
           <p className="ds-lede">
-            What your coach flagged. Check them off as you revise — they sync back into the
-            session they came from.
+            What your coach flagged. Check them off as you revise — they sync back into the session they came from.
           </p>
         </div>
         <div className="ds-tabs" role="tablist">
@@ -86,11 +85,7 @@ export const ActionItemsView = memo(function ActionItemsView({
                   <p>{a.text}</p>
                   <div className="ds-todo-meta">
                     {session && (
-                      <button
-                        type="button"
-                        className="ds-todo-source"
-                        onClick={() => onOpenSession(session.id)}
-                      >
+                      <button type="button" className="ds-todo-source" onClick={() => onOpenSession(session.id)}>
                         <ScrollText size={10} strokeWidth={1.8} />
                         {session.title}
                       </button>
