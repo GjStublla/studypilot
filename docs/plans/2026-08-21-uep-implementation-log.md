@@ -1443,4 +1443,4 @@ Web: this log only. Phase 5 was not started.
 
 - `README.md` now states Python 3.13 for direct FastAPI/pytest runs and points to the pinned `python:3.13-slim` backend image. The submission checklist now marks public-variable documentation, local test evidence, the visible hosted-check skip, and the current-tree secret scan as complete while retaining clean-clone, deployment, pilot, and approval gates.
 
-- The checklist now records the exact local evidence heads (`5fcb87e` web code baseline, `429ccbb` tracked docs, `d1af764` canonical extension) and an explicit “not deployed in this workspace” statement instead of leaving ambiguous commit/deployment placeholders.
+- The checklist now records the exact local evidence heads (`5fcb87e` web code baseline, `26d1e98` tracked docs, `d1af764` canonical extension) and an explicit “not deployed in this workspace” statement instead of leaving ambiguous commit/deployment placeholders.
