@@ -1051,3 +1051,42 @@ Not defects: named `microphone` absent from source and `dist/manifest.json`; pro
 Extension: `f161f8cddf690da3159ee8ada0309bf56d55e94a`
 
 Web: this log only. Phase 5 was not started.
+
+---
+
+## Phase 5–7 verification repair — 2026-08-24
+
+**Executor:** Codex (reconciled the dirty Grok 4.6 worktree before continuing)
+
+### Root causes found
+
+- The working tree had reverted `backend/main.py` and `backend/rate_limit.py` to the pre-Phase-6 implementation while deleting the backend test suite. The committed app-factory/rate-limit guard was restored and the backend tests were restored.
+- A TypeScript project-reference experiment changed the build to `tsc -b`, removed the Node types, and caused the production build to fail before Vite. The committed `tsc --noEmit` gate is the validated build path.
+- The built-environment scanner had lost its narrow Supabase vendor-default sanitizer and therefore rejected the known `http://localhost:9999` GoTrue fallback in the generated bundle. The sanitizer was restored.
+- The RLS pgTAP test used schema columns that do not exist (`raw_text`, `is_active`, `is_done`), omitted the required session `mode`, planned 42 assertions while running fewer, and attempted to read a temporary fixture table after switching to `authenticated`. The test was rewritten against the current migrations and grants `SELECT` on its fixture state before switching roles.
+- Function privilege tests attempted to treat `public` as a Postgres role. The check now inspects ACL grantee `0` for PUBLIC and rejects malformed Management API responses before constructing the allowlist map.
+
+### Verification
+
+- `npm test` — 14 files, 85 tests passed.
+- `python -m pytest backend/tests -q` — 24 tests passed (8 deprecation warnings from dependencies).
+- Production build with approved placeholder public HTTPS values — passed.
+- `node scripts/verify-built-env.mjs dist` — passed.
+- `npx supabase test db` against a fresh local reset — 5 files, 287 tests passed.
+- `npx supabase db lint --local --fail-on error` — exit 0; one existing warning for an unused local variable in `public.claim_live_rubric_lookup`.
+- Commit: `7529dd3` (`test: restore release and database verification gates`).
+
+### Remaining release gates
+
+- `npm run verify:release` still requires public build environment variables in the invoking shell; hosted function verification remains skipped without `SUPABASE_ACCESS_TOKEN`.
+- The historical Gitleaks finding for `backend/service-account.json` remains intentionally fail-closed until a human rotates the key and approves history rewriting.
+- Dashboard and extension maintainability phases remain unstarted; existing `Dashboard.tsx` and `FloatingStudyPilot.tsx` are still oversized.
+
+---
+
+## Phase 10 CI gate start — 2026-08-24
+
+- Web workflow now has independent non-secret jobs for Vitest/Deno/build scanning, Python pytest, local Supabase startup + pgTAP + unconditional cleanup, and a protected-main hosted function allowlist check with an explicit skip message when secrets are absent.
+- Canonical extension workflow now runs Node 22 typecheck, Vitest, production build, manifest validation, Chromium installation, and unpacked-extension Playwright under Xvfb.
+- Both workflows use dependency caching only and cancel superseded runs.
+- Workflow YAML parsed successfully with PyYAML. Local equivalents for web, backend, and Supabase passed before this edit; extension’s previously recorded typecheck/Vitest/build/manifest/Playwright gates remain green.
