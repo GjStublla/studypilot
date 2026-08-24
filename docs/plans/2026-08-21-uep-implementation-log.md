@@ -1209,6 +1209,7 @@ Web: this log only. Phase 5 was not started.
 - Commit `281dafa` replaced the dashboard bootstrap `loading`/`loadError` boolean pair with the explicit `DashboardBootstrapState` union (`loading | ready | error`).
 - The existing `Promise.allSettled` partial-load behavior and retry UI are preserved; fatal error remains limited to the authenticated case where sessions, rubrics, and action items all fail.
 - Targeted dashboard chat/rubric tests (12 tests) and the production build passed. The pre-existing whitespace-only dashboard change remains unstaged and preserved.
+- Follow-up full web verification: 15 Vitest files / 87 tests passed.
 
 ### Phase 9A context-settings boundary — 2026-08-24
 
