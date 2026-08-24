@@ -63,6 +63,41 @@ Stop the local services with:
 npm run local:stop
 ```
 
+### Clean-clone verification
+
+These commands reproduce the non-hosted release gates without private
+credentials. Unit tests work before `.env` exists; the production build is
+intentionally fail-closed until public HTTPS values are supplied.
+
+```bash
+git clone <repository-url> studypilot-clean
+cd studypilot-clean
+npm ci
+npm test
+npm run test:deno
+python -m pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+python -m pytest backend/tests -q
+npx supabase start
+npx supabase test db
+npx supabase stop --no-backup
+```
+
+For the public-placeholder production build, set only non-secret values in the
+shell that invokes the build:
+
+```bash
+export VITE_API_BASE_URL=https://api.example.invalid
+export VITE_SUPABASE_URL=https://project.supabase.co
+export VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjaS1wbGFjZWhvbGRlciJ9.ci-placeholder-key
+npm run build
+node scripts/verify-built-env.mjs dist
+```
+
+On PowerShell, assign the same values with `$env:VITE_API_BASE_URL =
+'https://api.example.invalid'` and equivalent assignments for the two
+Supabase variables before running the build commands. Replace placeholders
+only through a secure release environment; never commit hosted keys.
+
 ## Running with Docker
 
 The whole stack (React frontend + FastAPI backend) runs in Docker and talks to hosted Supabase. Node and Python run inside the containers, so the only tool you need locally is Docker.
