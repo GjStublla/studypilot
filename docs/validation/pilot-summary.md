@@ -8,10 +8,17 @@ Validate the source file before filling these fields:
 npm run validate:pilot -- docs/validation/pilot-results.csv
 ```
 
-The empty template is intentionally not a result. After approved collection,
-run the same command with `--require-data`, copy only its aggregate metrics and
-denominators into this summary, and retain the CSV row count and protocol
-version. Never paste participant names, contact details, draft content, audio,
+To generate a sanitized aggregate draft after approved collection, run:
+
+```text
+npm run summarize:pilot -- docs/validation/pilot-results.csv --require-data
+```
+
+The command writes Markdown to stdout only. The empty template is intentionally
+not a result; `--require-data` refuses to claim a pilot without approved rows.
+Copy only aggregate metrics and denominators into this summary, then add the
+CSV row count, protocol version, dates, findings, limitations, and approved
+quotes. Never paste participant names, contact details, draft content, audio,
 screenshots, transcripts, credentials, or rubric text here.
 
 ## Sample

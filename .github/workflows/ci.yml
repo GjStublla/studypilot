@@ -92,6 +92,7 @@ jobs:
         run: |
           node --test scripts/validate-pilot-results.test.mjs
           npm run validate:pilot
+          npm run summarize:pilot
 
       - name: Validate public claims
         run: |

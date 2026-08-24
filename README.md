@@ -81,6 +81,7 @@ npm run validate:pitch
 node --test scripts/validate-submission-package.test.mjs
 npm run validate:submission
 npm run validate:pilot
+npm run summarize:pilot
 npx playwright install chromium
 npm run test:e2e -- --reporter=line
 python -m pip install -r backend/requirements.txt -r backend/requirements-dev.txt

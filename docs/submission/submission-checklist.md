@@ -42,7 +42,7 @@ This section records what is reproducible in the workspace; it is not a deployme
 - [x] Node 22+ and Python prerequisites documented in `README.md` (Python 3.13 is also pinned by `backend/Dockerfile`).
 - [x] Public build variables documented without secrets in `README.md`, `.env.example`, and the release workflow placeholders.
 - [x] Backend and local Supabase setup were previously tested from fresh committed-head clone `studypilot-clean-clone-20260824-final`; the latest owner-aware clone `studypilot-clean-clone-20260824-submission-owners` additionally reproduced `npm ci` (0 vulnerabilities), submission tests 7/7, sibling-aware claims validation, and the full public-placeholder release wrapper. A bare production build without public variables fails closed as designed. The same web E2E command is in the README clean-clone sequence and the web CI workflow.
-- [x] Pilot results gate is reproducible: `npm run validate:pilot` accepts the header-only template and explicitly reports that no participant result is claimed; `--require-data` is reserved for approved collection.
+- [x] Pilot results gate is reproducible: `npm run validate:pilot` accepts the header-only template and explicitly reports that no participant result is claimed; `npm run summarize:pilot` emits a sanitized no-result Markdown draft, and `--require-data` is reserved for approved collection.
 - [x] Web Vitest, Deno, pytest, pgTAP, build, and built-environment scan recorded in the implementation log and CI workflow.
 - [x] Extension typecheck, Vitest, build, manifest validation, and unpacked Playwright recorded above.
 - [x] Hosted allowlist is visibly marked skipped because protected Supabase secrets are unavailable; production smoke checks remain an external gate.

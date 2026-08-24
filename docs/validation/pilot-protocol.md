@@ -59,3 +59,12 @@ rows. The validator reports whether the row count is within the 10–15
 participant target, but does not reject a smaller or larger approved sample;
 report any deviation as a limitation rather than silently treating it as target
 evidence.
+
+After approved collection, generate the sanitized aggregate draft with:
+
+```text
+npm run summarize:pilot -- docs/validation/pilot-results.csv --require-data
+```
+
+Review the generated denominators and add only the team-owned dates, protocol
+version, findings, limitations, and approved quotes to `pilot-summary.md`.

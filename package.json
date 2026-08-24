@@ -26,6 +26,7 @@
     "validate:claims": "node scripts/validate-claims.mjs --include-demo-script --require-demo-script",
     "validate:pitch": "node scripts/validate-claims.mjs --include-pitch-brief --require-pitch-brief",
     "validate:pilot": "node scripts/validate-pilot-results.mjs",
+    "summarize:pilot": "node scripts/validate-pilot-results.mjs --markdown",
     "extension:build": "npm run build --prefix ../studypilot-extension"
   },
   "dependencies": {
