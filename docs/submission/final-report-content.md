@@ -105,6 +105,8 @@ Rubric grounding is asynchronous and may fail or remain unavailable. The UI expo
 
 Replace the placeholders below with each member's approved contribution text. Do not infer percentages from Git history.
 
+**Owner:** The team lead must replace these placeholders with approved member names and contribution text before submission.
+
 - **[Member name]:** [approved role and contribution]
 - **[Member name]:** [approved role and contribution]
 - **[Member name]:** [approved role and contribution]
