@@ -14,7 +14,7 @@ The implementation objective is therefore: make the product demonstrably reliabl
 - Web/dashboard/API/Supabase: `C:\Users\gjins\Desktop\studypilot`
 - Canonical Chrome extension: `C:\Users\gjins\Desktop\studypilot-extension`
 - Preserve the untracked web `output/` directory and the existing formal plan.
-- Web remediation commits include `23ab897` (dashboard chat/session/rubric/context extraction), `60fdd2b` (shell and low-coupling view extraction), `7529dd3` (release/database verification repair), `2ce5667` (implementation log), `281dafa` (explicit dashboard bootstrap request state), and `078cb9b` (typed Supabase adapters and realtime payload boundaries).
+- Web remediation commits include `23ab897` (dashboard chat/session/rubric/context extraction), `60fdd2b` (shell and low-coupling view extraction), `7529dd3` (release/database verification repair), `2ce5667` (implementation log), `281dafa` (explicit dashboard bootstrap request state), `078cb9b` (typed Supabase adapters and realtime payload boundaries), and `9dd63b2` (centralized idle/loading/success/error bootstrap state).
 - Extension remediation commits include `d9f9fb1` (remove unreachable browser AI/mock/voice paths), `e281450` (split Supabase facade), `279e91f` (extract pure panel components), `c295320` (live-state derivation and listener cleanup), `5ea85a0` (history secret-scan CI), `818a500` (live coaching hook), `d9ff60d` (pure chat selection/presentation state), `1b33f60` (quick-actions component), `7a7051c` (invalid idle pause prevention), `f19a8ec` (dashboard workspace hook, fallback hardening, rapid-toggle and narrow-viewport E2E), `da2dfb0` (panel shell/header composition), `53a3715` (typed shared-chat switcher), `a5d6687` (isolated context/privacy settings), `dfd0e14` (save-queue concurrency/error characterization), and `206da8d` (study-mode panel composition). The extension worktree is clean at this handoff.
 
 ## Verified evidence
@@ -50,7 +50,7 @@ Extension:
 ### P1 — dashboard maintainability and release confidence
 
 1. Keep `Dashboard.tsx` orchestration-only and reduce it below the plan's 1,000-line target. It is currently about 1,161 lines.
-2. Add explicit request-state unions for the remaining dashboard fetches and add stale-promise/unmount cleanup tests; the initial bootstrap `loading`/`loadError` pair is now `DashboardBootstrapState` in `281dafa`, and Supabase adapter/realtime boundaries are typed in `078cb9b`.
+2. Add explicit request-state unions for the remaining dashboard fetches and add stale-promise/unmount cleanup tests; `DashboardBootstrapState` now centralizes `idle | loading | success | error` in `9dd63b2`, and Supabase adapter/realtime boundaries are typed in `078cb9b`.
 3. Split `Dashboard.css` into shell, chat, and content-view styles without changing selector scope or visual behavior.
 4. Add the deterministic web Playwright golden flow: upload/select rubric, grounded prompt, Socratic follow-up, action item, reload, and verify the same chat.
 5. Finish explicit named prop interfaces in `dashboard-types.ts`; do not add `any`, `@ts-ignore`, or lint suppressions.
