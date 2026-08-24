@@ -28,7 +28,7 @@ Use the same text-input fallback for every participant unless the protocol speci
 
 - Task completion (`completed`): all six steps completed without facilitator intervention.
 - Time to first useful feedback: seconds from prompt submission to the participant identifying one actionable revision.
-- Before/after rubric score: same assessor and rubric, recorded before and after the task.
+- Before/after rubric score: same assessor and rubric, normalized to a 0–100 scale and recorded before and after the task. Use the same scoring guide for both measurements.
 - Citation grounding: supported citations divided by citations checked.
 - Error-free session: no unrecovered auth, network, indexing, model, or UI error.
 - Median response latency: median milliseconds for the measured coaching requests.
@@ -51,7 +51,8 @@ npm run validate:pilot -- docs/validation/pilot-results.csv
 The command requires the fixed 11-column header, unique anonymous participant
 IDs in the `P001`/`P002` format,
 complete numeric/boolean values, supported-citation counts that cannot exceed
-checked counts, and no email, credential, draft, audio, screenshot, transcript,
-or rubric content. The checked-in header-only template exits successfully with
-an explicit “no participant rows” status; use `--require-data` only after the
-approved pilot has actually produced rows.
+checked counts, rubric scores between 0 and 100, and no email, credential,
+draft, audio, screenshot, transcript, or rubric content. The checked-in
+header-only template exits successfully with an explicit “no participant rows”
+status; use `--require-data` only after the approved pilot has actually produced
+rows.

@@ -26,8 +26,8 @@ screenshots, transcripts, credentials, or rubric text here.
 |---|---:|---|
 | Task completion | [ ] | [ ] |
 | Median time to useful feedback | [ ] seconds | [ ] |
-| Mean before score | [ ] | [ ] |
-| Mean after score | [ ] | [ ] |
+| Mean before score | [ ] | normalized 0–100 rubric score; [n] rows |
+| Mean after score | [ ] | normalized 0–100 rubric score; [n] rows |
 | Grounding precision | [ ] | citations supported / checked |
 | Error-free session rate | [ ] | [ ] |
 | Median response latency | [ ] ms | [ ] |

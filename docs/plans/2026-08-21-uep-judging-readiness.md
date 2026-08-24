@@ -632,7 +632,7 @@ The extension has one live implementation, one dashboard integration path, and n
 
 - Every result row has the fixed columns and no email, name, audio, essay text, access token, or rubric content.
 - `pilot-summary.md` can trace every number to CSV rows and labels the evidence as a pilot.
-- `npm run validate:pilot -- docs/validation/pilot-results.csv` enforces the fixed schema and privacy boundary; the checked-in header-only template reports “no participant rows” and `--require-data` fails until approved rows exist.
+- `npm run validate:pilot -- docs/validation/pilot-results.csv` enforces the fixed schema and privacy boundary, including normalized 0–100 before/after rubric scores; the checked-in header-only template reports “no participant rows” and `--require-data` fails until approved rows exist.
 
 **Exit:** The final report and pitch can present real validation instead of assumptions or competitor comparisons alone.
 
