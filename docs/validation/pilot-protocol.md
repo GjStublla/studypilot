@@ -39,3 +39,19 @@ Use the same text-input fallback for every participant unless the protocol speci
 Read the same neutral instructions to every participant. Do not coach the participant toward a preferred answer. Stop and record a recoverable failure if authentication cannot be restored, a request cannot be retried, or the participant's data could be exposed to another account.
 
 Recruit 10–15 students matching the target audience only after the deployed beta and clean-profile golden flow have been verified. Report sample size and limitations; do not present a small pilot as causal proof of learning improvement.
+
+## Results-file gate
+
+Before sharing or summarizing the research file, run:
+
+```text
+npm run validate:pilot -- docs/validation/pilot-results.csv
+```
+
+The command requires the fixed 11-column header, unique anonymous participant
+IDs in the `P001`/`P002` format,
+complete numeric/boolean values, supported-citation counts that cannot exceed
+checked counts, and no email, credential, draft, audio, screenshot, transcript,
+or rubric content. The checked-in header-only template exits successfully with
+an explicit “no participant rows” status; use `--require-data` only after the
+approved pilot has actually produced rows.

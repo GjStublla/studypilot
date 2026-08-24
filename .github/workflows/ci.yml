@@ -1,5 +1,7 @@
-# Phase 0: secret scan only. Later UEP phases add test/build jobs to this file;
-# do not treat a green secret-scan-only workflow as "full CI is done."
+# The history secret scan remains a deliberately visible gate until the
+# previously committed service-account credential is rotated and any approved
+# history rewrite is complete. The other jobs are non-secret reproducibility
+# checks and do not turn a skipped hosted check into a pass.
 #
 # Fail-closed: Gitleaks scans the full git history (`fetch-depth: 0`).
 # A credential that was committed and later deleted still fails the job.
@@ -85,6 +87,11 @@ jobs:
 
       - name: Run Deno function tests
         run: npm run test:deno
+
+      - name: Validate pilot results template
+        run: |
+          node --test scripts/validate-pilot-results.test.mjs
+          npm run validate:pilot
 
       - name: Build and scan public bundle
         env:

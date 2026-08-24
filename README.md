@@ -75,6 +75,7 @@ cd studypilot-clean
 npm ci
 npm test
 npm run test:deno
+npm run validate:pilot
 python -m pip install -r backend/requirements.txt -r backend/requirements-dev.txt
 python -m pytest backend/tests -q
 npx supabase start
