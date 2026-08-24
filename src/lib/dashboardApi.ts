@@ -6,7 +6,6 @@
 // never touches raw API payloads.
 
 import { apiFetch } from './api';
-import { setActiveRubric as setActiveRubricRpc } from './studypilot-api';
 
 // ─── Domain types (camelCase — what the UI uses) ──────────────────────────────
 
@@ -234,16 +233,8 @@ export async function setActionItemDone(id: string, done: boolean): Promise<Acti
   return mapActionItem(data);
 }
 
-/**
- * Prefer the atomic `set_active_rubric` RPC; fall back to FastAPI PATCH when
- * the migration is not yet applied or Supabase auth is unavailable.
- */
 export async function activateRubric(id: string): Promise<void> {
-  try {
-    await setActiveRubricRpc(id);
-    return;
-  } catch {
-    // Fall through to FastAPI.
-  }
+  // Rubric activation is CRUD owned by FastAPI; keep Supabase RPC calls in
+  // the Supabase/Edge adapter instead of crossing the dashboard boundary.
   await getJson(`/rubrics/${id}/active`, { method: 'PATCH' });
 }
