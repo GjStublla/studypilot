@@ -20,7 +20,6 @@ import {
   type Variants,
 } from 'framer-motion';
 import { Button } from './components/ui/button';
-import GradientBlinds from './components/GradientBlinds';
 import AuthPage from './components/AuthPage';
 import LegalPage from './components/LegalPage';
 import { clearAuth, storeAuth, apiFetch, type AuthTokens } from './lib/api';
@@ -37,6 +36,7 @@ import './components/AuthPage.css';
 
 const loadDashboard = () => import('./components/Dashboard');
 const Dashboard = lazy(loadDashboard);
+const GradientBlinds = lazy(() => import('./components/GradientBlinds'));
 const prefetchDashboard = () => {
   void loadDashboard();
 };
@@ -354,6 +354,10 @@ function ChromeInstallCta({
 function Hero({ user, onLogout }: { user: ReturnType<typeof getStoredUser>; onLogout: () => void }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = useReducedMotion();
+  const isSmallViewport =
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(max-width: 900px)').matches;
   const { scrollYProgress } = useScroll({
     target: scrollRef,
     offset: ['start start', 'end end'],
@@ -391,21 +395,25 @@ function Hero({ user, onLogout }: { user: ReturnType<typeof getStoredUser>; onLo
     <div ref={scrollRef} className="hero-scroll-container">
     <section className="hero">
       <div className="hero-bg" aria-hidden="true">
-        <GradientBlinds
-          gradientColors={heroGradientColors}
-          angle={18}
-          noise={0.12}
-          blindCount={18}
-          blindMinWidth={72}
-          spotlightRadius={0.58}
-          spotlightSoftness={1.25}
-          spotlightOpacity={0.62}
-          mouseDampening={0.16}
-          mirrorGradient
-          distortAmount={0.35}
-          shineDirection="left"
-          mixBlendMode={undefined}
-        />
+        {!isSmallViewport && (
+          <Suspense fallback={null}>
+            <GradientBlinds
+              gradientColors={heroGradientColors}
+              angle={18}
+              noise={0.12}
+              blindCount={18}
+              blindMinWidth={72}
+              spotlightRadius={0.58}
+              spotlightSoftness={1.25}
+              spotlightOpacity={0.62}
+              mouseDampening={0.16}
+              mirrorGradient
+              distortAmount={0.35}
+              shineDirection="left"
+              mixBlendMode={undefined}
+            />
+          </Suspense>
+        )}
       </div>
       <div className="hero-mask" aria-hidden="true" />
       <div className="hero-grain" aria-hidden="true" />
