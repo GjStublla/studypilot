@@ -4,7 +4,10 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 
 const root = resolve('src/components');
+const supabaseApi = resolve('src/lib/studypilot-api.ts');
 const domainTypes = /\b(?:ActionItem|FileSearchStatus|Rubric|Session|TranscriptLine)\b/;
+const dashboardExports =
+  /export\s+(?:async\s+)?function\s+(?:fetchSessions|fetchRubrics|fetchActionItems|fetchSessionTranscript|setActionItemDone)\b/g;
 
 function walk(directory) {
   const files = [];
@@ -28,8 +31,13 @@ for (const file of walk(root)) {
   }
 }
 
+const supabaseSource = readFileSync(supabaseApi, 'utf8');
+if (dashboardExports.test(supabaseSource)) {
+  violations.push(relative(process.cwd(), supabaseApi));
+}
+
 if (violations.length > 0) {
-  console.error('verify-dashboard-boundary: domain types must come from src/lib/dashboard-types.ts:');
+  console.error('verify-dashboard-boundary: dashboard data must stay behind src/lib/dashboardApi.ts:');
   for (const file of violations) console.error(`  - ${file}`);
   process.exit(1);
 }
