@@ -58,3 +58,9 @@ export const VIEW_TITLES: Record<View, { eyebrow: string; title: string }> = {
 export type DashboardRubric = Rubric;
 export type DashboardSession = Session;
 export type DashboardActionItem = ActionItem;
+
+export type SessionRow = {
+  session: Session;
+  rubric?: Rubric;
+  openCount: number;
+};
