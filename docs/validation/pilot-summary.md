@@ -2,6 +2,18 @@
 
 **Status:** Template — no participant data collected yet.
 
+Validate the source file before filling these fields:
+
+```text
+npm run validate:pilot -- docs/validation/pilot-results.csv
+```
+
+The empty template is intentionally not a result. After approved collection,
+run the same command with `--require-data`, copy only its aggregate metrics and
+denominators into this summary, and retain the CSV row count and protocol
+version. Never paste participant names, contact details, draft content, audio,
+screenshots, transcripts, credentials, or rubric text here.
+
 ## Sample
 
 - Participants: [n, target-audience description]
