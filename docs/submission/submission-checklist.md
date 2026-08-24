@@ -36,7 +36,7 @@ This section records what is reproducible in the workspace; it is not a deployme
 
 - [x] Node 22+ and Python prerequisites documented in `README.md` (Python 3.13 is also pinned by `backend/Dockerfile`).
 - [x] Public build variables documented without secrets in `README.md`, `.env.example`, and the release workflow placeholders.
-- [x] Backend and local Supabase setup tested from a clean clone: `npm ci`, web Vitest 17/96, Deno 42, placeholder production build plus `verify-built-env`, backend pytest 26, `npx supabase start`, pgTAP 5 files/291 tests, `npx supabase stop --no-backup`, and web Playwright 4/4 all passed in the isolated 2026-08-24 clone. A bare production build without public variables failed closed as designed.
+- [x] Backend and local Supabase setup tested from fresh committed-head clone `studypilot-clean-clone-20260824-final`: `npm ci` (0 vulnerabilities), web Vitest 19/106, Deno 42, six-document claims (8/8), submission artifacts (6/6), pilot-template validation, placeholder production build plus `verify-built-env`, backend pytest 26, `npx supabase start`, pgTAP 5 files/291 tests, `npx supabase stop --no-backup`, and web Playwright 4/4 all passed. A bare production build without public variables failed closed as designed.
 - [x] Pilot results gate is reproducible: `npm run validate:pilot` accepts the header-only template and explicitly reports that no participant result is claimed; `--require-data` is reserved for approved collection.
 - [x] Web Vitest, Deno, pytest, pgTAP, build, and built-environment scan recorded in the implementation log and CI workflow.
 - [x] Extension typecheck, Vitest, build, manifest validation, and unpacked Playwright recorded above.
