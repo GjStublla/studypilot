@@ -1218,3 +1218,10 @@ Web: this log only. Phase 5 was not started.
 - Commit `a5d6687` moved the privacy/context `SettingsSheet` and toggle primitive into `src/content/ContextSettings.tsx`; `FloatingStudyPilot` continues to re-export the same component for existing tests/imports.
 - `PanelComponents.tsx` now contains the visual study/quick-action primitives only; no privacy behavior changed.
 - Extension verification after the extraction: typecheck, 14 Vitest files / 66 tests, production build, manifest validation, and 10/10 unpacked Playwright checks passed.
+
+### Phase 8A typed data/realtime boundary — 2026-08-24
+
+- Commit `078cb9b` replaces the remaining dashboard-compatibility `any` adapters with named dashboard return types, normalizes nullable session/rubric/action-item fields at the Supabase boundary, and gives session details/list rows explicit relation types.
+- Realtime callbacks now use Supabase's `RealtimePostgresChangesPayload` type. Dashboard handlers consume the installed client's `eventType` discriminator instead of the nonexistent `event` property, preserving INSERT/UPDATE/DELETE behavior while making the boundary compile-checked.
+- Added adapter characterization tests for stable criterion IDs, null relation normalization, and session display defaults.
+- Verification: `npx tsc --noEmit`, full web Vitest (16 files / 90 tests), and `npm run build` all passed. The pre-existing whitespace-only `Dashboard.tsx` change remains unstaged and preserved.

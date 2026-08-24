@@ -494,7 +494,7 @@ The dashboard is backed by live typed adapters. The current adapters are:
 
 When changing a data path, preserve the typed adapter boundary and add a route/component test in the same phase. Do not reintroduce static seed data or direct model calls from the browser.
 
-The dashboard currently verifies 15 Vitest files / 87 tests, while backend pytest verifies 25 tests. A clean local Supabase reset runs 287 pgTAP assertions across five test files.
+The dashboard currently verifies 16 Vitest files / 90 tests, while backend pytest verifies 25 tests. A clean local Supabase reset runs 287 pgTAP assertions across five test files.
 
 ## 9. Production checklist
 
