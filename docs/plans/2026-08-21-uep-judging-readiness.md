@@ -554,7 +554,7 @@ The extension has one live implementation, one dashboard integration path, and n
 
 - [x] Add a web CI matrix for Node 22 install, TypeScript build, Vitest, Deno tests, Python pytest, secret scan, and built-environment scan. (Implemented as separate web-quality, backend-tests, and secret-scan jobs; production build uses documented public placeholders.)
 - [x] Add a Linux Supabase job that starts the local stack, resets migrations, runs pgTAP, and always stops the stack in cleanup.
-- [x] Add a web Playwright golden-flow test that uploads a fixture rubric, opens its chat, sends a coached prompt through deterministic network responses, creates an action item, and verifies the same chat after reload. (Implemented in `2b47d6c`; latest run 1/1.)
+- [x] Add a web Playwright golden-flow test that uploads a fixture rubric, opens its chat, sends a coached prompt through deterministic network responses, creates an action item, and verifies the same chat after reload. (Implemented in `2b47d6c`; latest run 1/1.) Add a separate Chromium-backed `web-e2e` CI job; the workflow is present, but its remote run remains open until the local head is pushed.
 - [x] Add an extension CI workflow for typecheck, Vitest, production build, manifest validation, secret scan, and unpacked-extension Playwright under Xvfb. (Workflow and extension-specific history secret scan are present; branch-protection configuration remains an admin gate.)
 - [x] Cache package downloads only; never cache `.env`, Supabase local volumes, auth storage, or built extension sessions.
 - [ ] Make branch protection require all non-secret CI jobs; keep deployed-project allowlist and production smoke checks as explicit protected-environment gates. (Repository settings are a human/admin gate.)

@@ -48,6 +48,7 @@ Web:
 - `node --test scripts/validate-claims.test.mjs` (8/8) and the sibling-aware `npm run validate:claims -- --extension-root ../studypilot-extension --require-extension` passed across six claim documents. The demo script is guarded against retired claims but still requires human review for timing, hosted evidence, and pilot wording.
 - `node --test scripts/validate-submission-package.test.mjs` (6/6) and `npm run validate:submission` pass the current report/demo/checklist structure. `node scripts/validate-submission-package.mjs --require-final-inputs` intentionally exits 1 until the eight human-owned URL, pilot, media, credential-rotation, contribution, and sign-off inputs are supplied.
 - Web commit `d85b27f` adds the missing FastAPI ownership proof, completes the local RLS update matrix, and changes the hosted-function CI job to run only on protected branches. The CI step visibly reports `SKIPPED` when protected Supabase secrets are absent; this is not a hosted verification pass.
+- Web CI now has a separate `web-e2e` job that installs Chromium and runs `npm run test:e2e -- --reporter=line` against the deterministic fixture. This makes the local web E2E gate executable in CI; no remote run is claimed until the local heads are pushed.
 
 Extension:
 
