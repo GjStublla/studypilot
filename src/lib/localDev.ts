@@ -15,26 +15,18 @@ function isDevLoopbackUrl(value: string | undefined): boolean {
     const { hostname, protocol } = new URL(value);
     return (
       (protocol === 'http:' || protocol === 'https:') &&
-      (
-        hostname === '127.0.0.1' ||
-        hostname === 'localhost' ||
-        hostname === '::1' ||
-        hostname === '[::1]'
-      )
+      (hostname === '127.0.0.1' || hostname === 'localhost' || hostname === '::1' || hostname === '[::1]')
     );
   } catch {
     return false;
   }
 }
 
-const localModeRequested =
-  import.meta.env.DEV && import.meta.env.MODE === LOCAL_DEV_MODE_NAME;
+const localModeRequested = import.meta.env.DEV && import.meta.env.MODE === LOCAL_DEV_MODE_NAME;
 const localSupabaseConfigured = isLoopbackUrl(import.meta.env.VITE_SUPABASE_URL);
 
 export const LOCAL_DEV_MODE = localModeRequested && localSupabaseConfigured;
 
 if (localModeRequested && !localSupabaseConfigured) {
-  console.error(
-    '[StudyPilot] Local development mode requires VITE_SUPABASE_URL to use a loopback host.',
-  );
+  console.error('[StudyPilot] Local development mode requires VITE_SUPABASE_URL to use a loopback host.');
 }

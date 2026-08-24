@@ -20,10 +20,7 @@ export interface StudyPilotRealtimeCallbacks {
   onSubscribed?: () => void;
 }
 
-export function useStudyPilotRealtime(
-  userId: string | null,
-  callbacks: StudyPilotRealtimeCallbacks,
-) {
+export function useStudyPilotRealtime(userId: string | null, callbacks: StudyPilotRealtimeCallbacks) {
   const callbacksRef = useRef(callbacks);
   useEffect(() => {
     callbacksRef.current = callbacks;
@@ -37,7 +34,9 @@ export function useStudyPilotRealtime(
 
     void (async () => {
       await injectStoredToken();
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (cancelled) return;
       if (!session?.access_token) {
         console.error('[Realtime] Cannot subscribe without an authenticated session');
@@ -54,11 +53,7 @@ export function useStudyPilotRealtime(
           { event: 'INSERT', schema: 'public', table: 'sessions', filter: `user_id=eq.${userId}` },
           async (payload) => {
             if (!callbacksRef.current.onNewSession) return;
-            const { data, error } = await supabase
-              .from('sessions')
-              .select('*')
-              .eq('id', payload.new.id)
-              .single();
+            const { data, error } = await supabase.from('sessions').select('*').eq('id', payload.new.id).single();
             if (!error && data) callbacksRef.current.onNewSession(data as Session);
           },
         )
@@ -67,10 +62,8 @@ export function useStudyPilotRealtime(
           { event: 'UPDATE', schema: 'public', table: 'sessions', filter: `user_id=eq.${userId}` },
           (payload) => callbacksRef.current.onSessionChanged?.(payload),
         )
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'session_messages' },
-          (payload) => callbacksRef.current.onSessionMessageChanged?.(payload),
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'session_messages' }, (payload) =>
+          callbacksRef.current.onSessionMessageChanged?.(payload),
         )
         .on(
           'postgres_changes',

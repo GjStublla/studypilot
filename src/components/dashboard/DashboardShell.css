@@ -36,7 +36,9 @@
   font-family: var(--sans);
   font-size: 14px;
   line-height: 1.5;
-  font-feature-settings: 'ss01' on, 'cv11' on;
+  font-feature-settings:
+    'ss01' on,
+    'cv11' on;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
   isolation: isolate;
@@ -77,7 +79,9 @@
 
 .app-dashboard *,
 .app-dashboard *::before,
-.app-dashboard *::after { font-family: inherit; }
+.app-dashboard *::after {
+  font-family: inherit;
+}
 
 .app-dashboard button {
   font-family: inherit;
@@ -89,7 +93,9 @@
   padding: 0;
 }
 
-.app-dashboard svg { display: block; }
+.app-dashboard svg {
+  display: block;
+}
 
 .app-dashboard h1,
 .app-dashboard h2,
@@ -119,7 +125,9 @@
   font-weight: 400;
   letter-spacing: -0.012em;
 }
-.app-dashboard .ds-serif i { font-style: italic; }
+.app-dashboard .ds-serif i {
+  font-style: italic;
+}
 
 .app-dashboard .ds-h1 {
   font-size: 36px;
@@ -227,7 +235,10 @@
   font-size: 12.5px;
   font-weight: 500;
   letter-spacing: 0;
-  transition: background 140ms ease, border-color 140ms ease, color 140ms ease,
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
     transform 120ms cubic-bezier(0.23, 1, 0.32, 1);
   white-space: nowrap;
   cursor: pointer;
@@ -274,7 +285,9 @@
   cursor: pointer;
   transition: color 120ms ease;
 }
-.app-dashboard .ds-link:hover { color: var(--ds-ink); }
+.app-dashboard .ds-link:hover {
+  color: var(--ds-ink);
+}
 
 .app-dashboard .ds-icon-btn {
   display: inline-flex;
@@ -285,7 +298,10 @@
   border-radius: 7px;
   color: var(--ds-muted);
   background: transparent;
-  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
   border: 1px solid transparent;
 }
 .app-dashboard .ds-icon-btn:hover {
@@ -316,10 +332,11 @@
   gap: 14px;
   padding: 16px 12px 12px;
   border-right: 1px solid var(--ds-line);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.014), rgba(0, 0, 0, 0)),
-    var(--ds-canvas);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.014), rgba(0, 0, 0, 0)), var(--ds-canvas);
   overflow-y: auto;
-  transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 200ms ease;
+  transition:
+    transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 200ms ease;
 }
 
 .app-dashboard .ds-brand {
@@ -367,20 +384,28 @@
   font-size: 13px;
   font-weight: 450;
   text-align: left;
-  transition: background 120ms ease, color 120ms ease;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
 }
-.app-dashboard .ds-nav-item svg { color: var(--ds-quiet); }
+.app-dashboard .ds-nav-item svg {
+  color: var(--ds-quiet);
+}
 .app-dashboard .ds-nav-item:hover {
   background: var(--ds-surface);
   color: var(--ds-ink);
 }
-.app-dashboard .ds-nav-item:hover svg { color: var(--ds-muted); }
+.app-dashboard .ds-nav-item:hover svg {
+  color: var(--ds-muted);
+}
 .app-dashboard .ds-nav-item.is-active {
   background: var(--ds-surface-2);
   color: var(--ds-ink);
   box-shadow: inset 0 0 0 1px var(--ds-line);
 }
-.app-dashboard .ds-nav-item.is-active svg { color: var(--ds-ink); }
+.app-dashboard .ds-nav-item.is-active svg {
+  color: var(--ds-ink);
+}
 .app-dashboard .ds-nav-meta {
   font-style: normal;
   font-family: var(--mono);
@@ -389,9 +414,13 @@
   letter-spacing: 0.04em;
   font-variant-numeric: tabular-nums;
 }
-.app-dashboard .ds-nav-item.is-active .ds-nav-meta { color: var(--ds-muted); }
+.app-dashboard .ds-nav-item.is-active .ds-nav-meta {
+  color: var(--ds-muted);
+}
 
-.app-dashboard .ds-side-spacer { flex: 1; }
+.app-dashboard .ds-side-spacer {
+  flex: 1;
+}
 
 .app-dashboard .ds-side-foot {
   display: flex;
@@ -418,14 +447,21 @@
   text-align: left;
   text-decoration: none;
   cursor: pointer;
-  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease;
 }
 .app-dashboard .ds-ext-pill:focus-visible {
   outline: 2px solid rgba(57, 215, 255, 0.85);
   outline-offset: 3px;
 }
-.app-dashboard .ds-ext-pill svg { color: var(--ds-muted); }
-.app-dashboard .ds-ext-pill:hover svg { color: var(--ds-ink); }
+.app-dashboard .ds-ext-pill svg {
+  color: var(--ds-muted);
+}
+.app-dashboard .ds-ext-pill:hover svg {
+  color: var(--ds-ink);
+}
 
 .app-dashboard .ds-account {
   display: grid;
@@ -437,7 +473,9 @@
   text-align: left;
   transition: background 120ms ease;
 }
-.app-dashboard .ds-account:hover { background: var(--ds-surface); }
+.app-dashboard .ds-account:hover {
+  background: var(--ds-surface);
+}
 .app-dashboard .ds-account-avatar {
   display: inline-grid;
   place-items: center;
@@ -513,7 +551,9 @@
   color: var(--ds-ink);
   letter-spacing: -0.005em;
 }
-.app-dashboard .ds-topbar-title .ds-eyebrow { font-size: 9.5px; }
+.app-dashboard .ds-topbar-title .ds-eyebrow {
+  font-size: 9.5px;
+}
 
 .app-dashboard .ds-topbar-actions {
   display: flex;
@@ -531,13 +571,17 @@
   border-radius: 8px;
   background: var(--ds-surface);
   width: 320px;
-  transition: border-color 140ms ease, background 140ms ease;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease;
 }
 .app-dashboard .ds-search:focus-within {
   border-color: var(--ds-line-strong);
   background: var(--ds-surface-2);
 }
-.app-dashboard .ds-search svg { color: var(--ds-quiet); }
+.app-dashboard .ds-search svg {
+  color: var(--ds-quiet);
+}
 .app-dashboard .ds-search input {
   background: transparent;
   border: 0;
@@ -546,7 +590,9 @@
   font-size: 12.5px;
   min-width: 0;
 }
-.app-dashboard .ds-search input::placeholder { color: var(--ds-quiet); }
+.app-dashboard .ds-search input::placeholder {
+  color: var(--ds-quiet);
+}
 .app-dashboard .ds-search kbd {
   font-family: var(--mono);
   font-size: 10px;
@@ -652,13 +698,18 @@
   background: var(--ds-surface-2);
   color: var(--ds-ink);
 }
-.app-dashboard .ds-chat-row.is-draft { cursor: default; }
+.app-dashboard .ds-chat-row.is-draft {
+  cursor: default;
+}
 .app-dashboard .ds-chat-title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.app-dashboard .ds-chat-session-glyph { flex: 0 0 auto; color: var(--ds-accent); }
+.app-dashboard .ds-chat-session-glyph {
+  flex: 0 0 auto;
+  color: var(--ds-accent);
+}
 .app-dashboard .ds-chat-actions {
   display: inline-flex;
   gap: 2px;
@@ -666,7 +717,9 @@
   opacity: 0;
 }
 .app-dashboard .ds-chat-row:hover .ds-chat-actions,
-.app-dashboard .ds-chat-row:focus-within .ds-chat-actions { opacity: 1; }
+.app-dashboard .ds-chat-row:focus-within .ds-chat-actions {
+  opacity: 1;
+}
 .app-dashboard .ds-chat-action {
   display: inline-grid;
   place-items: center;
@@ -678,7 +731,10 @@
   background: transparent;
   color: var(--ds-quiet);
 }
-.app-dashboard .ds-chat-action:hover { background: var(--ds-line); color: var(--ds-ink); }
+.app-dashboard .ds-chat-action:hover {
+  background: var(--ds-line);
+  color: var(--ds-ink);
+}
 .app-dashboard .ds-chat-rename-input {
   min-width: 0;
   width: 100%;
@@ -721,10 +777,11 @@
   border-radius: 6px;
   color: var(--ds-quiet);
   font-size: 12px;
-  transition: background 120ms ease, color 120ms ease;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
 }
 .app-dashboard .ds-back:hover {
   background: var(--ds-surface);
   color: var(--ds-ink);
 }
-

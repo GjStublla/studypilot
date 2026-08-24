@@ -21,10 +21,7 @@ export const ContextPanel = memo(function ContextPanel({
   onOpenExtension,
 }: ContextPanelProps) {
   const contextSession = view === 'session-detail' ? selectedSession : chatSession;
-  const visibleCriteria = useMemo(
-    () => activeRubric?.criteria.slice(0, 5) ?? [],
-    [activeRubric],
-  );
+  const visibleCriteria = useMemo(() => activeRubric?.criteria.slice(0, 5) ?? [], [activeRubric]);
 
   return (
     <aside className="ds-context" aria-label="Current context">
@@ -35,11 +32,7 @@ export const ContextPanel = memo(function ContextPanel({
       {activeRubric && (
         <section className="ds-context-section">
           <span className="ds-context-label">Active rubric</span>
-          <button
-            type="button"
-            className="ds-context-block ds-context-block-button"
-            onClick={() => onGoTo('rubrics')}
-          >
+          <button type="button" className="ds-context-block ds-context-block-button" onClick={() => onGoTo('rubrics')}>
             <span className="ds-context-block-title">{activeRubric.title}</span>
             <span className="ds-context-block-sub">{activeRubric.course}</span>
             <ul className="ds-mini-criteria">

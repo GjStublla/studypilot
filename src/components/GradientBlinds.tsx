@@ -81,11 +81,7 @@ function hexToRgb(hex: string): [number, number, number] {
   ];
 }
 
-function resolveColorStops(
-  gradientColors?: readonly string[],
-  color1?: string,
-  color2?: string,
-) {
+function resolveColorStops(gradientColors?: readonly string[], color1?: string, color2?: string) {
   if (gradientColors?.length) {
     return gradientColors.slice(0, MAX_COLORS);
   }
@@ -369,10 +365,7 @@ export default function GradientBlinds({
         }
 
         const delta = (time - lastTimeRef.current) / 1000;
-        const factor = Math.min(
-          1,
-          1 - Math.exp(-delta / Math.max(0.0001, mouseDampeningRef.current)),
-        );
+        const factor = Math.min(1, 1 - Math.exp(-delta / Math.max(0.0001, mouseDampeningRef.current)));
         const target = mouseTargetRef.current;
         const current = uniforms.iMouse.value;
 
@@ -444,11 +437,7 @@ export default function GradientBlinds({
 
       renderer.setSize(width, height);
       uniforms.iResolution.value = [gl.drawingBufferWidth, gl.drawingBufferHeight, 1];
-      uniforms.uBlindCount.value = getBlindCount(
-        width,
-        blindCountRef.current,
-        blindMinWidthRef.current,
-      );
+      uniforms.uBlindCount.value = getBlindCount(width, blindCountRef.current, blindMinWidthRef.current);
 
       if (firstResizeRef.current) {
         firstResizeRef.current = false;
@@ -550,6 +539,8 @@ export default function GradientBlinds({
       firstResizeRef.current = true;
       lastTimeRef.current = 0;
     };
+    // Keep the WebGL resource alive; the uniform-sync effect below applies prop changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reinitializing on every visual prop change is expensive.
   }, [dpr]);
 
   useEffect(() => {

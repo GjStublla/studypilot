@@ -2,12 +2,9 @@ import { memo, useEffect, useMemo, useRef, useState, type FormEvent } from 'reac
 import { FileText, ScrollText, Upload, X } from 'lucide-react';
 import { uploadRubricFile } from '../../lib/studypilot-api';
 import { DsButton, EmptyState } from './DashboardPrimitives';
-import { FileSearchStatusBadge, getRubricIndexStatus } from './RubricStatus';
-import type {
-  RubricsViewProps,
-  UploadedRubric,
-  UploadRubricModalProps,
-} from './dashboard-types';
+import { FileSearchStatusBadge } from './RubricStatus';
+import { getRubricIndexStatus } from './rubric-index-status';
+import type { RubricsViewProps, UploadRubricModalProps } from './dashboard-types';
 
 export const RubricsView = memo(function RubricsView({
   rubrics,
@@ -25,10 +22,8 @@ export const RubricsView = memo(function RubricsView({
     () =>
       q
         ? rubrics.filter((r) =>
-          [r.title, r.course, ...(r.criteria?.map((c) => c.name) || [])].some((f) =>
-            f.toLowerCase().includes(q),
-          ),
-        )
+            [r.title, r.course, ...(r.criteria?.map((c) => c.name) || [])].some((f) => f.toLowerCase().includes(q)),
+          )
         : rubrics,
     [rubrics, q],
   );
@@ -39,8 +34,8 @@ export const RubricsView = memo(function RubricsView({
         <div>
           <h2 className="ds-h2">Rubrics</h2>
           <p className="ds-lede">
-            The criteria your coach holds you to. Set one as active and every session inherits its
-            scoring — including your imports from the extension.
+            The criteria your coach holds you to. Set one as active and every session inherits its scoring — including
+            your imports from the extension.
           </p>
         </div>
         <DsButton variant="secondary" onClick={() => setUploadOpen(true)}>
@@ -59,10 +54,7 @@ export const RubricsView = memo(function RubricsView({
       )}
 
       {rubrics.length === 0 ? (
-        <EmptyState
-          title="No rubrics yet."
-          body="Upload a rubric to set the criteria your coach holds you to."
-        />
+        <EmptyState title="No rubrics yet." body="Upload a rubric to set the criteria your coach holds you to." />
       ) : filtered.length === 0 ? (
         <EmptyState title="No matches." body={`No rubrics match “${query.trim()}”.`} />
       ) : (
@@ -72,9 +64,7 @@ export const RubricsView = memo(function RubricsView({
             const indexStatus = getRubricIndexStatus(r);
             const indexRequestState = rubricIndexRequestStates[r.id];
             const indexing = indexRequestState?.status === 'loading';
-            const indexError = indexRequestState?.status === 'error'
-              ? indexRequestState.message
-              : undefined;
+            const indexError = indexRequestState?.status === 'error' ? indexRequestState.message : undefined;
             return (
               <li key={r.id}>
                 <article className={`ds-rubric-card ${isActive ? 'is-active' : ''}`}>
@@ -88,9 +78,7 @@ export const RubricsView = memo(function RubricsView({
                         status={indexing ? 'indexing' : indexStatus}
                         error={indexError ?? r.fileSearchError ?? r.file_search_error}
                         onRetry={
-                          !indexing && indexStatus === 'failed' && onRetryIndex
-                            ? () => onRetryIndex(r.id)
-                            : undefined
+                          !indexing && indexStatus === 'failed' && onRetryIndex ? () => onRetryIndex(r.id) : undefined
                         }
                       />
                       {isActive ? (
@@ -143,10 +131,7 @@ export const RubricsView = memo(function RubricsView({
    Upload Rubric Modal
    ============================================================================ */
 
-export const UploadRubricModal = memo(function UploadRubricModal({
-  onClose,
-  onUploaded,
-}: UploadRubricModalProps) {
+export const UploadRubricModal = memo(function UploadRubricModal({ onClose, onUploaded }: UploadRubricModalProps) {
   const [title, setTitle] = useState('');
   const [course, setCourse] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -163,14 +148,29 @@ export const UploadRubricModal = memo(function UploadRubricModal({
     }
     setError('');
     setFile(f);
-    if (!title) setTitle(f.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ').trim());
+    if (!title)
+      setTitle(
+        f.name
+          .replace(/\.[^.]+$/, '')
+          .replace(/[-_]/g, ' ')
+          .trim(),
+      );
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!file) { setError('Please select a file.'); return; }
-    if (!title.trim()) { setError('Please enter a rubric title.'); return; }
-    if (!course.trim()) { setError('Please enter a course name.'); return; }
+    if (!file) {
+      setError('Please select a file.');
+      return;
+    }
+    if (!title.trim()) {
+      setError('Please enter a rubric title.');
+      return;
+    }
+    if (!course.trim()) {
+      setError('Please enter a course name.');
+      return;
+    }
     setUploading(true);
     setError('');
     try {
@@ -195,7 +195,9 @@ export const UploadRubricModal = memo(function UploadRubricModal({
   }
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
@@ -206,7 +208,9 @@ export const UploadRubricModal = memo(function UploadRubricModal({
       role="dialog"
       aria-modal="true"
       aria-label="Upload rubric"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div className="ds-modal">
         <div className="ds-modal-head">
@@ -219,26 +223,47 @@ export const UploadRubricModal = memo(function UploadRubricModal({
           <div
             className={`ds-dropzone${dragOver ? ' is-over' : ''}${file ? ' has-file' : ''}`}
             onClick={() => fileInputRef.current?.click()}
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
             onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFileSelect(f); }}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOver(false);
+              const f = e.dataTransfer.files[0];
+              if (f) handleFileSelect(f);
+            }}
             role="button"
             tabIndex={0}
             aria-label="Drop file here or click to browse"
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click(); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click();
+            }}
           >
             <input
               ref={fileInputRef}
               type="file"
               className="ds-dropzone-input"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); }}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleFileSelect(f);
+              }}
             />
             {file ? (
               <div className="ds-dropzone-file">
                 <FileText size={20} strokeWidth={1.4} />
                 <span>{file.name}</span>
-                <button type="button" className="ds-dropzone-remove" aria-label="Remove"
-                  onClick={(e) => { e.stopPropagation(); setFile(null); setError(''); }}>
+                <button
+                  type="button"
+                  className="ds-dropzone-remove"
+                  aria-label="Remove"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFile(null);
+                    setError('');
+                  }}
+                >
                   <X size={12} strokeWidth={2} />
                 </button>
               </div>
@@ -253,24 +278,48 @@ export const UploadRubricModal = memo(function UploadRubricModal({
           <div className="ds-modal-fields">
             <div className="ds-modal-field">
               <label htmlFor="rubric-title">Rubric title</label>
-              <input id="rubric-title" type="text" value={title}
+              <input
+                id="rubric-title"
+                type="text"
+                value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Argumentative Essay Rubric" disabled={uploading} required />
+                placeholder="Argumentative Essay Rubric"
+                disabled={uploading}
+                required
+              />
             </div>
             <div className="ds-modal-field">
               <label htmlFor="rubric-course">Course</label>
-              <input id="rubric-course" type="text" value={course}
+              <input
+                id="rubric-course"
+                type="text"
+                value={course}
                 onChange={(e) => setCourse(e.target.value)}
-                placeholder="ENG 102 · Composition II" disabled={uploading} required />
+                placeholder="ENG 102 · Composition II"
+                disabled={uploading}
+                required
+              />
             </div>
           </div>
-          {error && <p className="ds-modal-error" role="alert">{error}</p>}
+          {error && (
+            <p className="ds-modal-error" role="alert">
+              {error}
+            </p>
+          )}
           <div className="ds-modal-foot">
-            <DsButton variant="ghost" type="button" onClick={onClose} disabled={uploading}>Cancel</DsButton>
+            <DsButton variant="ghost" type="button" onClick={onClose} disabled={uploading}>
+              Cancel
+            </DsButton>
             <DsButton variant="primary" type="submit" disabled={uploading || !file}>
-              {uploading
-                ? <><span className="ds-state-spinner" style={{ width: 12, height: 12 }} aria-hidden="true" /> Uploading…</>
-                : <><Upload size={13} strokeWidth={1.7} /> Upload &amp; extract</>}
+              {uploading ? (
+                <>
+                  <span className="ds-state-spinner" style={{ width: 12, height: 12 }} aria-hidden="true" /> Uploading…
+                </>
+              ) : (
+                <>
+                  <Upload size={13} strokeWidth={1.7} /> Upload &amp; extract
+                </>
+              )}
             </DsButton>
           </div>
         </form>

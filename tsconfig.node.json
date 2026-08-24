@@ -11,4 +11,3 @@
   },
   "include": ["vite.config.ts", "src/lib/deploymentConfig.ts"]
 }
-

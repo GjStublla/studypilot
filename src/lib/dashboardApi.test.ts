@@ -29,8 +29,6 @@ describe('dashboardApi.activateRubric', () => {
       text: async () => '',
     } as Response);
 
-    await expect(activateRubric('rubric-123')).rejects.toThrow(
-      'PATCH /rubrics/rubric-123/active failed: 409',
-    );
+    await expect(activateRubric('rubric-123')).rejects.toThrow('PATCH /rubrics/rubric-123/active failed: 409');
   });
 });

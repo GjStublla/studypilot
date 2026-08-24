@@ -1,7 +1,6 @@
 const CHROME_WEBSTORE_HOST = 'chromewebstore.google.com';
 
-export const BETA_ACCESS_MAILTO =
-  'mailto:hello@studypilot.app?subject=StudyPilot%20beta%20access';
+export const BETA_ACCESS_MAILTO = 'mailto:hello@studypilot.app?subject=StudyPilot%20beta%20access';
 
 export type LegalPageId = 'privacy' | 'terms' | 'cookies' | 'changelog';
 

@@ -145,11 +145,7 @@ function hexToRgb(hex: string): [number, number, number] {
     return [1, 1, 1];
   }
 
-  return [
-    parseInt(result[1], 16) / 255,
-    parseInt(result[2], 16) / 255,
-    parseInt(result[3], 16) / 255,
-  ];
+  return [parseInt(result[1], 16) / 255, parseInt(result[2], 16) / 255, parseInt(result[3], 16) / 255];
 }
 
 export default function RippleGrid({
@@ -168,6 +164,11 @@ export default function RippleGrid({
 }: RippleGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const uniformsRef = useRef<RippleUniforms | null>(null);
+  const mouseInteractionRef = useRef(mouseInteraction);
+
+  useEffect(() => {
+    mouseInteractionRef.current = mouseInteraction;
+  }, [mouseInteraction]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -227,7 +228,7 @@ export default function RippleGrid({
     };
 
     const updateMousePosition = (event: PointerEvent) => {
-      if (!mouseInteraction) {
+      if (!mouseInteractionRef.current) {
         return;
       }
 
@@ -319,6 +320,8 @@ export default function RippleGrid({
       gl.getExtension('WEBGL_lose_context')?.loseContext();
       gl.canvas.remove();
     };
+    // Keep the WebGL resource alive; the uniform-sync effect below applies prop changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reinitializing on every visual prop change is expensive.
   }, []);
 
   useEffect(() => {

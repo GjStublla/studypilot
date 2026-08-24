@@ -9,20 +9,9 @@ import {
   type TodoRowProps,
 } from './dashboard-types';
 
-export function DsButton({
-  children,
-  variant = 'primary',
-  onClick,
-  disabled,
-  type = 'button',
-}: DsButtonProps) {
+export function DsButton({ children, variant = 'primary', onClick, disabled, type = 'button' }: DsButtonProps) {
   return (
-    <button
-      type={type}
-      className={`ds-btn ds-btn-${variant}`}
-      onClick={onClick}
-      disabled={disabled}
-    >
+    <button type={type} className={`ds-btn ds-btn-${variant}`} onClick={onClick} disabled={disabled}>
       {children}
     </button>
   );
@@ -30,9 +19,7 @@ export function DsButton({
 
 export const ScoreDots = memo(function ScoreDots({ score, max }: ScoreDotsProps) {
   const dotIndexes =
-    max <= SCORE_DOT_INDEXES.length
-      ? SCORE_DOT_INDEXES.slice(0, max)
-      : Array.from({ length: max }, (_, i) => i);
+    max <= SCORE_DOT_INDEXES.length ? SCORE_DOT_INDEXES.slice(0, max) : Array.from({ length: max }, (_, i) => i);
 
   return (
     <span className="ds-dots" role="img" aria-label={`${score} of ${max}`}>
@@ -43,11 +30,7 @@ export const ScoreDots = memo(function ScoreDots({ score, max }: ScoreDotsProps)
   );
 });
 
-export const TodoRow = memo(function TodoRow({
-  item,
-  onToggle,
-  sessionTitle,
-}: TodoRowProps) {
+export const TodoRow = memo(function TodoRow({ item, onToggle, sessionTitle }: TodoRowProps) {
   return (
     <li className={item.done ? 'is-done' : ''}>
       <button
@@ -65,11 +48,7 @@ export const TodoRow = memo(function TodoRow({
   );
 });
 
-export const EmptyState = memo(function EmptyState({
-  title,
-  body,
-  action,
-}: EmptyStateProps) {
+export const EmptyState = memo(function EmptyState({ title, body, action }: EmptyStateProps) {
   return (
     <div className="ds-empty">
       <p className="ds-empty-title">{title}</p>
@@ -85,14 +64,7 @@ export const EmptyState = memo(function EmptyState({
 
 export const StudyPilotMark = memo(function StudyPilotMark({ size = 18 }: StudyPilotMarkProps) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 200 200"
-      fill="none"
-      aria-hidden="true"
-      className="ds-spmark"
-    >
+    <svg width={size} height={size} viewBox="0 0 200 200" fill="none" aria-hidden="true" className="ds-spmark">
       <circle cx="100" cy="100" r="84" className="ds-spmark-bg" />
       <path
         d="M100 56l26 84-26-18-26 18 26-84z"

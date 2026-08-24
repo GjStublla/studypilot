@@ -49,8 +49,8 @@ test('rejects report sections in the wrong order', () => {
 test('rejects an overlong or incomplete demo timeline', () => {
   const result = validateDemoTimeline('Target length: 2:00 maximum\n| 0:00-2:00 | only one step |');
   assert.equal(result.ok, false);
-  assert.ok(result.failures.some(failure => /1:58 maximum/.test(failure)));
-  assert.ok(result.failures.some(failure => /text-input fallback/.test(failure)));
+  assert.ok(result.failures.some((failure) => /1:58 maximum/.test(failure)));
+  assert.ok(result.failures.some((failure) => /text-input fallback/.test(failure)));
 });
 
 test('requires an owner annotation for pending human-owned checklist items', () => {
@@ -90,7 +90,14 @@ test('reports human-owned final inputs without treating them as structural failu
     checklist: '- [ ] Demo video: [link]',
   });
   assert.equal(pending.length, 2);
-  const result = validateSubmissionArtifacts({ report, demo, checklist, hostedFlow, contributionTemplate, reproductionRecord });
+  const result = validateSubmissionArtifacts({
+    report,
+    demo,
+    checklist,
+    hostedFlow,
+    contributionTemplate,
+    reproductionRecord,
+  });
   assert.equal(result.ok, true);
   assert.ok(result.pendingInputs.length > 0);
 });

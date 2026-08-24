@@ -17,7 +17,10 @@ describe('apiFetch auth and network recovery', () => {
 
   it('redirects to auth and clears tokens when an expired session cannot refresh', async () => {
     localStorage.setItem('sp_access_token', 'expired-access');
-    vi.stubGlobal('fetch', vi.fn(async () => response(401, { detail: 'expired' })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => response(401, { detail: 'expired' })),
+    );
 
     await expect(apiFetch('/sessions')).rejects.toThrow('Session expired. Please log in again.');
 
@@ -58,9 +61,12 @@ describe('apiFetch auth and network recovery', () => {
   });
 
   it('propagates a network failure so the caller can show a recoverable message', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => {
-      throw new Error('network offline');
-    }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('network offline');
+      }),
+    );
 
     await expect(apiFetch('/sessions')).rejects.toThrow('network offline');
     expect(window.location.hash).toBe('#dashboard');

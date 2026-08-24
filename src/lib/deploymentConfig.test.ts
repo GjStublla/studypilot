@@ -9,8 +9,7 @@ import {
   type PublicDeploymentEnv,
 } from './deploymentConfig';
 
-const VALID_ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJvbGUiOiJhbm9uIn0.testsuffix';
+const VALID_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJvbGUiOiJhbm9uIn0.testsuffix';
 
 const VALID_PRODUCTION: PublicDeploymentEnv = {
   VITE_API_BASE_URL: 'https://api.example.test',
@@ -30,10 +29,7 @@ describe('validatePublicDeploymentEnv production', () => {
   });
 
   it('rejects a missing URL without echoing values', () => {
-    const result = validatePublicDeploymentEnv(
-      { ...VALID_PRODUCTION, VITE_API_BASE_URL: '' },
-      'production',
-    );
+    const result = validatePublicDeploymentEnv({ ...VALID_PRODUCTION, VITE_API_BASE_URL: '' }, 'production');
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error).toBe('VITE_API_BASE_URL is required for production builds.');
@@ -41,10 +37,7 @@ describe('validatePublicDeploymentEnv production', () => {
   });
 
   it('rejects whitespace-only required values as missing', () => {
-    const result = validatePublicDeploymentEnv(
-      { ...VALID_PRODUCTION, VITE_SUPABASE_URL: '   ' },
-      'production',
-    );
+    const result = validatePublicDeploymentEnv({ ...VALID_PRODUCTION, VITE_SUPABASE_URL: '   ' }, 'production');
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error).toBe('VITE_SUPABASE_URL is required for production builds.');
@@ -52,10 +45,7 @@ describe('validatePublicDeploymentEnv production', () => {
 
   it('rejects a malformed URL without echoing it', () => {
     const malformed = 'not a url';
-    const result = validatePublicDeploymentEnv(
-      { ...VALID_PRODUCTION, VITE_API_BASE_URL: malformed },
-      'production',
-    );
+    const result = validatePublicDeploymentEnv({ ...VALID_PRODUCTION, VITE_API_BASE_URL: malformed }, 'production');
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error).toBe('VITE_API_BASE_URL is not a valid URL.');
@@ -64,10 +54,7 @@ describe('validatePublicDeploymentEnv production', () => {
 
   it('rejects loopback production URLs without echoing them', () => {
     const loopback = 'http://localhost:8000';
-    const result = validatePublicDeploymentEnv(
-      { ...VALID_PRODUCTION, VITE_API_BASE_URL: loopback },
-      'production',
-    );
+    const result = validatePublicDeploymentEnv({ ...VALID_PRODUCTION, VITE_API_BASE_URL: loopback }, 'production');
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error).toBe('VITE_API_BASE_URL must be a public HTTPS URL for production builds.');
@@ -97,10 +84,7 @@ describe('validatePublicDeploymentEnv production', () => {
       'https://169.254.1.1',
     ];
     for (const url of rejected) {
-      const result = validatePublicDeploymentEnv(
-        { ...VALID_PRODUCTION, VITE_API_BASE_URL: url },
-        'production',
-      );
+      const result = validatePublicDeploymentEnv({ ...VALID_PRODUCTION, VITE_API_BASE_URL: url }, 'production');
       expect(result.ok, url).toBe(false);
       if (result.ok) continue;
       expectValueFree(result.error, url);
@@ -108,19 +92,13 @@ describe('validatePublicDeploymentEnv production', () => {
   });
 
   it('rejects a missing or malformed anon key without echoing it', () => {
-    const missing = validatePublicDeploymentEnv(
-      { ...VALID_PRODUCTION, VITE_SUPABASE_ANON_KEY: '' },
-      'production',
-    );
+    const missing = validatePublicDeploymentEnv({ ...VALID_PRODUCTION, VITE_SUPABASE_ANON_KEY: '' }, 'production');
     expect(missing.ok).toBe(false);
     if (missing.ok) return;
     expect(missing.error).toBe('VITE_SUPABASE_ANON_KEY is required for production builds.');
 
     const malformed = 'not-a-jwt';
-    const shape = validatePublicDeploymentEnv(
-      { ...VALID_PRODUCTION, VITE_SUPABASE_ANON_KEY: malformed },
-      'production',
-    );
+    const shape = validatePublicDeploymentEnv({ ...VALID_PRODUCTION, VITE_SUPABASE_ANON_KEY: malformed }, 'production');
     expect(shape.ok).toBe(false);
     if (shape.ok) return;
     expect(shape.error).toBe('VITE_SUPABASE_ANON_KEY is missing or has an invalid public key shape.');
@@ -148,10 +126,7 @@ describe('validatePublicDeploymentEnv explicit local mode', () => {
   });
 
   it('rejects missing local URLs', () => {
-    const result = validatePublicDeploymentEnv(
-      { ...localEnv, VITE_SUPABASE_URL: undefined },
-      'local',
-    );
+    const result = validatePublicDeploymentEnv({ ...localEnv, VITE_SUPABASE_URL: undefined }, 'local');
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error).toBe('VITE_SUPABASE_URL is required in explicit local mode.');
@@ -161,10 +136,7 @@ describe('validatePublicDeploymentEnv explicit local mode', () => {
 describe('assertPublicDeploymentEnv', () => {
   it('throws a value-free error for loopback production URLs', () => {
     expect(() =>
-      assertPublicDeploymentEnv(
-        { ...VALID_PRODUCTION, VITE_API_BASE_URL: 'http://localhost:8000' },
-        'production',
-      ),
+      assertPublicDeploymentEnv({ ...VALID_PRODUCTION, VITE_API_BASE_URL: 'http://localhost:8000' }, 'production'),
     ).toThrow('VITE_API_BASE_URL must be a public HTTPS URL for production builds.');
   });
 
@@ -197,10 +169,8 @@ describe('mergePublicDeploymentEnv', () => {
     });
 
     expect(
-      mergePublicDeploymentEnv(
-        { VITE_API_BASE_URL: '' },
-        { VITE_API_BASE_URL: 'https://from-file.example.test' },
-      ).VITE_API_BASE_URL,
+      mergePublicDeploymentEnv({ VITE_API_BASE_URL: '' }, { VITE_API_BASE_URL: 'https://from-file.example.test' })
+        .VITE_API_BASE_URL,
     ).toBe('');
   });
 });

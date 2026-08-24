@@ -24,7 +24,9 @@ export interface SocraticCoachCallbacks {
  */
 async function getAuthToken(): Promise<string> {
   // Check for an active OAuth session first (no network call needed).
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
   if (session?.access_token) {
     try {
       const payload = JSON.parse(atob(session.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
@@ -58,23 +60,20 @@ export async function sendCoachingMessage(
 
   const authToken = await getAuthToken();
 
-  const response = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/socratic-coach`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${authToken}`,
-        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-      },
-      body: JSON.stringify({
-        chatId,
-        userMessage: userMessageText,
-        requestId,
-        originSurface,
-      }),
+  const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/socratic-coach`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${authToken}`,
+      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
     },
-  );
+    body: JSON.stringify({
+      chatId,
+      userMessage: userMessageText,
+      requestId,
+      originSurface,
+    }),
+  });
 
   if (!response.ok) {
     const errData = await response.json().catch(() => ({}));

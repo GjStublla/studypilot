@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  dashboardChatReducer,
-  selectChatMessages,
-  type DashboardChatState,
-} from './dashboard-chat-state';
+import { dashboardChatReducer, selectChatMessages, type DashboardChatState } from './dashboard-chat-state';
 import type { DashboardChatMessage, SocraticCoachCommit } from './studypilot-types';
 
 function message(
@@ -96,17 +92,11 @@ describe('dashboard chat state', () => {
       type: 'load-succeeded',
       chatId: 'chat-a',
       version: 1,
-      rows: [
-        message('assistant-row', 'ai', 'request-a', 2),
-        message('user-row', 'user', 'request-a', 1),
-      ],
+      rows: [message('assistant-row', 'ai', 'request-a', 2), message('user-row', 'user', 'request-a', 1)],
     });
 
     expect(state['chat-a'].pending).toHaveLength(0);
-    expect(selectChatMessages(state, 'chat-a').map((row) => row.id)).toEqual([
-      'user-row',
-      'assistant-row',
-    ]);
+    expect(selectChatMessages(state, 'chat-a').map((row) => row.id)).toEqual(['user-row', 'assistant-row']);
   });
 
   it('keeps an in-flight lock when Realtime loads the durable pair before SSE commit', () => {
@@ -116,10 +106,7 @@ describe('dashboard chat state', () => {
       type: 'load-succeeded',
       chatId: 'chat-a',
       version: 1,
-      rows: [
-        message('user-row', 'user', 'request-a', 1),
-        message('assistant-row', 'ai', 'request-a', 2),
-      ],
+      rows: [message('user-row', 'user', 'request-a', 1), message('assistant-row', 'ai', 'request-a', 2)],
     });
 
     expect(state['chat-a'].pending).toHaveLength(1);
@@ -144,9 +131,7 @@ describe('dashboard chat state', () => {
 
     const visible = selectChatMessages(state, 'chat-a');
     expect(visible.filter((row) => row.role === 'user')).toHaveLength(1);
-    expect(visible.filter((row) => row.role === 'ai').map((row) => row.text)).toEqual([
-      'Error: AI unavailable',
-    ]);
+    expect(visible.filter((row) => row.role === 'ai').map((row) => row.text)).toEqual(['Error: AI unavailable']);
   });
 
   it('reconciles a completed legacy turn by timestamp and content', () => {
@@ -174,10 +159,7 @@ describe('dashboard chat state', () => {
     });
 
     expect(state['chat-a'].pending).toHaveLength(0);
-    expect(selectChatMessages(state, 'chat-a').map((row) => row.id)).toEqual([
-      'legacy-user',
-      'legacy-assistant',
-    ]);
+    expect(selectChatMessages(state, 'chat-a').map((row) => row.id)).toEqual(['legacy-user', 'legacy-assistant']);
   });
 
   it('ignores a stale canonical load completion', () => {
@@ -204,9 +186,7 @@ describe('dashboard chat state', () => {
         message('ai-1', 'ai', 'request-a', 1, {
           used_file_search: true,
           grounding_metadata: {
-            groundingChunks: [
-              { retrievedContext: { title: 'Evidence', text: 'Cite sources' } },
-            ],
+            groundingChunks: [{ retrievedContext: { title: 'Evidence', text: 'Cite sources' } }],
           },
         }),
       ],

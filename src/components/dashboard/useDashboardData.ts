@@ -10,22 +10,9 @@ import {
 } from 'react';
 import { AUTH_REQUIRED } from '../../lib/authConfig';
 import { apiFetch } from '../../lib/api';
-import {
-  fetchActionItems,
-  fetchRubrics,
-  fetchSessionTranscript,
-  fetchSessions,
-  type ActionItem,
-  type Rubric,
-  type Session,
-  type TranscriptLine,
-} from '../../lib/dashboardApi';
-import {
-  getAiUsage,
-  getDashboardChatMessages,
-  getDashboardChats,
-  type AiUsage,
-} from '../../lib/studypilot-api';
+import { fetchActionItems, fetchRubrics, fetchSessionTranscript, fetchSessions } from '../../lib/dashboardApi';
+import type { ActionItem, Rubric, Session, TranscriptLine } from '../../lib/dashboard-types';
+import { getAiUsage, getDashboardChatMessages, getDashboardChats, type AiUsage } from '../../lib/studypilot-api';
 import type { DashboardChat } from '../../lib/studypilot-types';
 import { useStudyPilotRealtime } from '../../lib/useRealtime';
 import {
@@ -129,23 +116,30 @@ export function useDashboardData({
   const draftCreatingRef = useRef(false);
 
   useEffect(() => {
+    const transcriptRequestVersions = transcriptRequestVersionsRef.current;
     dashboardMountedRef.current = true;
     return () => {
       dashboardMountedRef.current = false;
-      transcriptRequestVersionsRef.current.clear();
+      transcriptRequestVersions.clear();
     };
   }, []);
 
-  useEffect(() => { chatsRef.current = chats; }, [chats]);
-  useEffect(() => { activeChatIdRef.current = activeChatId; }, [activeChatId]);
+  useEffect(() => {
+    chatsRef.current = chats;
+  }, [chats]);
+  useEffect(() => {
+    activeChatIdRef.current = activeChatId;
+  }, [activeChatId]);
 
   const refreshAiUsage = useCallback(() => {
     if (!AUTH_REQUIRED) return;
-    getAiUsage().then((usage) => {
-      if (dashboardMountedRef.current) setAiUsage(usage);
-    }).catch(() => {
-      // The migration may not be deployed yet; usage UI is optional in that case.
-    });
+    getAiUsage()
+      .then((usage) => {
+        if (dashboardMountedRef.current) setAiUsage(usage);
+      })
+      .catch(() => {
+        // The migration may not be deployed yet; usage UI is optional in that case.
+      });
   }, []);
 
   const refreshChats = useCallback(async (): Promise<DashboardChat[]> => {
@@ -161,11 +155,12 @@ export function useDashboardData({
       setChats(rows);
       setChatRequestState({ status: 'success' });
       const current = activeChatIdRef.current;
-      const next = firstLoad && current === null
-        ? rows[0]?.id ?? null
-        : current && !rows.some((chat) => chat.id === current)
-          ? rows[0]?.id ?? null
-          : current;
+      const next =
+        firstLoad && current === null
+          ? (rows[0]?.id ?? null)
+          : current && !rows.some((chat) => chat.id === current)
+            ? (rows[0]?.id ?? null)
+            : current;
       activeChatIdRef.current = next;
       setActiveChatId(next);
       if (!firstLoad && current && current !== next) replaceChatRoute(next);
@@ -197,10 +192,13 @@ export function useDashboardData({
     }
   }, []);
 
-  const invalidateChat = useCallback((chatId: string) => {
-    dispatchChat({ type: 'invalidate', chatId });
-    if (activeChatIdRef.current === chatId) void loadChatMessages(chatId);
-  }, [loadChatMessages]);
+  const invalidateChat = useCallback(
+    (chatId: string) => {
+      dispatchChat({ type: 'invalidate', chatId });
+      if (activeChatIdRef.current === chatId) void loadChatMessages(chatId);
+    },
+    [loadChatMessages],
+  );
 
   useEffect(() => {
     const storedId = localStorage.getItem('sp_user_id');
@@ -208,21 +206,30 @@ export function useDashboardData({
       setUserId(storedId);
       return;
     }
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (dashboardMountedRef.current && session?.user?.id) setUserId(session.user.id);
-    }).catch(() => { /* not fatal */ });
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        if (dashboardMountedRef.current && session?.user?.id) setUserId(session.user.id);
+      })
+      .catch(() => {
+        /* not fatal */
+      });
   }, []);
 
   useStudyPilotRealtime(userId, {
     onNewSession: () => {
-      void fetchSessions().then((rows) => {
-        if (dashboardMountedRef.current) setSessions(rows);
-      }).catch(() => undefined);
+      void fetchSessions()
+        .then((rows) => {
+          if (dashboardMountedRef.current) setSessions(rows);
+        })
+        .catch(() => undefined);
     },
     onSessionChanged: () => {
-      void fetchSessions().then((rows) => {
-        if (dashboardMountedRef.current) setSessions(rows);
-      }).catch(() => undefined);
+      void fetchSessions()
+        .then((rows) => {
+          if (dashboardMountedRef.current) setSessions(rows);
+        })
+        .catch(() => undefined);
     },
     onSessionMessageChanged: (payload) => {
       const sessionId = (payload.new as Record<string, unknown>).session_id;
@@ -247,25 +254,29 @@ export function useDashboardData({
     onDocumentUpdated: (doc) => {
       if (!dashboardMountedRef.current || !doc.rubric_id) return;
       const status = normalizeIndexStatus(doc.index_status);
-      setRubrics((prev) => prev.map((r) => (
-        r.id === doc.rubric_id
-          ? {
-            ...r,
-            file_search_status: status,
-            fileSearchStatus: status,
-            knowledgeDocumentId: doc.id ?? r.knowledgeDocumentId,
-          }
-          : r
-      )));
+      setRubrics((prev) =>
+        prev.map((r) =>
+          r.id === doc.rubric_id
+            ? {
+                ...r,
+                file_search_status: status,
+                fileSearchStatus: status,
+                knowledgeDocumentId: doc.id ?? r.knowledgeDocumentId,
+              }
+            : r,
+        ),
+      );
     },
     onActionItemChanged: (payload) => {
       if (!dashboardMountedRef.current) return;
       if (payload.eventType === 'INSERT') {
         setActionItems((prev) => [payload.new as ActionItem, ...prev]);
       } else if (payload.eventType === 'UPDATE') {
-        setActionItems((prev) => prev.map((item) => (
-          item.id === (payload.new as Record<string, unknown>).id ? payload.new as ActionItem : item
-        )));
+        setActionItems((prev) =>
+          prev.map((item) =>
+            item.id === (payload.new as Record<string, unknown>).id ? (payload.new as ActionItem) : item,
+          ),
+        );
       } else if (payload.eventType === 'DELETE') {
         const deletedId = (payload.old as Record<string, unknown>).id;
         setActionItems((prev) => prev.filter((item) => item.id !== deletedId));
@@ -276,9 +287,9 @@ export function useDashboardData({
       if (payload.eventType === 'INSERT') {
         setRubrics((prev) => [payload.new as Rubric, ...prev]);
       } else if (payload.eventType === 'UPDATE') {
-        setRubrics((prev) => prev.map((r) => (
-          r.id === (payload.new as Record<string, unknown>).id ? payload.new as Rubric : r
-        )));
+        setRubrics((prev) =>
+          prev.map((r) => (r.id === (payload.new as Record<string, unknown>).id ? (payload.new as Rubric) : r)),
+        );
       } else if (payload.eventType === 'DELETE') {
         const deletedId = (payload.old as Record<string, unknown>).id;
         setRubrics((prev) => prev.filter((r) => r.id !== deletedId));
@@ -340,10 +351,8 @@ export function useDashboardData({
           if (active) setActiveRubricId((prev) => prev || active.id);
         }
         if (a.status === 'fulfilled') setActionItems(a.value);
-        const fatalLoadError = AUTH_REQUIRED
-          && s.status === 'rejected'
-          && r.status === 'rejected'
-          && a.status === 'rejected';
+        const fatalLoadError =
+          AUTH_REQUIRED && s.status === 'rejected' && r.status === 'rejected' && a.status === 'rejected';
         setBootstrapState({ status: fatalLoadError ? 'error' : 'success' });
       })
       .catch(() => {
@@ -372,10 +381,10 @@ export function useDashboardData({
         }),
         selectedSessionId
           ? fetchSessionTranscript(selectedSessionId).then((lines) => {
-            if (!dashboardMountedRef.current) return;
-            setTranscripts((current) => ({ ...current, [selectedSessionId]: lines }));
-            setTranscriptStates((current) => ({ ...current, [selectedSessionId]: { status: 'success' } }));
-          })
+              if (!dashboardMountedRef.current) return;
+              setTranscripts((current) => ({ ...current, [selectedSessionId]: lines }));
+              setTranscriptStates((current) => ({ ...current, [selectedSessionId]: { status: 'success' } }));
+            })
           : Promise.resolve(),
       ]).finally(() => {
         refreshPending = false;

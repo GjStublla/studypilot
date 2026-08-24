@@ -84,13 +84,13 @@ export const PITCH_DOCUMENT = Object.freeze({
 });
 
 function matchesAny(text, patterns) {
-  return patterns.some(pattern => pattern.test(text));
+  return patterns.some((pattern) => pattern.test(text));
 }
 
-export function validateClaimDocuments(documents, {
-  claimRules = CLAIM_RULES,
-  forbiddenClaims = FORBIDDEN_CLAIMS,
-} = {}) {
+export function validateClaimDocuments(
+  documents,
+  { claimRules = CLAIM_RULES, forbiddenClaims = FORBIDDEN_CLAIMS } = {},
+) {
   const failures = [];
   for (const document of documents) {
     const text = String(document.text ?? '');
@@ -115,7 +115,7 @@ export function validateClaimDocuments(documents, {
   }
   return {
     ok: failures.length === 0,
-    checkedDocuments: documents.map(document => document.label),
+    checkedDocuments: documents.map((document) => document.label),
     failures,
   };
 }
@@ -173,15 +173,18 @@ export function parseCliArgs(argv, cwd = process.cwd()) {
   };
 }
 
-export function loadClaimDocuments(root, {
-  extensionRoot = path.resolve(root, '..', 'studypilot-extension'),
-  requireExtension = false,
-  includeDemoScript = false,
-  requireDemoScript = false,
-  includePitchBrief = false,
-  requirePitchBrief = false,
-} = {}) {
-  const documents = WEB_DOCUMENTS.map(document => ({
+export function loadClaimDocuments(
+  root,
+  {
+    extensionRoot = path.resolve(root, '..', 'studypilot-extension'),
+    requireExtension = false,
+    includeDemoScript = false,
+    requireDemoScript = false,
+    includePitchBrief = false,
+    requirePitchBrief = false,
+  } = {},
+) {
+  const documents = WEB_DOCUMENTS.map((document) => ({
     ...document,
     path: path.join(root, document.relativePath),
     text: fs.readFileSync(path.join(root, document.relativePath), 'utf8'),
@@ -228,9 +231,13 @@ export function loadClaimDocuments(root, {
 }
 
 function printHelp() {
-  console.log('Usage: node scripts/validate-claims.mjs [--extension-root PATH] [--require-extension] [--include-demo-script] [--require-demo-script] [--include-pitch-brief] [--require-pitch-brief]');
+  console.log(
+    'Usage: node scripts/validate-claims.mjs [--extension-root PATH] [--require-extension] [--include-demo-script] [--require-demo-script] [--include-pitch-brief] [--require-pitch-brief]',
+  );
   console.log('Checks public claim wording in the web repository and, when present, the canonical extension README.');
-  console.log('The optional demo-script check blocks retired claims while leaving its required wording for human review.');
+  console.log(
+    'The optional demo-script check blocks retired claims while leaving its required wording for human review.',
+  );
   console.log('The optional pitch-brief check blocks retired claims while leaving final pitch approval human-owned.');
 }
 
@@ -245,13 +252,13 @@ export function run(argv = process.argv.slice(2), root = process.cwd()) {
   for (const label of result.checkedDocuments) {
     console.log(`validate:claims: checked ${label}`);
   }
-  if (!documents.some(document => document.label === 'canonical extension README')) {
+  if (!documents.some((document) => document.label === 'canonical extension README')) {
     console.log('validate:claims: canonical extension README SKIPPED (not present; use --require-extension locally)');
   }
-  if (options.includeDemoScript && !documents.some(document => document.label === 'demo script')) {
+  if (options.includeDemoScript && !documents.some((document) => document.label === 'demo script')) {
     console.log('validate:claims: demo script SKIPPED (not present; use --require-demo-script to fail)');
   }
-  if (options.includePitchBrief && !documents.some(document => document.label === PITCH_DOCUMENT.label)) {
+  if (options.includePitchBrief && !documents.some((document) => document.label === PITCH_DOCUMENT.label)) {
     console.log('validate:claims: pitch claims brief SKIPPED (not present; use --require-pitch-brief to fail)');
   }
   if (!result.ok) {
@@ -264,8 +271,7 @@ export function run(argv = process.argv.slice(2), root = process.cwd()) {
   return 0;
 }
 
-const isMain = process.argv[1]
-  && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
 
 if (isMain) {
   try {

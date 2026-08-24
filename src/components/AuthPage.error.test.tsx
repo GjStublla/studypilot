@@ -66,9 +66,7 @@ describe('AuthPage recoverable errors', () => {
 
     await user.click(screen.getByRole('button', { name: 'Continue with Google' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Could not start Google sign-in. Please try again.',
-    );
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not start Google sign-in. Please try again.');
   });
 
   it('keeps password visibility controls in the keyboard tab order', async () => {

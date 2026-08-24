@@ -1,4 +1,4 @@
-import type { FileSearchStatus, Rubric, Session } from './dashboardApi';
+import type { FileSearchStatus, Rubric, Session } from './dashboard-types';
 import type { DashboardChat } from './studypilot-types';
 
 export type ChatRubricContext = {
@@ -47,9 +47,7 @@ export function resolveChatRubricContext(options: {
 }
 
 /** Map File Search / knowledge-document status without treating "indexing" as failed. */
-export function normalizeIndexStatus(
-  status: string | null | undefined,
-): FileSearchStatus {
+export function normalizeIndexStatus(status: string | null | undefined): FileSearchStatus {
   switch (status) {
     case 'pending':
     case 'indexing':

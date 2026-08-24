@@ -97,7 +97,7 @@ describe('Dashboard cross-surface chat state', () => {
     mocks.getDashboardChatMessages.mockResolvedValue([]);
     mocks.getAiUsage.mockResolvedValue({ used: 0, limit: 50 });
     mocks.sendCoachingMessage.mockImplementation(
-      (chatId: string, _text: string, options: SocraticCoachOptions, callbacks: SocraticCoachCallbacks) => (
+      (chatId: string, _text: string, options: SocraticCoachOptions, callbacks: SocraticCoachCallbacks) =>
         new Promise<{ commit: SocraticCoachCommit }>((resolve, reject) => {
           const commit: SocraticCoachCommit = {
             type: 'commit',
@@ -115,8 +115,7 @@ describe('Dashboard cross-surface chat state', () => {
             commit: () => resolve({ commit }),
             fail: reject,
           });
-        })
-      ),
+        }),
     );
   });
 
