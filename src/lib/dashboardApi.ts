@@ -49,6 +49,7 @@ export type Session = {
   rubricId: string | null;
   /** Canonical dashboard chat id when the session continues an existing chat. */
   chatId: string | null;
+  screenshotPath?: string | null;
   summary: string;
 };
 
@@ -91,6 +92,7 @@ type ApiSession = {
   when: string;
   rubric_id: string | null;
   chat_id?: string | null;
+  screenshot_path?: string | null;
   summary: string | null;
 };
 type ApiTranscriptMessage = { id: string; who: 'You' | 'StudyPilot'; text: string; t: string };
@@ -161,6 +163,7 @@ function mapSession(s: ApiSession): Session {
     when: s.when,
     rubricId: s.rubric_id ?? null,
     chatId: s.chat_id ?? null,
+    screenshotPath: s.screenshot_path ?? null,
     summary: s.summary ?? '',
   };
 }
