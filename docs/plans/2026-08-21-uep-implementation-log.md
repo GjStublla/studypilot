@@ -1099,3 +1099,4 @@ Web: this log only. Phase 5 was not started.
 - Added the persisted `screenshotPath` field to the dashboard session model and mapper, then removed snake_case fallback reads that masked type drift.
 - `npx tsc --noEmit`, `npm test` (14 files / 85 tests), and an approved-environment production build passed; the built-environment scan passed afterward.
 - This slice remains uncommitted because `Dashboard.tsx` already contained unrelated whitespace-only working-tree edits from the prior agent. The semantic changes are intentionally preserved for the next dashboard extraction commit.
+- Follow-up commit `5f68749` adds compatibility aliases for realtime rows; targeted dashboard/chat tests pass (3 files / 19 tests).
