@@ -218,8 +218,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionally empty — only run on the initial mount of this route
+  }, [isSupabaseCallback]);
 
   // Render nothing while the async session exchange completes
   if (isSupabaseCallback) return null;

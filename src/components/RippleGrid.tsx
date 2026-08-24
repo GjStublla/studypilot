@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useEffectEvent, useRef } from 'react';
 import { Mesh, Program, Renderer, Triangle } from 'ogl';
 import './RippleGrid.css';
 
@@ -170,7 +170,7 @@ export default function RippleGrid({
     mouseInteractionRef.current = mouseInteraction;
   }, [mouseInteraction]);
 
-  useEffect(() => {
+  const initializeWebGL = useEffectEvent(() => {
     const container = containerRef.current;
 
     if (!container) {
@@ -320,9 +320,9 @@ export default function RippleGrid({
       gl.getExtension('WEBGL_lose_context')?.loseContext();
       gl.canvas.remove();
     };
-    // Keep the WebGL resource alive; the uniform-sync effect below applies prop changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reinitializing on every visual prop change is expensive.
-  }, []);
+  });
+
+  useEffect(() => initializeWebGL(), []);
 
   useEffect(() => {
     const uniforms = uniformsRef.current;
