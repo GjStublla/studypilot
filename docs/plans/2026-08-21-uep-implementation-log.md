@@ -1192,3 +1192,9 @@ Web: this log only. Phase 5 was not started.
 - Commit `da2dfb0` extracted the animated panel shell, header controls, menu, personality picker, and drag-handler wiring into `src/content/ExtensionPanel.tsx`.
 - `FloatingStudyPilot.tsx` is now approximately 2,159 lines; the body still owns study/live/chat rendering and is the next composition boundary.
 - Extension verification after the extraction: typecheck, 14 Vitest files / 66 tests, production build, manifest validation, and 10/10 unpacked Playwright checks passed, including narrow viewport and rapid-toggle coverage.
+
+### Phase 9A chat-switcher composition — 2026-08-24
+
+- Commit `53a3715` extracted the typed shared-chat selector, rubric readiness badge, create-chat action, and refresh action into `src/content/ChatSwitcher.tsx`.
+- `FloatingStudyPilot.tsx` is now approximately 2,103 lines; the remaining body composition still contains study mode, voice dock, composer, history, and answer-card rendering.
+- Extension verification after the extraction: typecheck, 14 Vitest files / 66 tests, production build, manifest validation, and 10/10 unpacked Playwright checks passed.
