@@ -80,6 +80,9 @@ Extension:
    documented in the submission checklist, but the new local commits are not
    pushed yet.
 
+   The exact read-first/admin-approved branch-protection procedure is now in
+   [`context/runbook.md`](../../context/runbook.md); it was not executed here.
+
 ### P1 — dashboard maintainability and release confidence
 
 1. Keep `Dashboard.tsx` orchestration-only and below the plan's 1,000-line target. It is now 938 lines after `0cf07d5`, with data loading, realtime reconciliation, profile/bootstrap state, stale-request refs, and the extension-help modal extracted. Remaining work is behavior-level browser evidence, not another broad shell rewrite.

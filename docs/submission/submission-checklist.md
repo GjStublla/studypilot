@@ -17,6 +17,7 @@ This section records what is reproducible in the workspace; it is not a deployme
 - Hosted Supabase allowlist: visibly skipped because the process did not contain `SUPABASE_ACCESS_TOKEN`.
 - Remote CI/branch protection: read-only GitHub inspection reports `main` is not protected in either repository and no workflow runs are visible for either remote; push the reviewed local heads first, then configure required checks and record the actual run URLs.
 - Web CI now declares a separate Chromium/Playwright `web-e2e` job; its remote result remains pending until the reviewed local head is pushed.
+- Branch-protection instructions are recorded in `context/runbook.md` with separate web/extension required-check lists; no GitHub settings were changed from this workspace.
 - Architecture diagram: `docs/architecture/system.png` from `7a68341`.
 - Judging evidence matrix: `docs/submission/judging-evidence-matrix.md` maps every pre-pitch and ceremony criterion to local proof, remaining owner, and demo cue.
 - Current external state: no deployed URL, Chrome Web Store URL, pilot dataset, video, or contribution approvals have been supplied in this workspace.
