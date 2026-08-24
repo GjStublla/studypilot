@@ -213,6 +213,7 @@ describe('Dashboard cross-surface chat state', () => {
     act(() => streams[0].commit());
 
     await waitFor(() => expect(mocks.getAiUsage).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(mocks.fetchActionItems).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.getByRole('form')).toHaveAttribute('aria-busy', 'false'));
     expect(mocks.getAiUsage).toHaveBeenCalledTimes(2);
   });
