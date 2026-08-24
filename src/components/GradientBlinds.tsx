@@ -1,4 +1,4 @@
-import { useEffect, useRef, type CSSProperties } from 'react';
+import { useEffect, useEffectEvent, useRef, type CSSProperties } from 'react';
 import { Mesh, Program, Renderer, Triangle } from 'ogl';
 import './GradientBlinds.css';
 
@@ -287,7 +287,7 @@ export default function GradientBlinds({
   const uniformsRef = useRef<GradientUniforms | null>(null);
   const colorStopsKey = resolveColorStops(gradientColors, color1, color2).join('|');
 
-  useEffect(() => {
+  const initializeWebGL = useEffectEvent(() => {
     const container = containerRef.current;
 
     if (!container) {
@@ -539,9 +539,9 @@ export default function GradientBlinds({
       firstResizeRef.current = true;
       lastTimeRef.current = 0;
     };
-    // Keep the WebGL resource alive; the uniform-sync effect below applies prop changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reinitializing on every visual prop change is expensive.
-  }, [dpr]);
+  });
+
+  useEffect(() => initializeWebGL(), [dpr]);
 
   useEffect(() => {
     pausedRef.current = paused;
