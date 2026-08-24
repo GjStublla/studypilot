@@ -21,7 +21,7 @@ The implementation objective is therefore: make the product demonstrably reliabl
 
 Web:
 
-- Vitest: 14 files / 85 tests.
+- Vitest: 15 files / 87 tests.
 - FastAPI pytest: 25 tests.
 - Supabase local pgTAP: 5 files / 287 tests after a clean reset.
 - Production build with approved public HTTPS placeholders: passed.
