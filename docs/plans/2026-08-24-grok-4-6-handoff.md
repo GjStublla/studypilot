@@ -58,7 +58,7 @@ Extension:
 ### P1 — extension maintainability and narrow-width UX
 
 1. Expand characterization tests for the workspace hook and invalid live-control combinations. Save queue concurrency/error cleanup is now covered by `dfd0e14`; Live start/pause/resume/stop now live in `useLiveCoaching.ts`; pure derivation, chat reconciliation, and listener cleanup are covered by `c295320` and `d9ff60d`.
-2. Continue focused body composition from `FloatingStudyPilot.tsx`; `useDashboardWorkspace.ts`, `QuickActions.tsx`, `ExtensionPanel.tsx`, `ChatSwitcher.tsx`, and `ContextSettings.tsx` are now extracted. The remaining parent is approximately 2,103 lines and still owns the main body render composition.
+2. Continue focused body composition from `FloatingStudyPilot.tsx`; `useDashboardWorkspace.ts`, `QuickActions.tsx`, `ExtensionPanel.tsx`, `ChatSwitcher.tsx`, and `ContextSettings.tsx` are now extracted. The remaining parent is approximately 2,115 lines and still owns the main body render composition.
 3. Keep live transitions explicit (`idle | starting | live | paused | stopping | error`) and make invalid control combinations unrenderable.
 4. Add 360x640 and 390x700 screenshots/E2E checks for fully visible quick actions, no header overlap, no horizontal scroll, and no duplicate listeners after rapid open/close.
 5. Keep `studypilotSupabase.ts` as the public facade; its auth/chat modules now exist and must retain the current tests. Extension-specific history secret scanning is now in CI; branch protection remains an admin gate.
