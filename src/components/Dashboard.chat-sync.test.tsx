@@ -139,6 +139,14 @@ describe('Dashboard cross-surface chat state', () => {
     expect(screen.getByLabelText('Send')).toBeDisabled();
   });
 
+  it('settles a requested chat route when the chat list request fails', async () => {
+    mocks.getDashboardChats.mockRejectedValueOnce(new Error('chat service unavailable'));
+
+    render(<Dashboard routeHash={`#dashboard?chat=${CHAT_A}`} />);
+
+    expect(await screen.findByPlaceholderText(/Ask about your rubric/i)).toBeInTheDocument();
+  });
+
   it('preserves an active stream while the chat view is unmounted', async () => {
     const user = userEvent.setup();
     render(<Dashboard routeHash={`#dashboard?chat=${CHAT_A}`} />);
