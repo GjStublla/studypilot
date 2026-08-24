@@ -1198,3 +1198,9 @@ Web: this log only. Phase 5 was not started.
 - Commit `53a3715` extracted the typed shared-chat selector, rubric readiness badge, create-chat action, and refresh action into `src/content/ChatSwitcher.tsx`.
 - `FloatingStudyPilot.tsx` is now approximately 2,103 lines; the remaining body composition still contains study mode, voice dock, composer, history, and answer-card rendering.
 - Extension verification after the extraction: typecheck, 14 Vitest files / 66 tests, production build, manifest validation, and 10/10 unpacked Playwright checks passed.
+
+### Phase 9A context-settings boundary — 2026-08-24
+
+- Commit `a5d6687` moved the privacy/context `SettingsSheet` and toggle primitive into `src/content/ContextSettings.tsx`; `FloatingStudyPilot` continues to re-export the same component for existing tests/imports.
+- `PanelComponents.tsx` now contains the visual study/quick-action primitives only; no privacy behavior changed.
+- Extension verification after the extraction: typecheck, 14 Vitest files / 66 tests, production build, manifest validation, and 10/10 unpacked Playwright checks passed.
