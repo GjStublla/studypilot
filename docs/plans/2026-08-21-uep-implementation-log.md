@@ -1236,3 +1236,9 @@ Web: this log only. Phase 5 was not started.
 
 - Commit `9dd63b2` moved `DashboardBootstrapState` into `src/components/dashboard/dashboard-types.ts` and defined the explicit `idle | loading | success | error` union. The dashboard now uses `success` instead of the ambiguous `ready` label while preserving the existing partial-load and fatal-load behavior.
 - Verification: focused dashboard tests (12 tests), full web Vitest (16 files / 90 tests), and `npm run build` all passed. Per-request transcript/indexing states and stale-promise cleanup remain open follow-up work.
+
+### Phase 8B transcript request-state boundary — 2026-08-24
+
+- Commit `d2cf801` replaces the dashboard's global transcript-loading boolean with a per-session `DashboardRequestState` map. Loading, success, and error are now isolated to the selected session, and transcript failures render a retry action instead of silently becoming an empty transcript.
+- Added a dashboard characterization test for failure → retry → successful transcript recovery; the retry uses the selected session ID and does not refetch unrelated sessions.
+- Verification: targeted rubric/dashboard tests (9 tests), full web Vitest (16 files / 91 tests), and `npm run build` all passed. Unmount cancellation and request-state coverage for chat sends/rubric indexing remain open.
