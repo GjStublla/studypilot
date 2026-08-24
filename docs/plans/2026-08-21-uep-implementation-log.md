@@ -1145,6 +1145,11 @@ Web: this log only. Phase 5 was not started.
 - Extension verification after the slice: 13 Vitest files / 60 tests, typecheck, production build, manifest validation, and 8/8 unpacked Playwright tests passed.
 - The full `useLiveCoaching` and `useDashboardWorkspace` extraction remains open; this slice deliberately reduces risk before moving those closures.
 
+### Phase 10 extension CI secret-scan slice — 2026-08-24
+
+- Canonical extension commit `5ea85a0` added a full-history Gitleaks job with checksum verification to the extension workflow, alongside the existing typecheck/test/build/manifest/Playwright quality job.
+- Workflow YAML parsed successfully and the current source/browser-secret marker scan is clean. GitHub execution remains a CI/external gate.
+
 ### Phase 12 architecture/documentation slice — 2026-08-24
 
 - Added `docs/adr/0001-runtime-boundaries.md` documenting the FastAPI versus Supabase ownership decision, alternatives, consequences, and review trigger.
