@@ -1152,3 +1152,9 @@ Web: this log only. Phase 5 was not started.
 - Rewrote `context/backend.md`, `context/dashboard.md`, and `context/app-map.md` to describe the current typed adapters, extracted dashboard views, canonical sibling extension, and verified commands instead of mock-only behavior.
 - Updated README wording to identify the sibling extension as canonical and added the SEO artifact slice separately in commit `1e630dc`.
 - Mermaid CLI is not installed in the environment, so the rendered `system.png` remains an explicit open artifact; do not mark it complete until the source is rendered and visually inspected.
+
+### Phase 13 pilot-preparation slice — 2026-08-24
+
+- Added `docs/validation/pilot-protocol.md` with one controlled rubric-to-dashboard task, fixed measures, neutral facilitation, consent, and privacy rules.
+- Added `docs/validation/pilot-results.csv` with the locked anonymous schema and `pilot-summary.md` with evidence/limitations/quote sections.
+- No participants were recruited or data collected; those remain human-approved external gates.
