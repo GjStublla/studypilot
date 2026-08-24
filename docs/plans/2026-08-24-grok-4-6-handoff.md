@@ -67,6 +67,11 @@ Extension:
 3. Supply real production public build values and run the hosted Edge Function allowlist check. Record a visible skip when secrets are absent.
 4. Configure branch protection so non-secret CI jobs are required. Keep hosted checks and production smoke tests protected by environment secrets.
 
+   Read-only GitHub API inspection on 2026-08-24 reports `main` as **not
+   protected** for the web repository, and `gh run list` shows no visible runs
+   for either remote because the local remediation heads have not been pushed.
+   Treat this as an admin/push gate, not as evidence that CI is green.
+
 5. Use the credential-free [demo fixture](../submission/demo-fixture.md) when
    creating the human-owned hosted demo account; the GitHub remotes are
    documented in the submission checklist, but the new local commits are not
