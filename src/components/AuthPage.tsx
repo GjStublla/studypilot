@@ -266,7 +266,7 @@ function LoginForm() {
             className="auth-eye"
             aria-label={showPassword ? 'Hide password' : 'Show password'}
             onClick={() => setShowPassword((v) => !v)}
-            tabIndex={-1}
+            tabIndex={0}
           >
             {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
           </button>
@@ -435,7 +435,7 @@ function SignupForm({ onSuccess }: { onSuccess: () => void }) {
             className="auth-eye"
             aria-label={showPassword ? 'Hide password' : 'Show password'}
             onClick={() => setShowPassword((v) => !v)}
-            tabIndex={-1}
+            tabIndex={0}
           >
             {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
           </button>
