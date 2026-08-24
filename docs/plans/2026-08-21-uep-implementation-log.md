@@ -1390,3 +1390,9 @@ Web: this log only. Phase 5 was not started.
 - Web commit `4bd77c8` removes the runtime Supabase import from `src/lib/dashboardApi.ts`. Rubric activation now uses the FastAPI-owned `/rubrics/{id}/active` CRUD route; the Supabase `set_active_rubric` RPC remains inside the Supabase upload workflow where it belongs.
 - `dashboardApi.test.ts` now proves the FastAPI request and its recoverable failure path. The source boundary search returns no `studypilot-api` runtime import from `dashboardApi.ts`.
 - Verification after the slice: targeted activation tests passed 2/2; full web Vitest passed 17 files / 96 tests; production build passed; web Playwright passed 4/4.
+
+### Phase 5 production-config enforcement repair — 2026-08-24
+
+- Web commit `5fcb87e` removes tracked generated `vite.config.js` and `vite.config.d.ts` artifacts that Vite preferred over the validated `vite.config.ts`. The stale JavaScript config bypassed deployment validation and allowed a bundle to embed the local API URL.
+- A default production build now fails closed with the value-free error `VITE_API_BASE_URL must be a public HTTPS URL for production builds.` when the local `.env` is selected. A build with public placeholder URLs and a JWT-shaped placeholder anon key passes, and `node scripts/verify-built-env.mjs dist` returns `ok`.
+- Verification after the repair: web Vitest passed 17 files / 96 tests; TypeScript/build passed with public placeholders; built-environment scan passed. Local worktree edits and `output/` remain preserved.
