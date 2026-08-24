@@ -118,3 +118,82 @@ npx supabase functions deploy <function-slug> --project-ref rqszloxxegvxaedptcqj
   1. Revoke the key immediately in the Google Cloud Console or Supabase Dashboard.
   2. Issue a replacement credential and update production environment variables.
   3. Log the rotation date and key ID in a private incident record outside Git (see `SECURITY.md`).
+
+---
+
+## 5. GitHub Branch Protection (Human/Admin Gate)
+
+Do not run these commands until the reviewed local remediation heads have been
+pushed, the historical credentials have been rotated, and a repository admin has
+approved the settings. The commands below are intentionally read-first and use
+repository placeholders; they do not belong in CI and must not receive tokens
+through workflow YAML.
+
+### Required non-secret checks
+
+Protect each repository independently. For `GjStublla/studypilot`, require:
+
+- `Secret scan` (after the historical service-account incident is resolved)
+- `Web quality`
+- `Web Playwright E2E`
+- `Backend tests`
+- `Supabase pgTAP`
+
+Keep `Hosted function allowlist` as a protected-environment gate until its
+Supabase secrets are configured; do not turn a missing-secret skip into evidence
+that hosted verification passed. For `GjStublla/studypilot-extension`, require
+`Extension secret scan` and `Extension quality`.
+
+### Inspect before changing settings
+
+```bash
+gh api repos/<owner>/<repo>/branches/main/protection
+gh run list --repo <owner>/<repo> --limit 20
+```
+
+### Apply after explicit admin approval (PowerShell)
+
+Replace `<owner>/<repo>` with exactly one repository at a time. Review the
+resulting JSON before piping it to `gh api`.
+
+```powershell
+$requiredChecks = @(
+  'Secret scan',
+  'Web quality',
+  'Web Playwright E2E',
+  'Backend tests',
+  'Supabase pgTAP'
+)
+$protection = @{
+  required_status_checks = @{
+    strict = $true
+    contexts = $requiredChecks
+  }
+  enforce_admins = $true
+  required_pull_request_reviews = @{
+    dismiss_stale_reviews = $true
+    require_code_owner_reviews = $false
+    required_approving_review_count = 1
+  }
+  restrictions = $null
+  required_linear_history = $true
+  allow_force_pushes = $false
+  allow_deletions = $false
+} | ConvertTo-Json -Depth 6
+
+$protection | gh api --method PUT `
+  -H 'Accept: application/vnd.github+json' `
+  repos/<owner>/<repo>/branches/main/protection `
+  --input -
+```
+
+For the extension repository, set `$requiredChecks` to:
+
+```powershell
+$requiredChecks = @('Extension secret scan', 'Extension quality')
+```
+
+After each approved change, re-run the read-only inspection and record the
+protection response plus the actual workflow run URLs in
+`docs/submission/submission-checklist.md`. Do not mark CI green from a local
+run or from a job that was skipped.
