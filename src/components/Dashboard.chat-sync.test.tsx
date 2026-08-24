@@ -163,6 +163,26 @@ describe('Dashboard cross-surface chat state', () => {
     expect(screen.getByLabelText('Send')).toBeDisabled();
   });
 
+  it('ignores chat stream completion after the dashboard unmounts', async () => {
+    const user = userEvent.setup();
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { unmount } = render(<Dashboard routeHash={`#dashboard?chat=${CHAT_A}`} />);
+    const input = await screen.findByPlaceholderText(/Ask about your rubric/i);
+    await user.type(input, 'Question A');
+    await user.click(screen.getByLabelText('Send'));
+    await waitFor(() => expect(streams).toHaveLength(1));
+
+    unmount();
+    await act(async () => {
+      streams[0].callbacks.onTokenReceived('Late answer');
+      streams[0].fail(new Error('late failure'));
+      await Promise.resolve();
+    });
+
+    expect(consoleError).not.toHaveBeenCalledWith('Chat stream error:', expect.any(Error));
+    consoleError.mockRestore();
+  });
+
   it('refreshes AI usage exactly once after a failed request', async () => {
     const user = userEvent.setup();
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);

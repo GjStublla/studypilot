@@ -669,6 +669,7 @@ export default function Dashboard({
     const chat = sessionId
       ? await getOrCreateSessionChat(sessionId, title)
       : await createDashboardChat(title, null);
+    if (!dashboardMountedRef.current) return chat;
     setChats((current) => {
       const next = [chat, ...current.filter((item) => item.id !== chat.id)];
       chatsRef.current = next;
@@ -690,11 +691,13 @@ export default function Dashboard({
     );
     updateDashboardChat(chatId, { title: nextTitle })
       .then((updated) => {
+        if (!dashboardMountedRef.current) return;
         setChats((current) =>
           current.map((chat) => (chat.id === chatId ? updated : chat)),
         );
       })
       .catch(() => {
+        if (!dashboardMountedRef.current) return;
         setChats((current) =>
           current.map((chat) => (chat.id === chatId ? previous : chat)),
         );
@@ -718,6 +721,7 @@ export default function Dashboard({
     }
 
     deleteDashboardChat(chatId).catch(() => {
+      if (!dashboardMountedRef.current) return;
       chatsRef.current = previousChats;
       setChats(previousChats);
       if (activeChatIdRef.current === nextActiveChatId) {
@@ -741,7 +745,11 @@ export default function Dashboard({
 
   const sendChatMessage = useCallback((text: string, sessionId?: string | null): boolean => {
     const value = text.trim();
-    if (!value || (aiUsage !== null && aiUsage.used >= aiUsage.limit)) return false;
+    if (
+      !dashboardMountedRef.current
+      || !value
+      || (aiUsage !== null && aiUsage.used >= aiUsage.limit)
+    ) return false;
 
     const currentChatId = activeChatIdRef.current;
     if (currentChatId) {
@@ -758,21 +766,23 @@ export default function Dashboard({
       try {
         if (!chatId) {
           const chat = await createChat(titleFromFirstMessage(value), sessionId ?? null);
+          if (!dashboardMountedRef.current) return;
           chatId = chat.id;
           if (inFlightChatIdsRef.current.has(chatId)) return;
           inFlightChatIdsRef.current.add(chatId);
         }
       } catch (error) {
+        if (!dashboardMountedRef.current) return;
         console.error('Failed to create chat:', error);
         return;
       } finally {
         if (!currentChatId) {
           draftCreatingRef.current = false;
-          setDraftCreating(false);
+          if (dashboardMountedRef.current) setDraftCreating(false);
         }
       }
 
-      if (!chatId) return;
+      if (!chatId || !dashboardMountedRef.current) return;
       const requestId = crypto.randomUUID();
       dispatchChat({
         type: 'turn-started',
@@ -790,10 +800,12 @@ export default function Dashboard({
           { requestId, originSurface: 'dashboard' },
           {
             onTokenReceived: (token) => {
+              if (!dashboardMountedRef.current) return;
               dispatchChat({ type: 'token-received', chatId, requestId, token });
             },
           },
         );
+        if (!dashboardMountedRef.current) return;
         if (result.commit) {
           dispatchChat({ type: 'turn-committed', chatId, requestId, commit: result.commit });
         } else {
@@ -801,11 +813,13 @@ export default function Dashboard({
         }
         touchChat(chatId);
       } catch (error) {
+        if (!dashboardMountedRef.current) return;
         console.error('Chat stream error:', error);
         const message = error instanceof Error ? error.message : 'Unknown error';
         dispatchChat({ type: 'turn-failed', chatId, requestId, error: message });
       } finally {
         inFlightChatIdsRef.current.delete(chatId);
+        if (!dashboardMountedRef.current) return;
         refreshAiUsage();
         dispatchChat({ type: 'invalidate', chatId });
         void loadChatMessages(chatId);
