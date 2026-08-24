@@ -77,6 +77,8 @@ npm test
 npm run test:deno
 node --test scripts/validate-claims.test.mjs
 npm run validate:claims
+node --test scripts/validate-submission-package.test.mjs
+npm run validate:submission
 npm run validate:pilot
 python -m pip install -r backend/requirements.txt -r backend/requirements-dev.txt
 python -m pytest backend/tests -q
@@ -112,6 +114,13 @@ The claim check guards the web README, landing/legal copy, final report draft,
 the time-coded demo script for retired claims, and (when present) the canonical
 extension README. It does not certify the separately owned pitch wording or
 approve the demo's hosted/learning-impact evidence.
+
+`npm run validate:submission` separately checks the report's nine-section order,
+the seven-segment 1:58 demo timeline, fallback instructions, and checklist
+markers. It reports remaining human-owned inputs without treating them as
+complete; use `node scripts/validate-submission-package.mjs
+--require-final-inputs` only after the hosted URL, pilot, media, contribution,
+and sign-off inputs are actually supplied.
 
 ## Running with Docker
 
