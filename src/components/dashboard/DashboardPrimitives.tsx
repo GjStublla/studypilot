@@ -35,7 +35,7 @@ export const ScoreDots = memo(function ScoreDots({ score, max }: { score: number
       : Array.from({ length: max }, (_, i) => i);
 
   return (
-    <span className="ds-dots" aria-label={`${score} of ${max}`}>
+    <span className="ds-dots" role="img" aria-label={`${score} of ${max}`}>
       {dotIndexes.map((i) => (
         <i key={i} className={i < score ? 'on' : ''} />
       ))}

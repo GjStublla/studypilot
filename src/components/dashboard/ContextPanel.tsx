@@ -39,7 +39,7 @@ export const ContextPanel = memo(function ContextPanel({
   );
 
   return (
-    <aside className="ds-context">
+    <aside className="ds-context" aria-label="Current context">
       <div className="ds-context-head">
         <span className="ds-eyebrow">Current context</span>
       </div>

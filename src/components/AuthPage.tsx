@@ -23,7 +23,7 @@ export default function AuthPage() {
       {/* Background gradient matching the hero */}
       <div className="auth-bg" aria-hidden="true" />
 
-      <div className="auth-card">
+      <main className="auth-card">
         {/* Logo */}
         <div className="auth-brand">
           <StudyPilotMark size={40} />
@@ -69,7 +69,7 @@ export default function AuthPage() {
           <a href="#/privacy">Privacy Policy</a>
           <a href="#/terms">Terms of Use</a>
         </nav>
-      </div>
+      </main>
     </div>
   );
 }

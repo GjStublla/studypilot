@@ -491,7 +491,7 @@ button { font: inherit; }
 
 .footer-directory .chrome-cta-disabled,
 .footer-directory .chrome-cta-mail {
-  color: rgba(244, 245, 251, 0.44);
+  color: rgba(244, 245, 251, 0.54);
   font-size: 12px;
 }
 
@@ -1452,7 +1452,7 @@ button { font: inherit; }
 
 .footer-directory a,
 .footer-bottom a {
-  color: rgba(244, 245, 251, 0.44);
+  color: rgba(244, 245, 251, 0.54);
   font-size: 12px;
   font-weight: 400;
   letter-spacing: 0;
@@ -1472,7 +1472,7 @@ button { font: inherit; }
   margin-top: 24px;
   padding-top: 18px;
   border-top: 1px solid rgba(232, 234, 252, 0.08);
-  color: rgba(244, 245, 251, 0.42);
+  color: rgba(244, 245, 251, 0.54);
   font-size: 12px;
   letter-spacing: 0;
 }

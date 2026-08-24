@@ -242,7 +242,7 @@ function App() {
     return (
       <div className="auth-shell">
         <div className="auth-bg" aria-hidden="true" />
-        <div className="auth-card">
+        <main className="auth-card">
           <div className="auth-brand-text">StudyPilot local development</div>
           <p className="auth-error auth-error--banner" role="alert">
             {localDevAuthError}
@@ -254,7 +254,7 @@ function App() {
           <button className="auth-submit" type="button" onClick={() => window.location.reload()}>
             Retry
           </button>
-        </div>
+        </main>
       </div>
     );
   }
