@@ -60,6 +60,9 @@ import {
   normalizeIndexStatus,
   resolveChatRubricContext,
 } from '../lib/chat-rubric-context';
+import './dashboard/DashboardShell.css';
+import './dashboard/ChatView.css';
+import './dashboard/ContentViews.css';
 import './Dashboard.css';
 
 import { X } from 'lucide-react';
