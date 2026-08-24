@@ -1,89 +1,46 @@
-# App Map
+# StudyPilot Application Map
 
-## High-Level Flow
+## High-level flow
 
-```text
-index.html
-  -> src/main.tsx
-    -> src/App.tsx
-      -> marketing site sections
-      -> lazy Dashboard when hash starts with #dashboard
-```
+index.html -> src/main.tsx -> src/App.tsx -> marketing sections or the lazy #dashboard route.
 
-## Key Files
+The canonical Chrome extension is the sibling repository at C:\Users\gjins\Desktop\studypilot-extension. The repository-local legacy scaffold is not part of releases.
 
-`src/main.tsx`
+## Web surface
 
-Mounts the React app with `createRoot`. It imports global CSS from `src/index.css`.
+- src/App.tsx owns the marketing page, hash-based legal pages, auth/dashboard routing, install CTA, and truthful capability copy.
+- src/components/AuthPage.tsx handles sign-in/sign-up.
+- src/components/LegalPage.tsx renders privacy, terms, cookies, and changelog content.
+- src/components/Dashboard.tsx owns dashboard orchestration.
+- src/components/dashboard/ contains the extracted shell, views, primitives, and context panel.
+- src/lib/dashboardApi.ts is the FastAPI CRUD adapter.
+- src/lib/studypilot-api.ts is the Supabase/Edge chat, RAG, usage, signed-capture, and sync adapter.
+- src/lib/deploymentConfig.ts and scripts/verify-built-env.mjs enforce public production configuration.
+- src/components/Dashboard.css and src/index.css contain scoped dashboard and marketing styling respectively.
 
-`src/App.tsx`
+## Canonical extension surface
 
-Owns the marketing page and hash-route switch. It includes:
+The sibling extension is a Chrome MV3 package with content-panel orchestration, a service worker, offscreen live runtime, Supabase auth/chat facade, and Edge-mediated live-token/model access. It uses microphone audio while Live is active and only shares page URL, selected text, screenshots, or dashboard persistence when the user enables those controls.
 
-- `Hero`: sticky first-viewport marketing hero with scroll-driven product transform.
-- `Compatibility`: horizontal marquee of supported learning surfaces.
-- `Capabilities`: four feature modes: Listen, Summarize, Quiz, Ask.
-- `Workflow`: three-step usage explanation.
-- `Principles`: quiet/local/fast positioning.
-- `Install`: install call-to-action.
-- `Footer`: footer navigation and privacy-first beta badge.
+The extension's verified entry points include:
 
-`src/components/GradientBlinds.tsx`
+- src/content/FloatingStudyPilot.tsx — current orchestration shell; deeper live/workspace extraction remains open.
+- src/content/PanelComponents.tsx — extracted pure panel views and controls.
+- src/content/liveCoachingState.ts — tested live-state derivation.
+- src/shared/studypilotSupabase.ts — stable public facade.
+- src/shared/studypilotSupabase.auth.ts and studypilotSupabase.chat.ts — auth and persistence modules.
+- src/background/liveRuntime.ts — offscreen live lifecycle and privacy propagation.
+- src/live/ — WebSocket/live transport and message types.
 
-WebGL gradient background powered by OGL. It creates a canvas, shader program, resize observer, intersection observer, and pointer/scroll listeners. This is visually important but should be treated as a performance-sensitive component.
+## Data flow
 
-`src/components/GradientBlinds.css`
+FastAPI owns profile/session/rubric/action-item CRUD. Supabase Auth, Postgres/RLS, Realtime, Storage, and Edge Functions own chat/RAG/live/synchronization. Vertex AI/Gemini is called by server-side code only. See docs/adr/0001-runtime-boundaries.md and docs/architecture/system.mmd.
 
-Canvas container styling for the hero background.
+## Assets and performance-sensitive code
 
-`src/components/RippleGrid.tsx`
+Marketing assets live in public/assets. The hero uses the product modal SVG and the GradientBlinds OGL canvas; both are performance-sensitive. index.html preloads the hero product SVG and publishes canonical/Open Graph metadata. robots.txt and sitemap.xml are generated from public/.
 
-Another OGL canvas effect. It is not currently part of the main marketing route in `App.tsx`, but it exists as a reusable visual effect.
+## Verification map
 
-`src/components/Dashboard.tsx`
-
-Dashboard route. Do not edit right now unless asked; it is under active parallel work.
-
-`src/components/ui/button.tsx`
-
-Small anchor-style button component with variants mapped to CSS classes.
-
-`src/lib/utils.ts`
-
-Utility helpers. Currently used by the button component for class name joining.
-
-`src/index.css`
-
-Global styles for both the marketing site and dashboard. It contains layout, motion, visual styling, responsive rules, and accessibility reduced-motion overrides.
-
-`vite.config.ts`
-
-Vite config with manual chunks for React and Framer Motion dependencies:
-
-- `react-vendor`
-- `motion-vendor`
-
-## Assets
-
-Main public assets live in `public/assets/`, including:
-
-- StudyPilot logo/mark SVGs.
-- Product modal demo SVG.
-- Hero and extension mockup WebP assets.
-- App icon images.
-
-Brand source material also exists under `logos/studypilot_logo_pack/`.
-
-## Current UI Model
-
-The marketing page is the first screen. It does not use a separate router package. It uses hash navigation for page sections and the dashboard route. This keeps the app small, but means hash changes are manually observed in `App.tsx`.
-
-## Copy Themes
-
-The app emphasizes:
-
-- Studying from any browser tab.
-- Asking without switching apps.
-- Voice, summary, quiz, and ask modes.
-- Privacy-first/local-by-default behavior.
-- Low-distraction student workflow.
+- Web: npm test, npx tsc --noEmit, production build with approved public HTTPS values, verify-built-env, backend pytest, and local Supabase pgTAP.
+- Extension: npm run typecheck, npm test, npm run build, npm run validate:manifest, and npm run test:e2e.

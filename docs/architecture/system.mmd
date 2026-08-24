@@ -1,0 +1,25 @@
+flowchart LR
+  EXT[Canonical Chrome MV3 extension]
+  WEB[React dashboard and marketing site]
+  API[FastAPI CRUD API]
+  AUTH[Supabase Auth]
+  EDGE[Supabase Edge Functions\nchat / RAG / coaching / live token]
+  RT[Supabase Realtime]
+  DB[(Supabase Postgres\nRLS-protected user data)]
+  STORAGE[(Supabase Storage\noptional session captures)]
+  VERTEX[Vertex AI / Gemini]
+
+  EXT -->|JWT + CRUD/session sync| API
+  WEB -->|JWT + profile/session/rubric/action CRUD| API
+  EXT -->|auth/session + chat/live calls| AUTH
+  WEB -->|auth + chat/RAG calls| AUTH
+  EXT -->|authenticated chat, live, sync| EDGE
+  WEB -->|authenticated chat, RAG, coaching| EDGE
+  API -->|user-scoped queries| DB
+  AUTH -->|identity records| DB
+  EDGE -->|RLS-scoped reads/writes| DB
+  EDGE -->|optional screenshot objects| STORAGE
+  EDGE -->|server-side model invocation| VERTEX
+  EDGE -->|cross-surface events| RT
+  RT -->|chat/session updates| EXT
+  RT -->|chat/session updates| WEB
