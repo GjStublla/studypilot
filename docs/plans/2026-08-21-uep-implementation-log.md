@@ -1415,6 +1415,12 @@ Web: this log only. Phase 5 was not started.
 - A pure `liveMicIntent` boundary now distinguishes Live stop, SpeechRecognition stop, resume, start, and ignore-while-stopping. The mic control remains cancelable during `starting`/`connecting`, ignores a second click during `stopping`, and can mute fallback SpeechRecognition without sending another Live request.
 - Verification after the slice: focused live-state tests passed (8 assertions), full extension Vitest passed 17 files / 80 tests, typecheck/build/manifest validation passed, and unpacked Playwright passed 11/11. Hosted Vertex Live remains an external gate.
 
+### Phase 9A correlated Live runtime operations — 2026-08-24
+
+- Canonical extension commit `18f5273` adds a monotonic operation ID to Live status responses and panel fan-out. Service-worker start/stop/pause/resume continuations now stop mutating state when superseded; starting is also rejected while a stop is in progress.
+- The panel ignores older status fan-out, and `liveRuntime.privacy.test.ts` proves a delayed start failure after a newer stop returns the newer idle status without broadcasting a stale error.
+- Verification after the slice: extension Vitest passed 17 files / 83 tests; typecheck/build/manifest validation passed; unpacked Playwright passed 11/11. Hosted Vertex Live remains an external gate.
+
 ### Phase 1/2 privacy and claims audit — 2026-08-24
 
 - Reconciled the formal judging plan with the already-landed privacy/claims work: the landing-page local-processing language, tab-audio/exact-second/device-storage/no-account claims, extension disclosure, metadata, and report overview now have explicit checked rows and source/test evidence.
