@@ -1346,3 +1346,16 @@ Web: this log only. Phase 5 was not started.
 - Web commit `f89d658` closes the findings from the authenticated axe run: score dots now expose a valid image role, the sidebar/context complementary landmarks have unique labels, the auth route has a `<main>` landmark, and footer text/links meet the normal-text contrast threshold. The production dependency lock also updates the vulnerable transitive `nanoid` release; `npm audit --omit=dev` reports zero vulnerabilities afterward.
 - The golden-flow axe assertion now passes with zero violations on the authenticated dashboard action-items view. Landing and auth production-preview Lighthouse medians (three runs each) are: landing performance 0.85 / accessibility 1.00 / best practices 1.00 / SEO 1.00; auth performance 0.94 / accessibility 1.00 / best practices 1.00 / SEO 1.00.
 - A hosted dashboard Lighthouse performance median is intentionally not claimed: the current browser fixture is deterministic/mocked and the hosted environment is still an external gate. The remaining evidence task is to run that audit against a clean authenticated deployment once the human-owned hosted credentials and URL are available.
+
+### Phase 11 accessibility/performance follow-up — 2026-08-24
+
+- Commit `8db5a40` adds `e2e/accessibility.spec.ts` with landing, sign-in, and account-creation axe checks. The authenticated dashboard axe assertion remains in the web golden flow; the full web browser suite passes 4/4 with no serious/critical public findings and zero dashboard violations.
+- The hero's decorative WebGL renderer is now lazy-loaded and skipped below 900 px, allowing the existing CSS gradient to carry the small-screen background. This removes the mobile main-thread/GPU cost without changing the desktop visual treatment or reduced-motion behavior.
+- Three post-change Lighthouse runs per route/device against the production preview are recorded in `context/performance-notes.md`: mobile landing/auth performance medians are `0.96`/`0.96`, desktop landing/auth are `0.91`/`1.00`; all accessibility, best-practices, and SEO medians are `1.00`, CLS is `0`, and mobile LCP medians are `2.63s`/`2.58s`.
+- Full web verification after the slice: Vitest 17 files / 96 tests, web Playwright 4/4, production build, and `npm run verify:release` passed with hosted function allowlist explicitly skipped because `SUPABASE_ACCESS_TOKEN` was absent. Lighthouse sometimes exits with a Windows temp-directory `EPERM` after writing valid JSON; this is recorded as a runner cleanup caveat, not a hosted pass.
+
+### Phase 12 architecture/scaffold completion — 2026-08-24
+
+- Commit `7a68341` adds the inspected 3× `docs/architecture/system.png` render from `system.mmd`; labels are readable at report scale and the diagram shows browser clients, FastAPI CRUD, Supabase Auth/Realtime/Edge, Postgres/Storage, and Vertex AI.
+- The tracked `extension/` audit found no unique production behavior. Its own README marked it non-production and the root `extension:build` script already targeted `../studypilot-extension`; commit `6a08fac` removes the exact tracked scaffold without touching the canonical sibling repository.
+- `npm run extension:build` was re-run after removal and passed; the canonical extension worktree remains clean, and `git ls-files extension` returns no result.
