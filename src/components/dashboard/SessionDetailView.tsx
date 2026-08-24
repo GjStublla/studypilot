@@ -23,18 +23,22 @@ export const SessionDetailView = memo(function SessionDetailView({
   actionItems,
   transcript,
   transcriptLoading,
+  transcriptError,
   onToggleAction,
   onBack,
   onContinueInChat,
+  onRetryTranscript,
 }: {
   session: Session | undefined;
   rubric: Rubric | undefined;
   actionItems: ActionItem[];
   transcript: TranscriptLine[];
   transcriptLoading: boolean;
+  transcriptError?: string | null;
   onToggleAction: (id: string) => void;
   onBack: () => void;
   onContinueInChat: () => void;
+  onRetryTranscript?: () => void;
 }) {
   const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
   const [screenshotError, setScreenshotError] = useState(false);
@@ -140,6 +144,12 @@ export const SessionDetailView = memo(function SessionDetailView({
                 <span className="ds-state-spinner" aria-hidden="true" />
                 <p>Loading transcript…</p>
               </div>
+            ) : transcriptError ? (
+              <EmptyState
+                title="Transcript unavailable."
+                body={transcriptError}
+                action={onRetryTranscript ? { label: 'Try again', onClick: onRetryTranscript } : undefined}
+              />
             ) : transcript.length === 0 ? (
               <EmptyState
                 title="No transcript."

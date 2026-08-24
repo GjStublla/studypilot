@@ -5,6 +5,7 @@ import type {
   CoachMode,
   SessionRow,
   DashboardBootstrapState,
+  DashboardRequestState,
 } from './dashboard/dashboard-types';
 import { Sidebar, TopBar } from './dashboard/DashboardShell';
 import { ActionItemsView } from './dashboard/ActionItemsView';
@@ -138,7 +139,7 @@ export default function Dashboard({
   const [draftCreating, setDraftCreating] = useState(false);
   const [chatsLoaded, setChatsLoaded] = useState(false);
   const [transcripts, setTranscripts] = useState<Record<string, TranscriptLine[]>>({});
-  const [transcriptLoading, setTranscriptLoading] = useState(false);
+  const [transcriptStates, setTranscriptStates] = useState<Record<string, DashboardRequestState>>({});
   const [bootstrapState, setBootstrapState] = useState<DashboardBootstrapState>({ status: 'loading' });
   const [aiUsage, setAiUsage] = useState<AiUsage | null>(null);
   const [extensionHelpOpen, setExtensionHelpOpen] = useState(false);
@@ -231,8 +232,19 @@ export default function Dashboard({
       const sessionId = (payload.new as Record<string, unknown>).session_id;
       if (typeof sessionId !== 'string') return;
       void fetchSessionTranscript(sessionId)
-        .then((lines) => setTranscripts((current) => ({ ...current, [sessionId]: lines })))
-        .catch(() => undefined);
+        .then((lines) => {
+          setTranscripts((current) => ({ ...current, [sessionId]: lines }));
+          setTranscriptStates((current) => ({ ...current, [sessionId]: { status: 'success' } }));
+        })
+        .catch((error) => {
+          setTranscriptStates((current) => ({
+            ...current,
+            [sessionId]: {
+              status: 'error',
+              message: error instanceof Error ? error.message : 'Transcript unavailable',
+            },
+          }));
+        });
     },
     onDocumentUpdated: (doc) => {
       // Update rubric status if document is linked to a rubric
@@ -404,6 +416,7 @@ export default function Dashboard({
         selectedSessionId
           ? fetchSessionTranscript(selectedSessionId).then((lines) => {
             setTranscripts((current) => ({ ...current, [selectedSessionId]: lines }));
+            setTranscriptStates((current) => ({ ...current, [selectedSessionId]: { status: 'success' } }));
           })
           : Promise.resolve(),
       ]).finally(() => {
@@ -514,6 +527,11 @@ export default function Dashboard({
       ? rubricsById.get(selectedSession.rubricId)
       : undefined;
   const selectedTranscript = selectedSession ? transcripts[selectedSession.id] ?? [] : [];
+  const selectedTranscriptState = selectedSession ? transcriptStates[selectedSession.id] : undefined;
+  const selectedTranscriptLoading = selectedTranscriptState?.status === 'loading';
+  const selectedTranscriptError = selectedTranscriptState?.status === 'error'
+    ? selectedTranscriptState.message ?? 'StudyPilot could not load this transcript.'
+    : null;
   // Memoized so the reference is stable between unrelated renders — the ChatView
   // effect that seeds messages from it depends on this not changing every render.
   // "Recent activity" derived from the user's real sessions (most recent first).
@@ -544,17 +562,31 @@ export default function Dashboard({
   // time a transcript is fetched.
   const transcriptsRef = useRef(transcripts);
   useEffect(() => { transcriptsRef.current = transcripts; });
+  const transcriptStatesRef = useRef(transcriptStates);
+  useEffect(() => { transcriptStatesRef.current = transcriptStates; });
   const sessionsRef = useRef(sessions);
   useEffect(() => { sessionsRef.current = sessions; }, [sessions]);
 
   const ensureTranscript = useCallback(
-    (sessionId: string) => {
-      if (transcriptsRef.current[sessionId] !== undefined) return;
-      setTranscriptLoading(true);
+    (sessionId: string, force = false) => {
+      if (!force && transcriptsRef.current[sessionId] !== undefined) return;
+      if (transcriptStatesRef.current[sessionId]?.status === 'loading') return;
+      setTranscriptStates((current) => ({ ...current, [sessionId]: { status: 'loading' } }));
       fetchSessionTranscript(sessionId)
-        .then((lines) => setTranscripts((prev) => ({ ...prev, [sessionId]: lines })))
-        .catch(() => setTranscripts((prev) => ({ ...prev, [sessionId]: [] })))
-        .finally(() => setTranscriptLoading(false));
+        .then((lines) => {
+          setTranscripts((prev) => ({ ...prev, [sessionId]: lines }));
+          setTranscriptStates((current) => ({ ...current, [sessionId]: { status: 'success' } }));
+        })
+        .catch((error) => {
+          setTranscripts((prev) => ({ ...prev, [sessionId]: [] }));
+          setTranscriptStates((current) => ({
+            ...current,
+            [sessionId]: {
+              status: 'error',
+              message: error instanceof Error ? error.message : 'Transcript unavailable',
+            },
+          }));
+        });
     },
     [], // stable — reads transcripts via ref, not closure
   );
@@ -1002,10 +1034,14 @@ export default function Dashboard({
                   rubric={selectedSessionRubric}
                   actionItems={selectedSessionActionItems}
                   transcript={selectedTranscript}
-                  transcriptLoading={transcriptLoading}
+                  transcriptLoading={selectedTranscriptLoading}
+                  transcriptError={selectedTranscriptError}
                   onToggleAction={toggleAction}
                   onBack={backToSessions}
                   onContinueInChat={continueSelectedInChat}
+                  onRetryTranscript={
+                    selectedSession ? () => ensureTranscript(selectedSession.id, true) : undefined
+                  }
                 />
               )}
 
