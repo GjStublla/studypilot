@@ -4,6 +4,7 @@ import { uploadRubricFile } from '../../lib/studypilot-api';
 import type { Rubric } from '../../lib/dashboardApi';
 import { DsButton, EmptyState } from './DashboardPrimitives';
 import { FileSearchStatusBadge, getRubricIndexStatus } from './RubricStatus';
+import type { DashboardRequestState } from './dashboard-types';
 
 export type UploadedRubric = {
   id: string;
@@ -23,6 +24,7 @@ export const RubricsView = memo(function RubricsView({
   rubrics,
   activeRubricId,
   query,
+  rubricIndexRequestStates = {},
   onSetActive,
   onAskAbout,
   onRetryIndex,
@@ -31,6 +33,7 @@ export const RubricsView = memo(function RubricsView({
   rubrics: Rubric[];
   activeRubricId: string;
   query: string;
+  rubricIndexRequestStates?: Readonly<Record<string, DashboardRequestState>>;
   onSetActive: (id: string) => void;
   onAskAbout: (id: string) => void;
   onRetryIndex?: (id: string) => void;
@@ -87,6 +90,11 @@ export const RubricsView = memo(function RubricsView({
           {filtered.map((r) => {
             const isActive = r.id === activeRubricId;
             const indexStatus = getRubricIndexStatus(r);
+            const indexRequestState = rubricIndexRequestStates[r.id];
+            const indexing = indexRequestState?.status === 'loading';
+            const indexError = indexRequestState?.status === 'error'
+              ? indexRequestState.message
+              : undefined;
             return (
               <li key={r.id}>
                 <article className={`ds-rubric-card ${isActive ? 'is-active' : ''}`}>
@@ -97,10 +105,10 @@ export const RubricsView = memo(function RubricsView({
                     </span>
                     <span className="ds-rubric-status-row">
                       <FileSearchStatusBadge
-                        status={indexStatus}
-                        error={r.fileSearchError ?? r.file_search_error}
+                        status={indexing ? 'indexing' : indexStatus}
+                        error={indexError ?? r.fileSearchError ?? r.file_search_error}
                         onRetry={
-                          indexStatus === 'failed' && onRetryIndex
+                          !indexing && indexStatus === 'failed' && onRetryIndex
                             ? () => onRetryIndex(r.id)
                             : undefined
                         }

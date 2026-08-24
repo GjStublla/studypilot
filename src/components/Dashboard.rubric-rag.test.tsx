@@ -237,6 +237,40 @@ describe('Dashboard rubric RAG behaviors', () => {
     });
   });
 
+  it('hides duplicate retry controls while indexing is in flight', async () => {
+    const user = userEvent.setup();
+    let resolveRetry!: (value: {
+      knowledgeDocumentId: string;
+      status: string;
+      fileSearchStoreName: string;
+      fileSearchDocumentName: string;
+    }) => void;
+    mocks.fetchRubrics.mockResolvedValue([
+      makeRubric({
+        file_search_status: 'failed',
+        fileSearchStatus: 'failed',
+        fileSearchError: 'timeout',
+      }),
+    ]);
+    mocks.retryRubricIndexing.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveRetry = resolve;
+    }));
+
+    render(<Dashboard routeHash={`#dashboard?chat=${CHAT_ID}`} />);
+    await user.click(await screen.findByRole('button', { name: 'Retry' }));
+
+    expect(await screen.findByText('Indexing…')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+
+    resolveRetry({
+      knowledgeDocumentId: 'kd-1',
+      status: 'indexed',
+      fileSearchStoreName: 'stores/1',
+      fileSearchDocumentName: 'docs/1',
+    });
+    await waitFor(() => expect(screen.getByText('Indexed')).toBeInTheDocument());
+  });
+
   it('shows Indexing… for in-progress status instead of treating it as failed', async () => {
     mocks.fetchRubrics.mockResolvedValue([
       makeRubric({

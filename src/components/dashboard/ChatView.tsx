@@ -9,7 +9,7 @@ import type { Rubric, Session } from '../../lib/dashboardApi';
 import type { AiUsage } from '../../lib/studypilot-api';
 import { EmptyState, StudyPilotMark } from './DashboardPrimitives';
 import { FileSearchStatusBadge, getRubricIndexStatus } from './RubricStatus';
-import type { DashboardStudent } from './dashboard-types';
+import type { DashboardRequestState, DashboardStudent } from './dashboard-types';
 
 type Message = ChatViewMessage;
 
@@ -35,6 +35,7 @@ export const ChatView = memo(function ChatView({
   activeChatBusy,
   draftCreating,
   aiUsage,
+  rubricIndexRequestStates = {},
   onOpenSession,
   onSelectChat,
   onStartNewChat,
@@ -56,6 +57,7 @@ export const ChatView = memo(function ChatView({
   activeChatBusy: boolean;
   draftCreating: boolean;
   aiUsage: AiUsage | null;
+  rubricIndexRequestStates?: Readonly<Record<string, DashboardRequestState>>;
   onOpenSession: () => void;
   onSelectChat: (chatId: string) => void;
   onStartNewChat: () => void;
@@ -149,6 +151,13 @@ export const ChatView = memo(function ChatView({
     || Boolean(activeChat?.rubric_context_locked && activeChat.rubric_id == null);
   const effectiveRubric = lockedNull ? undefined : activeRubric;
   const indexStatus = getRubricIndexStatus(effectiveRubric);
+  const rubricIndexRequestState = effectiveRubric
+    ? rubricIndexRequestStates[effectiveRubric.id]
+    : undefined;
+  const rubricIndexing = rubricIndexRequestState?.status === 'loading';
+  const rubricIndexError = rubricIndexRequestState?.status === 'error'
+    ? rubricIndexRequestState.message
+    : undefined;
 
   return (
     <div className="ds-view ds-view-chat">
@@ -202,12 +211,12 @@ export const ChatView = memo(function ChatView({
                 ) : null}
               </span>
             ) : null}
-            {effectiveRubric && indexStatus !== 'not_indexed' && (
+            {effectiveRubric && (indexStatus !== 'not_indexed' || rubricIndexing) && (
               <FileSearchStatusBadge
-                status={indexStatus}
-                error={effectiveRubric.fileSearchError ?? effectiveRubric.file_search_error}
+                status={rubricIndexing ? 'indexing' : indexStatus}
+                error={rubricIndexError ?? effectiveRubric.fileSearchError ?? effectiveRubric.file_search_error}
                 onRetry={
-                  indexStatus === 'failed' && effectiveRubric.id && onRetryIndex
+                  !rubricIndexing && indexStatus === 'failed' && effectiveRubric.id && onRetryIndex
                     ? () => onRetryIndex(effectiveRubric.id)
                     : undefined
                 }
