@@ -74,6 +74,11 @@ SUPABASE_ACCESS_TOKEN=sbp_... SUPABASE_PROJECT_REF=rqszloxxegvxaedptcqj npm run 
 npm run verify:release
 ```
 
+After deployment access and the deterministic demo account are approved, use
+[`docs/submission/hosted-golden-flow-checklist.md`](../docs/submission/hosted-golden-flow-checklist.md)
+to run the two fresh-profile golden flows and record checkpoint evidence. A
+local fixture or placeholder build is not hosted-demo evidence.
+
 ### Docker Production Deployment
 ```bash
 # Build and run the single-worker production stack

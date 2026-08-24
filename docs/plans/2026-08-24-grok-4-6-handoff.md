@@ -50,11 +50,12 @@ Web:
 - Web commit `14395cd` adds explicit owner-role annotations to every pending human-owned submission gate and makes the structural validator reject any future pending gate without an `Owner:` annotation. This improves handoff accountability without treating role labels as completed approvals; the strict final-input gate remains red until real links, pilot data, credential handling, and sign-offs exist.
 - After `14395cd`, the full non-hosted `npm run verify:release` wrapper passed again: web Vitest 19/106, claims 8/8, submission tests 7/7, structural validation, public-placeholder build, and built-environment scan. Hosted allowlist verification remains skipped without a protected token.
 - Communication phase commit `6bcb1b9` adds the human-owned pitch claims brief, a required `npm run validate:pitch` retired-claim guard, and the corresponding README/CI/release-wrapper wiring. Claim tests are now 11/11; this guards the preparation brief without marking the final pitch approved.
+- Phase 14 preparation commit adds `docs/submission/hosted-golden-flow-checklist.md` and structural validation for its two-run/A1–A8/privacy/fallback/sign-off markers. Submission tests are now 8/8; the checklist remains preparation only and does not claim a hosted run.
 - Clean clone `C:\Users\gjins\Desktop\studypilot-clean-clone-20260824-pitch-guard` at `6bcb1b9` reproduced npm ci (0 vulnerabilities), claim tests 11/11, sibling-aware claims/pitch validation, submission tests 7/7, the full non-hosted release wrapper, and web Playwright 4/4. The clone was clean; hosted allowlist verification remained skipped.
 - A new clean clone at `C:\Users\gjins\Desktop\studypilot-clean-clone-20260824-latest` (head `ceda67f`) reproduced the current tracked-head evidence: `npm ci` with 0 vulnerabilities, pilot validator tests 6/6 and empty-template validation, `verify:release`, web Playwright 4/4, backend pytest 26, Deno 42, and Supabase pgTAP 291. The clone was clean and its local Supabase stack was stopped; this does not establish hosted deployment or remote CI.
 - A second clean clone at `C:\Users\gjins\Desktop\studypilot-clean-clone-20260824-submission-owners` (head `97549c0`) reproduced the owner-aware submission gate: `npm ci` with 0 vulnerabilities, submission tests 7/7, sibling-aware claims validation, eight owned-but-pending final inputs, and the full non-hosted `verify:release` wrapper. The clone was clean; hosted allowlist verification remained skipped without protected credentials.
 - `node --test scripts/validate-claims.test.mjs` (11/11), the sibling-aware six-document claims run, and `npm run validate:pitch` passed. The demo script and pitch brief are guarded against retired claims but still require human review for timing, hosted evidence, pilot wording, and final approval.
-- `node --test scripts/validate-submission-package.test.mjs` (7/7) and `npm run validate:submission` pass the current report/demo/checklist structure, including pending-gate owner annotations. `node scripts/validate-submission-package.mjs --require-final-inputs` intentionally exits 1 until the eight human-owned URL, pilot, media, credential-rotation, contribution, and sign-off inputs are supplied.
+- `node --test scripts/validate-submission-package.test.mjs` (8/8) and `npm run validate:submission` pass the current report/demo/hosted-flow/checklist structure, including pending-gate owner annotations. `node scripts/validate-submission-package.mjs --require-final-inputs` intentionally exits 1 until the eight human-owned URL, pilot, media, credential-rotation, contribution, and sign-off inputs are supplied.
 - Web commit `d85b27f` adds the missing FastAPI ownership proof, completes the local RLS update matrix, and changes the hosted-function CI job to run only on protected branches. The CI step visibly reports `SKIPPED` when protected Supabase secrets are absent; this is not a hosted verification pass.
 - Web CI now has a separate `web-e2e` job that installs Chromium and runs `npm run test:e2e -- --reporter=line` against the deterministic fixture. This makes the local web E2E gate executable in CI; no remote run is claimed until the local heads are pushed.
 
@@ -86,6 +87,11 @@ Extension:
    creating the human-owned hosted demo account; the GitHub remotes are
    documented in the submission checklist, but the new local commits are not
    pushed yet.
+
+   Execute the two-run hosted path from
+   [`hosted-golden-flow-checklist.md`](../submission/hosted-golden-flow-checklist.md)
+   once the deployment URL, beta access, and demo account are approved. The
+   checklist is preparation only; no hosted run is currently claimed.
 
    The exact read-first/admin-approved branch-protection procedure is now in
    [`context/runbook.md`](../../context/runbook.md); it was not executed here.

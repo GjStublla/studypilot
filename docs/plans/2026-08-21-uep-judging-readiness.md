@@ -656,6 +656,7 @@ The extension has one live implementation, one dashboard integration path, and n
 - [ ] Edit out loading pauses, notifications, unrelated tabs, credentials, personal data, and browser debug UI; keep the final video under 1:58 to leave upload/transcode margin below two minutes.
 - [ ] Record a backup video and prepare a text-input fallback plus screenshots of each golden-path checkpoint.
 - [ ] Run the full release checklist from a clean clone, then have a teammate follow the README without verbal help.
+- [x] Prepare `docs/submission/hosted-golden-flow-checklist.md` with two clean-profile runs, checkpoint evidence, privacy/fallback rules, and owner sign-off; the actual hosted execution remains external.
 
 **Verify**
 
