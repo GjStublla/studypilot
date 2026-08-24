@@ -99,6 +99,11 @@ function getLoggedInStudent() {
 
 const STUDENT = getLoggedInStudent();
 
+type DashboardBootstrapState =
+  | { status: 'loading' }
+  | { status: 'ready' }
+  | { status: 'error' };
+
 /* ---------- Component ---------- */
 
 function replaceDashboardHash(chatId?: string | null): void {
@@ -133,8 +138,7 @@ export default function Dashboard({
   const [chatsLoaded, setChatsLoaded] = useState(false);
   const [transcripts, setTranscripts] = useState<Record<string, TranscriptLine[]>>({});
   const [transcriptLoading, setTranscriptLoading] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
+  const [bootstrapState, setBootstrapState] = useState<DashboardBootstrapState>({ status: 'loading' });
   const [aiUsage, setAiUsage] = useState<AiUsage | null>(null);
   const [extensionHelpOpen, setExtensionHelpOpen] = useState(false);
   const chatsRef = useRef<DashboardChat[]>([]);
@@ -336,7 +340,6 @@ export default function Dashboard({
   // failing endpoint doesn't blank the whole dashboard — we render whatever loaded.
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     Promise.allSettled([fetchSessions(), fetchRubrics(), fetchActionItems(), refreshChats()])
       .then(([s, r, a, c]) => {
         if (cancelled) return;
@@ -348,17 +351,15 @@ export default function Dashboard({
         }
         if (a.status === 'fulfilled') setActionItems(a.value);
         if (c.status === 'rejected') setChatsLoaded(true);
-        if (
+        const fatalLoadError =
           AUTH_REQUIRED &&
           s.status === 'rejected' &&
           r.status === 'rejected' &&
-          a.status === 'rejected'
-        ) {
-          setLoadError(true);
-        }
+          a.status === 'rejected';
+        setBootstrapState({ status: fatalLoadError ? 'error' : 'ready' });
       })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+      .catch(() => {
+        if (!cancelled) setBootstrapState({ status: 'ready' });
       });
     return () => {
       cancelled = true;
@@ -929,12 +930,12 @@ export default function Dashboard({
         />
 
         <div className="ds-canvas">
-          {loading ? (
+          {bootstrapState.status === 'loading' ? (
             <div className="ds-state ds-state-loading">
               <span className="ds-state-spinner" aria-hidden="true" />
               <p>Loading your workspace…</p>
             </div>
-          ) : loadError ? (
+          ) : bootstrapState.status === 'error' ? (
             <div className="ds-state ds-state-error">
               <p>We couldn't load your data. Check your connection and try again.</p>
               <button type="button" className="ds-btn" onClick={() => window.location.reload()}>
