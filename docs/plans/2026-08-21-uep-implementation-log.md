@@ -1158,3 +1158,10 @@ Web: this log only. Phase 5 was not started.
 - Added `docs/validation/pilot-protocol.md` with one controlled rubric-to-dashboard task, fixed measures, neutral facilitation, consent, and privacy rules.
 - Added `docs/validation/pilot-results.csv` with the locked anonymous schema and `pilot-summary.md` with evidence/limitations/quote sections.
 - No participants were recruited or data collected; those remain human-approved external gates.
+
+### Phase 14 submission-preparation slice — 2026-08-24
+
+- Expanded `docs/submission/final-report-content.md` into the PDF's required nine-section order with evidence-qualified stack, architecture, features, challenges, and contribution placeholders.
+- Added `docs/submission/demo-script.md` with the sub-two-minute golden path, fallback, and recording rules.
+- Added `docs/submission/submission-checklist.md` for exact commits, links, verification evidence, safety sign-off, and human approvals.
+- The report, video, deployed URL, pilot results, diagram PNG, and contribution approvals remain incomplete external deliverables.
