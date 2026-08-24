@@ -26,7 +26,7 @@ Web:
 - Supabase local pgTAP: 5 files / 287 tests after a clean reset.
 - Production build with approved public HTTPS placeholders: passed.
 - `node scripts/verify-built-env.mjs dist`: passed.
-- Web Playwright golden flow: 1/1 passed in 8.7s with a deterministic fixture covering rubric upload/extraction, rubric-scoped SSE coaching, action-item refresh, and reload persistence. The fixture uses only public placeholder values and is excluded from Vitest discovery.
+- Web Playwright golden flow: 1/1 passed (latest full run 18.7s, including axe) with a deterministic fixture covering rubric upload/extraction, rubric-scoped SSE coaching, action-item refresh, and reload persistence. The fixture uses only public placeholder values and is excluded from Vitest discovery.
 - Dashboard axe check: 0 violations on the authenticated action-items view during the same golden flow; the check is committed in `f89d658`.
 - Production-preview Lighthouse medians over three runs per route: landing performance `0.85`, accessibility `1.00`, best practices `1.00`, SEO `1.00`; auth performance `0.94`, accessibility `1.00`, best practices `1.00`, SEO `1.00`. These are local production-preview measurements, not hosted production claims.
 - Supabase local lint: exit 0; one pre-existing unused-local warning remains.
