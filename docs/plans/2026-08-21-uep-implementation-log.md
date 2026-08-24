@@ -1225,3 +1225,9 @@ Web: this log only. Phase 5 was not started.
 - Realtime callbacks now use Supabase's `RealtimePostgresChangesPayload` type. Dashboard handlers consume the installed client's `eventType` discriminator instead of the nonexistent `event` property, preserving INSERT/UPDATE/DELETE behavior while making the boundary compile-checked.
 - Added adapter characterization tests for stable criterion IDs, null relation normalization, and session display defaults.
 - Verification: `npx tsc --noEmit`, full web Vitest (16 files / 90 tests), and `npm run build` all passed. The pre-existing whitespace-only `Dashboard.tsx` change remains unstaged and preserved.
+
+### Phase 9A study-mode composition — 2026-08-24
+
+- Canonical extension commit `206da8d` extracted the dedicated Flashcards/Quiz panel into `src/content/StudyModePanel.tsx`, preserving the existing animation, retry/regenerate controls, structured-card viewers, and perfect-score callback.
+- `FloatingStudyPilot.tsx` is now approximately 2,070 lines; the remaining body still owns the main chat composer, answer card, voice dock, and study-session controls.
+- Extension verification after the extraction: typecheck, 14 Vitest files / 68 tests, production build, manifest validation baseline, and 10/10 unpacked Playwright checks all passed.
