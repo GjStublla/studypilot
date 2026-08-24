@@ -1329,3 +1329,14 @@ Web: this log only. Phase 5 was not started.
 
 - Canonical extension commit `ea76936` adds an e2e-only Supabase fixture origin, an explicit `build:e2e` mode, and a connected shared-chat browser flow. The test selects a rubric-scoped chat, commits an SSE coaching response, refreshes canonical history, minimizes/reopens the panel, and reloads the study page before asserting the same response remains available.
 - Extension verification after the slice: typecheck passed; Vitest passed with 16 files / 74 tests; production build and manifest validation passed; unpacked Playwright passed 11/11. The fixture is deterministic and contains no hosted credentials; a real hosted run remains an external release gate.
+
+### Phase 8B dashboard action-item refresh — 2026-08-24
+
+- Web commit `c34cd77` refreshes the canonical action-item list after a coaching stream settles, so action items created by the coach appear immediately in the dashboard without requiring a reload. The existing mounted guard prevents the follow-up fetch from mutating an unmounted dashboard.
+- Added a chat-sync regression assertion for the initial bootstrap fetch plus the post-commit refresh. Full web Vitest remained green at 17 files / 96 tests, and the production build passed.
+
+### Phase 10 web rubric/chat/action-item golden flow — 2026-08-24
+
+- Web commit `2b47d6c` adds a deterministic Playwright fixture and `npm run test:e2e`. The browser path uploads a rubric, exercises extraction/indexing status, opens the rubric-scoped chat, streams and commits a grounded coaching response, verifies the refreshed action item, reloads, and verifies the persisted chat and rubric context again.
+- The fixture mocks the FastAPI bootstrap endpoints and Supabase REST/Storage/Edge Function responses with public placeholders only; no hosted credentials are stored. Vitest explicitly excludes `e2e/**` so the unit gate and browser gate remain separate.
+- Verification: web Playwright 1/1 passed in 8.7s; full Vitest 17 files / 96 tests passed; `npx tsc --noEmit` and production build passed. Hosted Supabase allowlist verification is still skipped without a process-scoped `SUPABASE_ACCESS_TOKEN`.
