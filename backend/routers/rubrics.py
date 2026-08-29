@@ -13,8 +13,10 @@ modify their own rubric rows.
 
 from __future__ import annotations
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 from dependencies import verify_token, get_token
 from supabase_client import get_user_client
@@ -45,13 +47,22 @@ class RubricResponse(BaseModel):
 # Criterion supplied when creating a rubric.
 # id is omitted — the DB generates it.
 class CreateCriterionRequest(BaseModel):
-    name: str = Field(min_length=1, max_length=200, strip_whitespace=True)
+    name: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=200),
+    ]
     max_score: int = Field(default=4, ge=1, le=100)
 
 
 class CreateRubricRequest(BaseModel):
-    title: str = Field(min_length=1, max_length=300, strip_whitespace=True)
-    course: str = Field(min_length=1, max_length=200, strip_whitespace=True)
+    title: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=300),
+    ]
+    course: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=200),
+    ]
     criteria: list[CreateCriterionRequest] = Field(
         default=[],
         # Reasonable upper bound — a rubric with 30+ criteria is unusable

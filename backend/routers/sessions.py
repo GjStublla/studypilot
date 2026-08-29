@@ -13,11 +13,11 @@ user, so the DB enforces that users can only read/write their own rows.
 
 from __future__ import annotations
 
-from typing import Literal, NoReturn
+from typing import Annotated, Literal, NoReturn
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 from dependencies import verify_token, get_token
 from supabase_client import get_user_client
@@ -132,7 +132,10 @@ class SessionDetail(BaseModel):
 
 # POST /sessions
 class CreateSessionRequest(BaseModel):
-    title: str = Field(min_length=1, max_length=300, strip_whitespace=True)
+    title: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=300),
+    ]
     mode: Literal[
         "Essay Coach", "Presentation Coach", "Study Coach", "Lecture", "Research Reader"
     ]
@@ -152,7 +155,10 @@ class CreateSessionResponse(BaseModel):
 # POST /sessions/{id}/messages
 class CreateMessageRequest(BaseModel):
     role: Literal["user", "ai", "system"]
-    message_text: str = Field(min_length=1, max_length=10_000, strip_whitespace=True)
+    message_text: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=10_000),
+    ]
     time_offset_seconds: int = Field(default=0, ge=0)
 
 

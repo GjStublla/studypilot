@@ -14,13 +14,17 @@ export function extractCitations(input: {
       .map((c, index) => ({
         title: (c.title || `Source ${index + 1}`).trim() || `Source ${index + 1}`,
         uri: c.uri ?? null,
-        snippet: c.snippet ?? null,
+        snippet: c.snippet ?? c.text ?? null,
+        ...(typeof c.pageNumber === 'number' ? { pageNumber: c.pageNumber } : {}),
         sourceIndex: c.sourceIndex ?? index,
       }))
       .filter((c) => c.title.length > 0);
   }
 
   const meta = input.grounding_metadata as GroundingMetadata | null | undefined;
+  if (Array.isArray(meta?.citations) && meta.citations.length > 0) {
+    return extractCitations({ citations: meta.citations });
+  }
   const chunks = meta?.groundingChunks;
   if (!Array.isArray(chunks) || chunks.length === 0) return [];
 

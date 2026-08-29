@@ -6,8 +6,10 @@ Endpoints:
     PATCH /users/me    Update allowed profile fields (name, theme, default_coach_mode)
 """
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 from dependencies import verify_token, get_token
 from supabase_client import get_user_client
@@ -33,7 +35,10 @@ class UpdateProfileRequest(BaseModel):
     All fields are optional so the client can send a partial update.
     Email and initials are derived/managed by the DB and are not editable here.
     """
-    name: str | None = Field(default=None, min_length=1, max_length=100, strip_whitespace=True)
+    name: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=100),
+    ] | None = None
     theme: str | None = Field(default=None, pattern="^(dark|light)$")
     default_coach_mode: str | None = Field(default=None, pattern="^(essay|lecture|reader)$")
 

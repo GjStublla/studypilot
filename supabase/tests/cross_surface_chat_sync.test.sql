@@ -281,8 +281,8 @@ select policies_are(
 select policies_are(
   'public',
   'dashboard_chat_turns',
-  array[]::text[],
-  'turn claims have no client policies'
+  array['Service role manages dashboard chat turns'],
+  'turn claims expose only the explicit service-role policy'
 );
 
 select ok(exists (

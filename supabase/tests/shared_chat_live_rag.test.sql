@@ -127,8 +127,8 @@ select is(
 );
 select is(
   has_function_privilege('authenticated', 'public.ensure_chat_rubric_locked(uuid, uuid)', 'execute'),
-  true,
-  'authenticated users can lock an effective chat rubric'
+  false,
+  'authenticated users cannot call the service-only chat rubric lock'
 );
 select is(
   has_function_privilege(
@@ -207,8 +207,8 @@ select policies_are(
 select policies_are(
   'public',
   'live_chat_rubric_lookups',
-  array[]::text[],
-  'lookup claims have no client policies'
+  array['Service role manages live rubric lookup claims'],
+  'lookup claims expose only the explicit service-role policy'
 );
 
 select ok(exists (
@@ -526,10 +526,17 @@ update public.rubrics
 set active = true
 where id = '41333333-3333-4333-8333-333333333333';
 
+reset role;
+select set_config('request.jwt.claim.role', 'service_role', true);
+set local role service_role;
+
 select is(
-  public.ensure_chat_rubric_locked('a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1')->>'rubric_id',
+  public.ensure_chat_rubric_locked(
+    'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1',
+    '31111111-1111-4111-8111-111111111111'
+  )->>'rubric_id',
   '41333333-3333-4333-8333-333333333333',
-  'ensure_chat_rubric_locked pins the active rubric when unlocked'
+  'service role ensure_chat_rubric_locked pins the active rubric when unlocked'
 );
 
 -- Live session RLS visibility
