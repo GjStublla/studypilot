@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { GroundingCitation } from './studypilot-types';
 import { extractCitations } from './groundingCitations';
 
 describe('extractCitations', () => {
@@ -35,6 +36,25 @@ describe('extractCitations', () => {
       title: 'Web source',
       uri: 'https://example.com/b',
     });
+  });
+
+  it('preserves normalized Edge citation text and page numbers', () => {
+    const storedCitation = {
+      title: 'Assessment rubric',
+      uri: 'ragFiles/rubric.pdf',
+      text: 'The thesis must be specific.',
+      pageNumber: 3,
+    } as unknown as GroundingCitation;
+
+    expect(extractCitations({ citations: [storedCitation] })).toEqual([
+      {
+        title: 'Assessment rubric',
+        uri: 'ragFiles/rubric.pdf',
+        snippet: 'The thesis must be specific.',
+        pageNumber: 3,
+        sourceIndex: 0,
+      },
+    ]);
   });
 
   it('returns an empty list when no grounding is present', () => {

@@ -135,6 +135,9 @@ export interface GroundingCitation {
   title: string;
   uri?: string | null;
   snippet?: string | null;
+  /** Edge normalization uses `text`; the UI aliases it to `snippet`. */
+  text?: string | null;
+  pageNumber?: number | null;
   sourceIndex?: number;
 }
 
@@ -151,6 +154,7 @@ export interface GroundingChunk {
 }
 
 export interface GroundingMetadata {
+  citations?: GroundingCitation[];
   groundingChunks?: GroundingChunk[];
   groundingSupports?: unknown[];
   retrievalQueries?: string[];

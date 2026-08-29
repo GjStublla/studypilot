@@ -664,15 +664,7 @@ export async function getDashboardChatMessages(chatId: string): Promise<Dashboar
     .order('id', { ascending: true });
 
   if (error) {
-    // Fallback when citations column is not present yet.
-    const { data: legacy, error: legacyError } = await supabase
-      .from('dashboard_chat_messages')
-      .select('*')
-      .eq('chat_id', chatId)
-      .order('server_sequence', { ascending: true })
-      .order('id', { ascending: true });
-    if (legacyError) throw error;
-    return legacy || [];
+    throw error;
   }
   return data || [];
 }

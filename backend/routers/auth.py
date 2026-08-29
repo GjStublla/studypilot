@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException, Header, Request, status
-from gotrue.errors import AuthApiError
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from supabase_auth.errors import AuthApiError
+from pydantic import BaseModel, EmailStr, Field, StringConstraints, field_validator
 import re
+from typing import Annotated
 
 from rate_limit import limiter
 from supabase_client import supabase, supabase_admin
@@ -25,7 +26,10 @@ PASSWORD_POLICY_MSG = (
 
 class SignUpRequest(BaseModel):
     email: EmailStr
-    name: str = Field(min_length=1, max_length=100, strip_whitespace=True)
+    name: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=100),
+    ]
     password: str = Field(min_length=8)
 
     @field_validator("password")

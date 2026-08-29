@@ -476,7 +476,8 @@ const MessageBubble = memo(function MessageBubble({ message, student, thinking =
 });
 
 function CitationItem({ citation, index }: CitationItemProps) {
-  const label = citation.title || `Source ${index + 1}`;
+  const pageLabel = citation.pageNumber ? ` (p. ${citation.pageNumber})` : '';
+  const label = `${citation.title || `Source ${index + 1}`}${pageLabel}`;
   return (
     <li className="ds-citation">
       <span className="ds-citation-index">{index + 1}</span>
