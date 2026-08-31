@@ -1,5 +1,16 @@
 # UEP submission checklist
 
+## Current handoff - 2026-09-01
+
+- Verified engineering baselines: web `80410e9`; canonical extension `daf1a16`. The judging-document refresh follows these code baselines.
+- Web: formatting, lint, dashboard boundary, typecheck, 108 Vitest tests, 7 local-env tests, production build, built-env scan, and Playwright 4/4 passed.
+- Extension: formatting, lint, typecheck, 98 Vitest tests, production build, manifest validation, and unpacked-extension Playwright 15/15 passed.
+- Both repositories were cleaned of redundant `.env.local` overrides. Required Docker env files remain ignored; tracked env files are examples or explicit public build modes.
+- A 21.8-second local extension showcase exists outside Git as a draft. It is not the final deployed golden-flow demo required by the rubric.
+- Honest external blockers remain: the supplied Google service-account key is revoked, hosted Supabase secrets require Owner/Administrator access, pilot evidence is pending, and final media/team/mentor sign-off is pending.
+
+The detailed 2026-08-24 evidence below is retained as an implementation audit trail. Where a historical count or head differs, this current handoff section is authoritative.
+
 ## Local phase evidence — 2026-08-24
 
 This section records what is reproducible in the workspace; it is not a deployment or mentor sign-off.
