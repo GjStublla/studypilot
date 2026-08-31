@@ -1,4 +1,4 @@
-# studypilot
+# StudyPilot
 
 StudyPilot is a rubric-aware coaching loop across the browser and dashboard: it uses the page, the student's question, and an uploaded rubric to coach the next improvement, then carries the conversation and action items into the dashboard.
 
@@ -6,7 +6,27 @@ The beta uses your microphone and the page context you choose to share. Answers 
 
 Live microphone audio is processed by Google Vertex AI while a session is active. Screenshots are sent only when you enable them. Chat and session history save only when “Save to dashboard” is on.
 
-Built with React, TypeScript, and Vite.
+Built with React, TypeScript, Vite, FastAPI, Supabase, Vertex AI/Gemini, and a
+Manifest V3 Chrome extension. Model credentials and privileged database keys
+remain behind authenticated server boundaries.
+
+## UEP judging evidence
+
+The judge-facing evidence is kept next to the code so technical claims remain
+reproducible:
+
+- [System architecture](docs/architecture/system.png) and
+  [runtime-boundary ADR](docs/adr/0001-runtime-boundaries.md)
+- [UEP judging evidence matrix](docs/submission/judging-evidence-matrix.md)
+- [Final report draft](docs/submission/final-report-content.md)
+- [Two-minute demo script](docs/submission/demo-script.md) and
+  [synthetic demo fixture](docs/submission/demo-fixture.md)
+- [Submission checklist](docs/submission/submission-checklist.md)
+- [Canonical Chrome extension](https://github.com/GjStublla/studypilot-extension)
+
+The evidence matrix distinguishes local engineering proof from hosted, pilot,
+and mentor-owned evidence. Local test results are never presented as deployed
+availability or measured learning outcomes.
 
 ## Local quality gate
 
