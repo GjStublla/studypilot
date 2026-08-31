@@ -40,7 +40,8 @@ the hosted daily limit.
 - Node.js 22 or later
 - Python 3.13 when running the FastAPI backend or pytest outside Docker (the backend image pins `python:3.13-slim`)
 - Docker Desktop
-- Gemini service-account credentials for real local AI responses
+- A Google Cloud project with the Vertex AI API and billing enabled
+- Each developer's own service-account credentials with the Vertex AI User role for real local AI responses
 
 Install dependencies and start local Supabase:
 
@@ -54,11 +55,25 @@ The repository tracks `.env.studypilot-local` with the standard public local
 Supabase URL and anon key, so no frontend secret setup is required. Use
 `npm run local:status` when you need to inspect the running service URLs.
 
-For real Gemini calls, copy
+For real Gemini calls, every developer must create their own ignored local file by copying
 [`supabase/functions/.env.local.example`](supabase/functions/.env.local.example)
-to `supabase/functions/.env.local` and fill in the service-account values. The
-tracked example enables the AI-usage bypass, but the server also verifies that
-it is running against a local Supabase hostname before honoring it.
+to `supabase/functions/.env.local` and filling in either the service-account
+JSON or the split email/private-key values. A `GEMINI_API_KEY` is not sufficient:
+StudyPilot's text, RAG, and Live paths use Vertex service-account OAuth. Do not
+commit this file or send one shared private key to the team; use one
+least-privilege service account per developer in the same Google Cloud project.
+
+```powershell
+Copy-Item supabase/functions/.env.local.example supabase/functions/.env.local
+# Edit the copied file, then validate it without printing any secret values.
+npm run local:check
+```
+
+The tracked example enables the AI-usage bypass, but the server also verifies
+that it is running against a local Supabase hostname before honoring it. The
+preflight validates local file structure and required variables; the first AI
+request is still the authoritative check that the credential is active, the
+Vertex AI API is enabled, and the service account has access.
 
 Run the functions and dashboard in separate terminals:
 
@@ -77,6 +92,21 @@ Stop the local services with:
 ```bash
 npm run local:stop
 ```
+
+### Local Gemini troubleshooting
+
+| Symptom                                             | Cause / fix                                                                                                                                                  |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `missing supabase/functions/.env.local`             | Copy the tracked example, add your own Vertex service-account values, then run `npm run local:check`.                                                        |
+| `GEMINI_API_KEY is not used`                        | This app is Vertex-only. Configure `GEMINI_SERVICE_ACCOUNT_CREDENTIALS`, or both `GOOGLE_CLIENT_EMAIL` and `GOOGLE_PRIVATE_KEY`.                             |
+| Google `401` or `invalid_grant`                     | The service-account key is malformed, revoked, or does not match the email. Create a fresh key for that developer and replace only their local ignored file. |
+| Google `403` or `PERMISSION_DENIED`                 | Enable billing and the Vertex AI API in the configured project, then grant that developer's service account the Vertex AI User role.                         |
+| Supabase status reports a missing container         | Start Docker Desktop, run `npm run local:stop`, then `npm run local:start`; each computer needs its own local Supabase stack.                                |
+| The extension calls `127.0.0.1` on another computer | Loopback always means that friend's computer, not yours. They must run their own local stack and local Edge Functions.                                       |
+
+The default model IDs are intentional: text/RAG uses `gemini-3.5-flash`, Live
+uses `gemini-3.1-flash-live-preview`, Vertex interactions default to `global`,
+and Vertex RAG defaults to `us-central1`.
 
 ### Clean-clone verification
 

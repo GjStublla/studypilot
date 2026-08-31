@@ -35,6 +35,7 @@ run('lint', ['run', 'lint']);
 run('dashboard boundary', ['run', 'verify:dashboard-boundary']);
 run('typecheck', ['run', 'typecheck']);
 run('unit tests', ['test', '--', '--run']);
+run('local AI environment tests', ['run', 'test:local-ai-env']);
 
 const buildEnv = {
   ...process.env,
