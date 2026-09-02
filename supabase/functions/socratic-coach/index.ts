@@ -68,7 +68,7 @@ type RequestImage = {
 };
 
 type ClientContext = {
-  page?: { title?: string; url?: string };
+  page?: { title?: string; url?: string; text?: string };
   action?: string;
   selection?: string;
   integrity?: string;
@@ -161,6 +161,7 @@ function normalizeClientContext(value: unknown): ClientContext | undefined {
     : undefined;
   const title = optionalLimitedString(rawPage?.title, 500);
   const url = optionalLimitedString(rawPage?.url, 2_000);
+  const pageText = optionalLimitedString(rawPage?.text, 6_000);
   const action = optionalLimitedString(record.action, 500);
   const selection = optionalLimitedString(record.selection, 4_000);
   const integrity = optionalLimitedString(record.integrity, 1_000);
@@ -169,15 +170,21 @@ function normalizeClientContext(value: unknown): ClientContext | undefined {
     : undefined;
 
   if (
-    !title && !url && !action && !selection && !integrity &&
+    !title && !url && !pageText && !action && !selection && !integrity &&
     screenshotShared === undefined
   ) {
     return undefined;
   }
 
   return {
-    ...(title || url
-      ? { page: { ...(title ? { title } : {}), ...(url ? { url } : {}) } }
+    ...(title || url || pageText
+      ? {
+        page: {
+          ...(title ? { title } : {}),
+          ...(url ? { url } : {}),
+          ...(pageText ? { text: pageText } : {}),
+        },
+      }
       : {}),
     ...(action ? { action } : {}),
     ...(selection ? { selection } : {}),
@@ -197,7 +204,14 @@ function formatClientContext(context: ClientContext | undefined): string {
   if (context.screenshotShared !== undefined) {
     lines.push(`Screenshot shared: ${context.screenshotShared ? "yes" : "no"}`);
   }
-  return lines.length > 0 ? `CURRENT CLIENT CONTEXT:\n${lines.join("\n")}` : "";
+  const header = lines.length > 0
+    ? `CURRENT CLIENT CONTEXT:\n${lines.join("\n")}`
+    : "";
+  if (context.page?.text) {
+    const textBlock = `PAGE CONTENT:\n${context.page.text}`;
+    return header ? `${header}\n\n${textBlock}` : textBlock;
+  }
+  return header;
 }
 
 function normalizeImages(

@@ -112,6 +112,7 @@ export interface ActionItemsViewProps {
   rubricsById: ReadonlyMap<string, Rubric>;
   query: string;
   onToggle: (id: string) => void;
+  onDelete: (id: string) => void;
   onOpenSession: (id: string) => void;
 }
 
@@ -120,6 +121,7 @@ export interface SettingsViewProps {
   theme: Theme;
   coachMode: CoachMode;
   aiUsage: DashboardAiUsage | null;
+  savedNotice: string | null;
   onSetCoachMode: (mode: CoachMode) => void;
   onSignOut: () => void;
   onSetTheme: (theme: Theme) => void;
@@ -130,6 +132,7 @@ export interface SessionsViewProps {
   query: string;
   onOpenSession: (id: string) => void;
   onContinueInChat: (id: string) => void;
+  onDelete: (id: string) => void;
 }
 
 export interface ContextPanelProps {

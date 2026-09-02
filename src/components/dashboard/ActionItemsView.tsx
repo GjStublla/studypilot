@@ -1,7 +1,8 @@
-import { memo, useMemo, useState } from 'react';
-import { BookOpen, Check, ScrollText } from 'lucide-react';
+import { memo, useMemo } from 'react';
+import { BookOpen, Check, ScrollText, Trash2 } from 'lucide-react';
 import { EmptyState } from './DashboardPrimitives';
 import type { ActionItemsViewProps } from './dashboard-types';
+import { useState } from 'react';
 
 export const ActionItemsView = memo(function ActionItemsView({
   open,
@@ -10,9 +11,11 @@ export const ActionItemsView = memo(function ActionItemsView({
   rubricsById,
   query,
   onToggle,
+  onDelete,
   onOpenSession,
 }: ActionItemsViewProps) {
   const [tab, setTab] = useState<'open' | 'done'>('open');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const q = query.trim().toLowerCase();
   const items = useMemo(() => {
     const base = tab === 'open' ? open : done;
@@ -22,6 +25,15 @@ export const ActionItemsView = memo(function ActionItemsView({
       return [a.text, sessionTitle].some((f) => f.toLowerCase().includes(q));
     });
   }, [tab, open, done, q, sessionsById]);
+
+  function handleDeleteClick(id: string) {
+    if (confirmDeleteId === id) {
+      onDelete(id);
+      setConfirmDeleteId(null);
+    } else {
+      setConfirmDeleteId(id);
+    }
+  }
 
   return (
     <div className="ds-view ds-view-todo">
@@ -59,10 +71,10 @@ export const ActionItemsView = memo(function ActionItemsView({
           title={q ? 'No matches.' : tab === 'open' ? 'All clear.' : 'Nothing completed yet.'}
           body={
             q
-              ? `No ${tab} action items match “${query.trim()}”.`
+              ? `No ${tab} action items match "${query.trim()}".`
               : tab === 'open'
                 ? 'New action items from your next coaching session will land here.'
-                : 'Check items off as you revise and they’ll show up here.'
+                : "Check items off as you revise and they'll show up here."
           }
         />
       ) : (
@@ -70,6 +82,7 @@ export const ActionItemsView = memo(function ActionItemsView({
           {items.map((a) => {
             const session = a.sessionId ? sessionsById.get(a.sessionId) : undefined;
             const rubric = a.rubricId ? rubricsById.get(a.rubricId) : undefined;
+            const pendingDelete = confirmDeleteId === a.id;
             return (
               <li key={a.id} className={a.done ? 'is-done' : ''}>
                 <button
@@ -98,6 +111,17 @@ export const ActionItemsView = memo(function ActionItemsView({
                     )}
                   </div>
                 </div>
+                <button
+                  type="button"
+                  className={`ds-icon-btn ds-icon-btn-danger ${pendingDelete ? 'is-confirm' : ''}`}
+                  aria-label={pendingDelete ? 'Confirm delete' : 'Delete action item'}
+                  title={pendingDelete ? 'Click again to confirm deletion' : 'Delete'}
+                  onClick={() => handleDeleteClick(a.id)}
+                  onBlur={() => setConfirmDeleteId(null)}
+                >
+                  <Trash2 size={13} strokeWidth={1.8} />
+                  {pendingDelete && <span className="ds-icon-btn-label">Delete?</span>}
+                </button>
               </li>
             );
           })}

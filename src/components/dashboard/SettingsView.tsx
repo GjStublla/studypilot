@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { Check } from 'lucide-react';
 import { DsButton } from './DashboardPrimitives';
 import { SETTINGS_COACH_MODES, type SettingsViewProps } from './dashboard-types';
 
@@ -7,6 +8,7 @@ export const SettingsView = memo(function SettingsView({
   theme,
   coachMode,
   aiUsage,
+  savedNotice,
   onSetCoachMode,
   onSignOut,
   onSetTheme,
@@ -18,6 +20,12 @@ export const SettingsView = memo(function SettingsView({
           <h2 className="ds-h2">Settings</h2>
           <p className="ds-lede">A short list, kept short on purpose.</p>
         </div>
+        {savedNotice && (
+          <span className="ds-save-notice" aria-live="polite">
+            <Check size={13} strokeWidth={2.4} />
+            {savedNotice}
+          </span>
+        )}
       </header>
 
       <div className="ds-stack ds-stack-tight">
@@ -98,7 +106,7 @@ export const SettingsView = memo(function SettingsView({
           </div>
           <p className="ds-prose">
             Live microphone audio is processed by Google Vertex AI while a session is active. Screenshots are sent only
-            when you enable them. Chat and session history save only when “Save to dashboard” is on.
+            when you enable them. Chat and session history save only when "Save to dashboard" is on.
           </p>
           <p className="ds-prose ds-prose-quiet">Cloud sync is a single toggle, never a default.</p>
         </article>
