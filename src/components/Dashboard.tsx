@@ -23,7 +23,7 @@ import {
   retryRubricIndexing,
   updateDashboardChat,
 } from '../lib/studypilot-api';
-import { fetchActionItems, fetchSessionTranscript, setActionItemDone, activateRubric } from '../lib/dashboardApi';
+import { fetchActionItems, fetchSessionTranscript, setActionItemDone, activateRubric, deleteRubric } from '../lib/dashboardApi';
 import type { Rubric, Session } from '../lib/dashboard-types';
 import { sendCoachingMessage } from '../lib/socraticCoach';
 import type { DashboardChat } from '../lib/studypilot-types';
@@ -622,6 +622,26 @@ export default function Dashboard({
     [activeRubricId, setRubrics],
   );
 
+  const handleDeleteRubric = useCallback(
+    async (rubricId: string) => {
+      // Optimistically remove from local state.
+      const removed = rubrics.find((r) => r.id === rubricId);
+      setRubrics((prev) => prev.filter((r) => r.id !== rubricId));
+      // If we just removed the active rubric ID, clear it.
+      if (activeRubricId === rubricId) setActiveRubricId('');
+      try {
+        await deleteRubric(rubricId);
+      } catch (error) {
+        // Rollback on failure.
+        console.error('Failed to delete rubric:', error);
+        if (removed) setRubrics((prev) => [removed, ...prev.filter((r) => r.id !== rubricId)]);
+        if (activeRubricId === rubricId) setActiveRubricId(rubricId);
+        alert(error instanceof Error ? error.message : 'Could not delete rubric. Please try again.');
+      }
+    },
+    [activeRubricId, rubrics, setRubrics],
+  );
+
   const askAboutRubric = useCallback(
     async (rubricId: string) => {
       // Open (or reuse) the durable rubric chat without changing the global default.
@@ -854,6 +874,7 @@ export default function Dashboard({
                   activeRubricId={activeRubricId}
                   query={query}
                   onSetActive={setActiveRubricOnServer}
+                  onDelete={handleDeleteRubric}
                   onAskAbout={askAboutRubric}
                   onRetryIndex={retryIndexRubric}
                   rubricIndexRequestStates={rubricIndexRequestStates}

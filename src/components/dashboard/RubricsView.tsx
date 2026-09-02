@@ -12,6 +12,7 @@ export const RubricsView = memo(function RubricsView({
   query,
   rubricIndexRequestStates = {},
   onSetActive,
+  onDelete,
   onAskAbout,
   onRetryIndex,
   onRubricUploaded,
@@ -109,6 +110,19 @@ export const RubricsView = memo(function RubricsView({
                       <DsButton variant="ghost" onClick={() => onAskAbout(r.id)}>
                         Ask about rubric
                       </DsButton>
+                      {!isActive && (
+                        <DsButton
+                          variant="ghost"
+                          onClick={() => {
+                            if (window.confirm(`Delete "${r.title}"? This cannot be undone.`)) {
+                              onDelete(r.id);
+                            }
+                          }}
+                          aria-label={`Delete ${r.title}`}
+                        >
+                          <X size={13} strokeWidth={1.7} /> Delete
+                        </DsButton>
+                      )}
                       <DsButton
                         variant={isActive ? 'secondary' : 'primary'}
                         disabled={isActive}
@@ -186,7 +200,7 @@ export const UploadRubricModal = memo(function UploadRubricModal({ onClose, onUp
         knowledge_document_id: result.knowledgeDocumentId,
         file_search_status: result.fileSearchStatus,
         fileSearchStatus: result.fileSearchStatus,
-        criteria: result.criteria.map((c) => ({ ...c, score: 0, max: c.max_score })),
+        criteria: (result.criteria ?? []).map((c) => ({ ...c, score: 0, max: c.max_score })),
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed. Please try again.');
