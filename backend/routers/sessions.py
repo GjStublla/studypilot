@@ -2,10 +2,13 @@
 Sessions router — /sessions
 
 Endpoints:
-    GET  /sessions              List the logged-in user's sessions (summary list)
-    GET  /sessions/{id}         Full session detail: metadata + transcript + action items
-    POST /sessions              Save a new session (called by the Chrome extension)
-    POST /sessions/{id}/messages  Append transcript messages to an existing session
+    GET    /sessions                        List the logged-in user's sessions (paginated)
+    GET    /sessions/{id}                   Full session detail: metadata + transcript + action items
+    POST   /sessions                        Save a new session (called by the Chrome extension)
+    PATCH  /sessions/{id}                   Update session title / summary / rubric
+    DELETE /sessions/{id}                   Delete a session and its messages + action items
+    POST   /sessions/{id}/messages          Append a single transcript message
+    POST   /sessions/{id}/messages/batch    Append multiple transcript messages in one call
 
 All routes are RLS-scoped: the Supabase PostgREST client runs as the verified
 user, so the DB enforces that users can only read/write their own rows.
@@ -17,7 +20,7 @@ from typing import Annotated, Literal, NoReturn
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field, StringConstraints
 
 from dependencies import verify_token, get_token
@@ -51,16 +54,12 @@ def _when_str(ts: str | None) -> str:
         now = datetime.now(timezone.utc)
         delta = (now.date() - dt.date()).days
 
-        # Format hour:minute AM/PM without a leading zero.
-        # strftime %-I is Linux-only; %#I is Windows-only.
-        # Use %I and strip the leading zero manually for cross-platform safety.
         time_str = dt.strftime("%I:%M %p").lstrip("0")
 
         if delta == 0:
             return f"Today · {time_str}"
         if delta == 1:
             return f"Yesterday · {time_str}"
-        # Use %d and strip leading zero manually — %-d is not portable either.
         day = str(dt.day)
         month = dt.strftime("%b")
         return f"{month} {day} · {time_str}"
@@ -73,9 +72,6 @@ def _handle_postgrest_error(e: Exception, context: str) -> NoReturn:
     Re-raise Supabase/PostgREST exceptions as appropriate HTTP errors.
     PGRST116 means .single() found no rows → 404.
     Everything else is an infrastructure problem → 500 with server-side log.
-
-    Typed as NoReturn because it always raises — callers don't need a
-    guard `return` after calling this.
     """
     error_str = str(e).lower()
     if "pgrst116" in error_str or "no rows" in error_str:
@@ -90,16 +86,37 @@ def _handle_postgrest_error(e: Exception, context: str) -> NoReturn:
     )
 
 
+def _require_session_owner(client, session_id: str, user_id: str) -> dict:
+    """
+    Fetch a session row and verify ownership. Raises 404 if not found or not owned.
+    Returns the raw session dict on success.
+    """
+    try:
+        result = (
+            client.table("sessions")
+            .select("id, title, source, mode, duration_seconds, when_timestamp, rubric_id, summary, active")
+            .eq("id", session_id)
+            .eq("user_id", user_id)
+            .single()
+            .execute()
+        )
+    except Exception as e:
+        _handle_postgrest_error(e, "Session")
+
+    if not result.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
+    return result.data
+
+
 # ─── Response / Request models ────────────────────────────────────────────────
 
 class SessionSummary(BaseModel):
-    """Lightweight session row used in the list view."""
     id: str
     title: str
     source: str
     mode: str
-    duration: str        # formatted e.g. "24m"
-    when: str            # formatted relative label
+    duration: str
+    when: str
     rubric_id: str | None
     summary: str | None
 
@@ -108,7 +125,7 @@ class TranscriptMessage(BaseModel):
     id: str
     who: Literal["You", "StudyPilot"]
     text: str
-    t: str               # formatted time offset e.g. "2:39"
+    t: str
 
 
 class ActionItemInSession(BaseModel):
@@ -118,7 +135,6 @@ class ActionItemInSession(BaseModel):
 
 
 class SessionDetail(BaseModel):
-    """Full session: metadata + transcript + action items."""
     id: str
     title: str
     source: str
@@ -131,7 +147,6 @@ class SessionDetail(BaseModel):
     action_items: list[ActionItemInSession]
 
 
-# POST /sessions
 class CreateSessionRequest(BaseModel):
     title: Annotated[
         str,
@@ -153,7 +168,16 @@ class CreateSessionResponse(BaseModel):
     title: str
 
 
-# POST /sessions/{id}/messages
+class UpdateSessionRequest(BaseModel):
+    """All fields optional — send only what changed."""
+    title: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=300),
+    ] | None = None
+    summary: str | None = Field(default=None, max_length=5000)
+    rubric_id: str | None = None
+
+
 class CreateMessageRequest(BaseModel):
     role: Literal["user", "ai", "system"]
     message_text: Annotated[
@@ -167,6 +191,15 @@ class CreateMessageResponse(BaseModel):
     id: str
 
 
+class BatchCreateMessageRequest(BaseModel):
+    messages: list[CreateMessageRequest] = Field(min_length=1, max_length=500)
+
+
+class BatchCreateMessageResponse(BaseModel):
+    inserted: int
+    ids: list[str]
+
+
 # ─── Routes ───────────────────────────────────────────────────────────────────
 
 @router.get(
@@ -177,20 +210,27 @@ class CreateMessageResponse(BaseModel):
 def list_sessions(
     user_id: str = Depends(verify_token),
     token: str = Depends(get_token),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    q: str | None = Query(default=None, max_length=200),
 ):
     """
-    Returns all sessions for the authenticated user, ordered by most recent first.
-    Each item is a summary (no transcript or action items) for fast list rendering.
+    Returns sessions for the authenticated user, most recent first.
+    Supports pagination via limit/offset and optional server-side search via ?q=.
     """
     try:
         client = get_user_client(token)
-        result = (
+        query = (
             client.table("sessions")
             .select("id, title, source, mode, duration_seconds, when_timestamp, rubric_id, summary")
             .eq("user_id", user_id)
             .order("when_timestamp", desc=True)
-            .execute()
+            .range(offset, offset + limit - 1)
         )
+        if q and q.strip():
+            # Push search to the DB with a case-insensitive pattern match on title.
+            query = query.ilike("title", f"%{q.strip()}%")
+        result = query.execute()
     except Exception as e:
         print(f"[sessions] list_sessions failed for user {user_id}: {e}")
         raise HTTPException(
@@ -223,29 +263,11 @@ def get_session(
     user_id: str = Depends(verify_token),
     token: str = Depends(get_token),
 ):
-    """
-    Returns the full session: metadata, transcript messages, and associated
-    action items.  RLS ensures the user can only fetch their own sessions.
-    """
     client = get_user_client(token)
     session_id = str(session_id)
 
-    # --- Fetch session row ---
-    try:
-        session_result = (
-            client.table("sessions")
-            .select("id, title, source, mode, duration_seconds, when_timestamp, rubric_id, summary")
-            .eq("id", session_id)
-            .eq("user_id", user_id)   # belt-and-suspenders on top of RLS
-            .single()
-            .execute()
-        )
-    except Exception as e:
-        _handle_postgrest_error(e, "Session")
+    session = _require_session_owner(client, session_id, user_id)
 
-    session = session_result.data
-
-    # --- Fetch transcript messages ---
     try:
         messages_result = (
             client.table("session_messages")
@@ -261,7 +283,6 @@ def get_session(
             detail="Could not retrieve transcript. Please try again.",
         )
 
-    # --- Fetch action items linked to this session ---
     try:
         actions_result = (
             client.table("action_items")
@@ -278,12 +299,10 @@ def get_session(
             detail="Could not retrieve action items. Please try again.",
         )
 
-    # --- Map transcript role → dashboard "who" label ---
     def _who(role: str) -> Literal["You", "StudyPilot"]:
         return "You" if role == "user" else "StudyPilot"
 
     def _t_label(offset_seconds: int) -> str:
-        """Convert offset seconds to MM:SS display string."""
         m, s = divmod(offset_seconds, 60)
         return f"{m}:{s:02d}"
 
@@ -327,13 +346,6 @@ def create_session(
     user_id: str = Depends(verify_token),
     token: str = Depends(get_token),
 ):
-    """
-    Creates a new session row for the authenticated user.
-    Typically called by the Chrome extension at the end of a coaching session.
-
-    If rubric_id is provided, the caller must own that rubric — RLS enforces
-    this at the DB level; a foreign-key violation will surface as 400.
-    """
     client = get_user_client(token)
 
     insert_data: dict = {
@@ -343,8 +355,6 @@ def create_session(
         "duration_seconds": body.duration_seconds,
         "source": body.source,
     }
-    # Only include optional fields when present to avoid sending null where
-    # the DB column has a NOT NULL constraint or a meaningful default.
     if body.rubric_id is not None:
         insert_data["rubric_id"] = body.rubric_id
     if body.page_title is not None:
@@ -355,15 +365,9 @@ def create_session(
         insert_data["summary"] = body.summary
 
     try:
-        result = (
-            client.table("sessions")
-            .insert(insert_data)
-            .execute()
-        )
+        result = client.table("sessions").insert(insert_data).execute()
     except Exception as e:
         error_str = str(e).lower()
-        # Foreign-key violation means the supplied rubric_id doesn't belong to
-        # this user — return 400 rather than leaking a 500.
         if "foreign key" in error_str or "fk_" in error_str:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -385,11 +389,127 @@ def create_session(
     return CreateSessionResponse(id=row["id"], title=row["title"])
 
 
+@router.patch(
+    "/{session_id}",
+    response_model=SessionSummary,
+    summary="Update a session's title, summary, or rubric",
+)
+def update_session(
+    session_id: UUID,
+    body: UpdateSessionRequest,
+    user_id: str = Depends(verify_token),
+    token: str = Depends(get_token),
+):
+    """
+    Partially updates a session. Only title, summary, and rubric_id are
+    writable post-creation. Send only the fields you want to change.
+    Returns the updated session summary.
+    """
+    client = get_user_client(token)
+    session_id = str(session_id)
+
+    # Build update dict from explicitly provided fields only.
+    updates: dict = {}
+    if body.title is not None:
+        updates["title"] = body.title
+    if body.summary is not None:
+        updates["summary"] = body.summary
+    if "rubric_id" in body.model_fields_set:
+        updates["rubric_id"] = body.rubric_id  # allows setting to null
+
+    if not updates:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="No valid fields provided for update.",
+        )
+
+    # Verify ownership first so we return a clean 404, not a silent no-op.
+    _require_session_owner(client, session_id, user_id)
+
+    try:
+        result = (
+            client.table("sessions")
+            .update(updates)
+            .eq("id", session_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+    except Exception as e:
+        error_str = str(e).lower()
+        if "foreign key" in error_str or "fk_" in error_str:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="rubric_id is invalid or does not belong to your account.",
+            )
+        print(f"[sessions] update_session failed for session {session_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not update session. Please try again.",
+        )
+
+    if not result.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
+
+    row = result.data[0]
+    return SessionSummary(
+        id=row["id"],
+        title=row["title"],
+        source=row.get("source") or "Chrome Extension",
+        mode=row["mode"],
+        duration=_duration_str(row.get("duration_seconds") or 0),
+        when=_when_str(row.get("when_timestamp")),
+        rubric_id=row.get("rubric_id"),
+        summary=row.get("summary"),
+    )
+
+
+@router.delete(
+    "/{session_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a session and all its messages and action items",
+)
+def delete_session(
+    session_id: UUID,
+    user_id: str = Depends(verify_token),
+    token: str = Depends(get_token),
+):
+    """
+    Permanently deletes a session. The associated session_messages and
+    action_items rows are removed automatically by ON DELETE CASCADE constraints
+    in the DB schema.
+
+    Returns 404 if the session doesn't exist or belongs to another user.
+    """
+    client = get_user_client(token)
+    session_id = str(session_id)
+
+    # Verify ownership before deleting so we can distinguish 404 from a DB error.
+    _require_session_owner(client, session_id, user_id)
+
+    try:
+        result = (
+            client.table("sessions")
+            .delete()
+            .eq("id", session_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+    except Exception as e:
+        print(f"[sessions] delete_session failed for session {session_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not delete session. Please try again.",
+        )
+
+    if not result.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
+
+
 @router.post(
     "/{session_id}/messages",
     response_model=CreateMessageResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Append a transcript message to a session",
+    summary="Append a single transcript message to a session",
 )
 def create_message(
     session_id: UUID,
@@ -399,36 +519,12 @@ def create_message(
 ):
     """
     Saves a single transcript message into session_messages.
-
-    The session must belong to the authenticated user — RLS on session_messages
-    enforces this via a join to sessions.user_id = auth.uid().
-
-    Callers can batch-insert by calling this endpoint repeatedly, or save
-    messages incrementally as the session progresses.
+    For multiple messages at once use POST /sessions/{id}/messages/batch.
     """
     client = get_user_client(token)
     session_id = str(session_id)
 
-    # Verify the session belongs to this user before writing a message.
-    # This gives a cleaner 404 than letting the RLS violation surface as a
-    # generic DB error.
-    try:
-        session_check = (
-            client.table("sessions")
-            .select("id")
-            .eq("id", session_id)
-            .eq("user_id", user_id)
-            .single()
-            .execute()
-        )
-    except Exception as e:
-        _handle_postgrest_error(e, "Session")
-
-    if not session_check.data:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Session not found.",
-        )
+    _require_session_owner(client, session_id, user_id)
 
     try:
         result = (
@@ -455,3 +551,56 @@ def create_message(
         )
 
     return CreateMessageResponse(id=result.data[0]["id"])
+
+
+@router.post(
+    "/{session_id}/messages/batch",
+    response_model=BatchCreateMessageResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Append multiple transcript messages to a session in one call",
+)
+def batch_create_messages(
+    session_id: UUID,
+    body: BatchCreateMessageRequest,
+    user_id: str = Depends(verify_token),
+    token: str = Depends(get_token),
+):
+    """
+    Inserts up to 500 transcript messages in a single DB round-trip.
+    Preferred over calling POST /messages repeatedly for full transcripts.
+    All messages must belong to the same session.
+    """
+    client = get_user_client(token)
+    session_id = str(session_id)
+
+    _require_session_owner(client, session_id, user_id)
+
+    rows = [
+        {
+            "session_id": session_id,
+            "role": m.role,
+            "message_text": m.message_text,
+            "time_offset_seconds": m.time_offset_seconds,
+        }
+        for m in body.messages
+    ]
+
+    try:
+        result = client.table("session_messages").insert(rows).execute()
+    except Exception as e:
+        print(f"[sessions] batch_create_messages failed for session {session_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not save messages. Please try again.",
+        )
+
+    if not result.data:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not save messages. Please try again.",
+        )
+
+    return BatchCreateMessageResponse(
+        inserted=len(result.data),
+        ids=[row["id"] for row in result.data],
+    )

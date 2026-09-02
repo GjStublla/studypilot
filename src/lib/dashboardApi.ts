@@ -177,6 +177,18 @@ export async function activateRubric(id: string): Promise<void> {
   await getJson(`/rubrics/${id}/active`, { method: 'PATCH' });
 }
 
+export async function deleteActionItem(id: string): Promise<void> {
+  const res = await apiFetch(`/action-items/${id}`, { method: 'DELETE' });
+  if (res.status === 404) throw new Error('Action item not found.');
+  if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
+}
+
+export async function deleteSession(id: string): Promise<void> {
+  const res = await apiFetch(`/sessions/${id}`, { method: 'DELETE' });
+  if (res.status === 404) throw new Error('Session not found.');
+  if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
+}
+
 export async function deleteRubric(id: string): Promise<void> {
   const res = await apiFetch(`/rubrics/${id}`, { method: 'DELETE' });
   if (res.status === 409) {

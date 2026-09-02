@@ -23,7 +23,7 @@ import {
   retryRubricIndexing,
   updateDashboardChat,
 } from '../lib/studypilot-api';
-import { fetchActionItems, fetchSessionTranscript, setActionItemDone, activateRubric, deleteRubric } from '../lib/dashboardApi';
+import { fetchActionItems, fetchSessionTranscript, setActionItemDone, activateRubric, deleteRubric, deleteActionItem, deleteSession } from '../lib/dashboardApi';
 import type { Rubric, Session } from '../lib/dashboard-types';
 import { sendCoachingMessage } from '../lib/socraticCoach';
 import type { DashboardChat } from '../lib/studypilot-types';
@@ -106,10 +106,19 @@ export default function Dashboard({
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
   // Default coach mode also comes from the profile; persisted back via PATCH /users/me.
   const [coachMode, setCoachMode] = useState<CoachMode>('essay');
+  const [savedNotice, setSavedNotice] = useState<string | null>(null);
+  const savedNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function flashSavedNotice(message: string) {
+    setSavedNotice(message);
+    if (savedNoticeTimer.current) clearTimeout(savedNoticeTimer.current);
+    savedNoticeTimer.current = setTimeout(() => setSavedNotice(null), 2500);
+  }
   const replaceChatRoute = useCallback(replaceDashboardHash, []);
 
   const {
     sessions,
+    setSessions,
     rubrics,
     setRubrics,
     actionItems,
@@ -269,13 +278,40 @@ export default function Dashboard({
       const current = actionItems.find((a) => a.id === id);
       if (!current) return;
       const nextDone = !current.done;
-      // Optimistic flip; revert if the PATCH fails so the UI never lies.
       setActionItems((items) => items.map((a) => (a.id === id ? { ...a, done: nextDone } : a)));
       setActionItemDone(id, nextDone).catch(() => {
         setActionItems((items) => items.map((a) => (a.id === id ? { ...a, done: current.done } : a)));
       });
     },
     [actionItems, setActionItems],
+  );
+
+  const handleDeleteActionItem = useCallback(
+    (id: string) => {
+      const removed = actionItems.find((a) => a.id === id);
+      setActionItems((items) => items.filter((a) => a.id !== id));
+      deleteActionItem(id).catch(() => {
+        if (removed) setActionItems((items) => [...items, removed]);
+      });
+    },
+    [actionItems, setActionItems],
+  );
+
+  const handleDeleteSession = useCallback(
+    (id: string) => {
+      const removed = sessions.find((s) => s.id === id);
+      // Optimistically remove from list and clear cached transcript.
+      setSessions((prev) => prev.filter((s) => s.id !== id));
+      setTranscripts((prev) => { const next = { ...prev }; delete next[id]; return next; });
+      setTranscriptStates((prev) => { const next = { ...prev }; delete next[id]; return next; });
+      // If viewing this session's detail, go back to the list.
+      if (selectedSessionId === id) setSelectedSessionId('');
+      deleteSession(id).catch(() => {
+        // Restore on failure.
+        if (removed) setSessions((prev) => [...prev, removed]);
+      });
+    },
+    [sessions, setSessions, selectedSessionId, setTranscripts, setTranscriptStates],
   );
 
   // Fetch a session's transcript the first time it's needed, then cache it.
@@ -584,11 +620,12 @@ export default function Dashboard({
     } catch {
       /* localStorage unavailable */
     }
-    // Persist to the profile so the choice follows the user across devices.
     apiFetch('/users/me', {
       method: 'PATCH',
       body: JSON.stringify({ theme: next }),
-    }).catch(() => {
+    })
+      .then((res) => { if (res.ok) flashSavedNotice('Appearance saved'); })
+      .catch(() => {
       /* best-effort — the local theme is already applied */
     });
   }, []);
@@ -738,13 +775,13 @@ export default function Dashboard({
   const changeCoachMode = useCallback((mode: CoachMode) => {
     setCoachMode((prev) => {
       if (prev === mode) return prev;
-      // Optimistic; revert if the profile PATCH is rejected or fails.
       apiFetch('/users/me', {
         method: 'PATCH',
         body: JSON.stringify({ default_coach_mode: mode }),
       })
         .then((res) => {
-          if (!res.ok) setCoachMode(prev);
+          if (res.ok) flashSavedNotice('Coach mode saved');
+          else setCoachMode(prev);
         })
         .catch(() => setCoachMode(prev));
       return mode;
@@ -850,6 +887,7 @@ export default function Dashboard({
                   query={query}
                   onOpenSession={openSessionDetail}
                   onContinueInChat={openInChat}
+                  onDelete={handleDeleteSession}
                 />
               )}
 
@@ -912,6 +950,7 @@ export default function Dashboard({
                   rubricsById={rubricsById}
                   query={query}
                   onToggle={toggleAction}
+                  onDelete={handleDeleteActionItem}
                   onOpenSession={openSessionDetail}
                 />
               )}
@@ -922,6 +961,7 @@ export default function Dashboard({
                   theme={theme}
                   coachMode={coachMode}
                   aiUsage={aiUsage}
+                  savedNotice={savedNotice}
                   onSetCoachMode={changeCoachMode}
                   onSignOut={signOut}
                   onSetTheme={applyTheme}

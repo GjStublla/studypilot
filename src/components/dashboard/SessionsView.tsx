@@ -1,5 +1,5 @@
-import { memo, useMemo } from 'react';
-import { ArrowRight, Chrome } from 'lucide-react';
+import { memo, useMemo, useState } from 'react';
+import { ArrowRight, Chrome, Trash2 } from 'lucide-react';
 import { DsButton, EmptyState } from './DashboardPrimitives';
 import type { SessionsViewProps } from './dashboard-types';
 
@@ -8,7 +8,9 @@ export const SessionsView = memo(function SessionsView({
   query,
   onOpenSession,
   onContinueInChat,
+  onDelete,
 }: SessionsViewProps) {
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const q = query.trim().toLowerCase();
   const filtered = useMemo(
     () =>
@@ -19,6 +21,15 @@ export const SessionsView = memo(function SessionsView({
         : rows,
     [rows, q],
   );
+
+  function handleDeleteClick(id: string) {
+    if (confirmDeleteId === id) {
+      onDelete(id);
+      setConfirmDeleteId(null);
+    } else {
+      setConfirmDeleteId(id);
+    }
+  }
 
   return (
     <div className="ds-view ds-view-sessions">
@@ -42,10 +53,11 @@ export const SessionsView = memo(function SessionsView({
           body="Run a coaching session in the Chrome extension and it'll be imported here automatically."
         />
       ) : filtered.length === 0 ? (
-        <EmptyState title="No matches." body={`No sessions match “${query.trim()}”.`} />
+        <EmptyState title="No matches." body={`No sessions match "${query.trim()}".`} />
       ) : (
         <ul className="ds-session-list">
           {filtered.map(({ session: s, rubric, openCount }) => {
+            const pendingDelete = confirmDeleteId === s.id;
             return (
               <li key={s.id}>
                 <article className="ds-session-card">
@@ -82,6 +94,17 @@ export const SessionsView = memo(function SessionsView({
                     <DsButton variant="ghost" onClick={() => onOpenSession(s.id)}>
                       View transcript
                     </DsButton>
+                    <button
+                      type="button"
+                      className={`ds-icon-btn ds-icon-btn-danger ${pendingDelete ? 'is-confirm' : ''}`}
+                      aria-label={pendingDelete ? 'Confirm delete session' : 'Delete session'}
+                      title={pendingDelete ? 'Click again to confirm deletion' : 'Delete session'}
+                      onClick={() => handleDeleteClick(s.id)}
+                      onBlur={() => setConfirmDeleteId(null)}
+                    >
+                      <Trash2 size={14} strokeWidth={1.8} />
+                      {pendingDelete && <span className="ds-icon-btn-label">Delete?</span>}
+                    </button>
                   </div>
                 </article>
               </li>
