@@ -116,13 +116,14 @@ export function normalizeVertexInteractionsLocation(location: string): string {
 
 /**
  * Vertex RAG Engine location. RAG corpora are regional (not global).
- * Default us-central1; override with VERTEX_RAG_LOCATION.
+ * Default us-west1 — avoids the Spanner capacity restriction on us-central1
+ * for new GCP projects. Override with VERTEX_RAG_LOCATION.
  */
 export function getVertexRagLocation(): string {
   return (
     Deno.env.get("VERTEX_RAG_LOCATION")?.trim() ||
     Deno.env.get("RAG_LOCATION")?.trim() ||
-    "us-central1"
+    "us-west1"
   )
 }
 

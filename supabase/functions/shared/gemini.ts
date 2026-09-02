@@ -1,5 +1,9 @@
 /**
- * Gemini Interactions API client — Vertex-only.
+ * Gemini generateContent / streamGenerateContent client — Vertex-only.
+ *
+ * Uses the standard Vertex AI generateContent endpoint which works on any
+ * GCP project with the Vertex AI API enabled and billing active. Does not
+ * require the Agent Platform / Interactions API.
  *
  * Requires GOOGLE_PROJECT_ID + service-account credentials.
  * No GEMINI_API_KEY / Generative Language fallback for production paths.
@@ -31,15 +35,12 @@ export function getGeminiTextModel(): string {
 
 function isGeminiPart(value: unknown): value is GeminiPart {
   if (!value || typeof value !== "object") return false
-
   const record = value as Record<string, unknown>
   if (typeof record.text === "string" && record.text.trim().length > 0) {
     return true
   }
-
   const inlineData = record.inlineData
   if (!inlineData || typeof inlineData !== "object") return false
-
   const data = inlineData as Record<string, unknown>
   return typeof data.mimeType === "string" &&
     data.mimeType.trim().length > 0 &&
@@ -49,178 +50,136 @@ function isGeminiPart(value: unknown): value is GeminiPart {
 
 function buildUserParts(body: Record<string, unknown>): GeminiPart[] {
   const parts = Array.isArray(body.parts) ? body.parts.filter(isGeminiPart) : []
-
   if (parts.length > 0) return parts
-
   const input = typeof body.input === "string" ? body.input : ""
   return [{ text: input }]
 }
 
-function partToInteractionContent(
-  part: GeminiPart,
-): Record<string, unknown> {
-  if ("text" in part) {
-    return { type: "text", text: part.text }
-  }
-  return {
-    type: "image",
-    data: part.inlineData.data,
-    mime_type: part.inlineData.mimeType,
-  }
-}
-
 /**
- * Convert generateContent-style `contents` into Interactions `input` steps.
- * Callers may also pass `input` (string | array) directly.
+ * Convert Interactions-style input steps back to generateContent contents.
+ * Also handles generateContent-style contents passthrough.
  */
-export function contentsToInteractionInput(
-  contents: unknown[],
+function toGenerateContentContents(
+  body: Record<string, unknown>,
 ): Array<Record<string, unknown>> {
-  const steps: Array<Record<string, unknown>> = []
-  for (const raw of contents) {
-    if (!raw || typeof raw !== "object") continue
-    const row = raw as Record<string, unknown>
-    const role = typeof row.role === "string" ? row.role : "user"
-    const parts = Array.isArray(row.parts)
-      ? row.parts.filter(isGeminiPart).map(partToInteractionContent)
-      : []
-    if (parts.length === 0) continue
-    if (role === "model" || role === "assistant") {
-      steps.push({ type: "model_output", content: parts })
-    } else {
-      steps.push({ type: "user_input", content: parts })
-    }
+  // Already in generateContent format
+  if (Array.isArray(body.contents) && body.contents.length > 0) {
+    return body.contents as Array<Record<string, unknown>>
   }
-  return steps
+
+  // Interactions-style: input is an array of steps
+  if (Array.isArray(body.input)) {
+    const contents: Array<Record<string, unknown>> = []
+    for (const step of body.input) {
+      if (!step || typeof step !== "object") continue
+      const s = step as Record<string, unknown>
+      const role = s.type === "model_output" ? "model" : "user"
+      const content = Array.isArray(s.content) ? s.content : []
+      const parts = content
+        .map((c: unknown) => {
+          if (!c || typeof c !== "object") return null
+          const block = c as Record<string, unknown>
+          if (block.type === "text" && typeof block.text === "string") {
+            return { text: block.text }
+          }
+          if (block.type === "image") {
+            return {
+              inlineData: {
+                mimeType: block.mime_type ?? "image/jpeg",
+                data: block.data,
+              },
+            }
+          }
+          return null
+        })
+        .filter(Boolean)
+      if (parts.length > 0) {
+        contents.push({ role, parts })
+      }
+    }
+    return contents
+  }
+
+  // Plain string input or parts
+  const parts = buildUserParts(body)
+  return [{ role: "user", parts }]
 }
 
 /**
- * Normalize tools for Interactions.
- * Accepts Vertex `retrieval` / `vertex_rag_store` and rejects bare File Search
- * store tools (Developer API only — not available on Vertex).
+ * Build a generateContent request body from either a generateContent-style
+ * or Interactions-style input body.
  */
-export function normalizeInteractionTools(
-  tools: unknown[] | undefined,
-): unknown[] | undefined {
-  if (!tools?.length) return undefined
-  return tools.map((tool) => {
-    if (!tool || typeof tool !== "object") return tool
-    const record = tool as Record<string, unknown>
-    if (typeof record.type === "string") {
-      if (record.type === "file_search") {
-        throw new Error(
-          "Gemini File Search tools are not supported on Vertex. Use Vertex RAG (retrieval / vertex_rag_store).",
-        )
-      }
-      return tool
-    }
-    if (record.retrieval && typeof record.retrieval === "object") {
-      return { type: "retrieval", ...record }
-    }
-    if (record.file_search && typeof record.file_search === "object") {
-      throw new Error(
-        "Gemini File Search tools are not supported on Vertex. Use Vertex RAG (retrieval / vertex_rag_store).",
-      )
-    }
-    return tool
-  })
-}
-
-/** Normalize camelCase generation_config keys to Interactions snake_case. */
-export function normalizeGenerationConfig(
-  config: unknown,
-): Record<string, unknown> | undefined {
-  if (!config || typeof config !== "object" || Array.isArray(config)) {
-    return undefined
-  }
-  const src = config as Record<string, unknown>
-  const out: Record<string, unknown> = { ...src }
-  if ("maxOutputTokens" in src && !("max_output_tokens" in src)) {
-    out.max_output_tokens = src.maxOutputTokens
-    delete out.maxOutputTokens
-  }
-  if ("topP" in src && !("top_p" in src)) {
-    out.top_p = src.topP
-    delete out.topP
-  }
-  if ("topK" in src && !("top_k" in src)) {
-    out.top_k = src.topK
-    delete out.topK
-  }
-  return out
-}
-
-export function buildInteractionRequestBody(
+export function buildGenerateContentRequestBody(
   body: Record<string, unknown>,
   model: string,
 ): Record<string, unknown> {
-  const stream = body.stream === true
+  const contents = toGenerateContentContents(body)
+
   const systemInstruction = typeof body.system_instruction === "string"
-    ? body.system_instruction
+    ? { parts: [{ text: body.system_instruction }] }
     : typeof body.systemInstruction === "string"
-    ? body.systemInstruction
+    ? { parts: [{ text: body.systemInstruction }] }
     : undefined
 
-  let input: unknown = body.input
-  if (input === undefined || input === null || input === "") {
-    if (Array.isArray(body.contents) && body.contents.length > 0) {
-      input = contentsToInteractionInput(body.contents)
-    } else {
-      const parts = buildUserParts(body)
-      input = parts.map(partToInteractionContent)
-    }
-  }
+  // Normalize generation config keys (camelCase → camelCase for generateContent)
+  const rawConfig = body.generation_config ?? body.generationConfig
+  const generationConfig = rawConfig && typeof rawConfig === "object" &&
+      !Array.isArray(rawConfig)
+    ? rawConfig as Record<string, unknown>
+    : undefined
 
-  const tools = normalizeInteractionTools(
-    Array.isArray(body.tools) ? body.tools : undefined,
-  )
-  const generationConfig = normalizeGenerationConfig(
-    body.generation_config ?? body.generationConfig,
-  )
+  // Only include Vertex-compatible tools (no file_search)
+  const rawTools = Array.isArray(body.tools) ? body.tools : undefined
+  const tools = rawTools?.filter((tool: unknown) => {
+    if (!tool || typeof tool !== "object") return false
+    const t = tool as Record<string, unknown>
+    if (t.type === "file_search") return false
+    if (t.file_search) return false
+    return true
+  })
 
   return {
-    model,
-    input,
-    stream,
-    // Vertex Interactions for Gemini 3.x requires store:true.
-    store: body.store === false ? false : true,    ...(typeof body.previous_interaction_id === "string"
-      ? { previous_interaction_id: body.previous_interaction_id }
-      : {}),
-    ...(systemInstruction ? { system_instruction: systemInstruction } : {}),
-    ...(tools ? { tools } : {}),
-    ...(generationConfig ? { generation_config: generationConfig } : {}),
+    contents,
+    ...(systemInstruction ? { systemInstruction } : {}),
+    ...(generationConfig ? { generationConfig } : {}),
+    ...(tools?.length ? { tools } : {}),
   }
 }
 
-export function interactionsEndpoint(
-  mode: GeminiAuthMode,
-  projectId: string | undefined,
+/**
+ * Build the Vertex AI generateContent / streamGenerateContent endpoint URL.
+ * Format: https://{host}/v1/projects/{project}/locations/{location}/publishers/google/models/{model}:streamGenerateContent?alt=sse
+ */
+export function generateContentEndpoint(
+  projectId: string,
+  model: string,
   stream: boolean,
 ): string {
-  const suffix = stream ? "?alt=sse" : ""
-  if (mode !== "vertex-interactions") {
-    throw new Error(`Unsupported Interactions mode: ${mode}`)
-  }
-  if (!projectId) {
-    throw new Error("GOOGLE_PROJECT_ID is required for Vertex Interactions")
-  }
   const location = getVertexLocation()
-  // Multi-region codes (global/us/eu) share the global AI Platform hostname.
-  // Only true regional IDs (us-central1, …) use {region}-aiplatform.googleapis.com —
-  // and those are normalized away for Interactions via getVertexLocation().
   const useGlobalHost =
     location === "global" || location === "us" || location === "eu"
   const host = useGlobalHost
     ? "aiplatform.googleapis.com"
     : `${location}-aiplatform.googleapis.com`
-  return `https://${host}/v1beta1/projects/${projectId}/locations/${location}/interactions${suffix}`
+  const resolvedLocation = useGlobalHost ? "us-central1" : location
+  const method = stream ? "streamGenerateContent" : "generateContent"
+  const suffix = stream ? "?alt=sse" : ""
+  return `https://${host}/v1/projects/${projectId}/locations/${resolvedLocation}/publishers/google/models/${model}:${method}${suffix}`
 }
 
+/**
+ * Main entry point — same signature as the old createGeminiInteraction so
+ * all callers (socratic-coach, summarize-session, extract-rubric) are unchanged.
+ *
+ * Calls Vertex AI streamGenerateContent / generateContent instead of the
+ * Agent Platform Interactions API, which works on any standard Vertex project.
+ */
 export async function createGeminiInteraction(
   body: Record<string, unknown>,
 ): Promise<Response> {
   const projectId = getGoogleProjectId()
-  const mode = resolveInteractionsAuthMode(projectId)
+  // Validate credentials are present (same guard as before)
+  resolveInteractionsAuthMode(projectId)
   const stream = body.stream === true
 
   const model = normalizeGeminiModelId(
@@ -229,14 +188,21 @@ export async function createGeminiInteraction(
       getGeminiTextModel(),
   )
 
-  const requestBody = buildInteractionRequestBody(body, model)
-  const url = interactionsEndpoint(mode, projectId, stream)
+  if (!projectId) {
+    throw new Error("GOOGLE_PROJECT_ID is required for Vertex AI")
+  }
+
+  const requestBody = buildGenerateContentRequestBody(body, model)
+  const url = generateContentEndpoint(projectId, model, stream)
 
   const doFetch = async () => {
-    const headers = interactionsHeaders(mode, await getAccessToken())
+    const token = await getAccessToken()
     return fetch(url, {
       method: "POST",
-      headers,
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
       body: JSON.stringify(requestBody),
     })
   }
@@ -275,14 +241,11 @@ export function describeGeminiError(errText: string): string {
 
 function collectText(value: unknown): string {
   if (!value || typeof value !== "object") return ""
-
   if (Array.isArray(value)) {
     return value.map(collectText).join("")
   }
-
   const record = value as Record<string, unknown>
   if (typeof record.text === "string") return record.text
-
   return [
     collectText(record.content),
     collectText(record.parts),
@@ -290,14 +253,25 @@ function collectText(value: unknown): string {
 }
 
 /**
- * Extract assistant text from an Interactions response (or legacy
- * generateContent candidates for transitional callers).
+ * Extract assistant text from a generateContent response (candidates array).
+ * Also handles legacy Interactions response shapes for compatibility.
  */
 export function extractInteractionText(response: unknown): string {
   if (!response || typeof response !== "object") return ""
-
   const record = response as Record<string, unknown>
 
+  // generateContent response: { candidates: [{ content: { parts: [...] } }] }
+  const candidates = Array.isArray(record.candidates) ? record.candidates : []
+  if (candidates.length > 0) {
+    return candidates
+      .map((c: unknown) =>
+        collectText((c as { content?: unknown })?.content)
+      )
+      .join("")
+      .trim()
+  }
+
+  // Legacy Interactions response shapes (kept for compatibility)
   const steps = Array.isArray(record.steps) ? record.steps : []
   if (steps.length > 0) {
     const texts: string[] = []
@@ -317,21 +291,13 @@ export function extractInteractionText(response: unknown): string {
     if (joined) return joined
   }
 
-  const candidates = Array.isArray(record.candidates) ? record.candidates : []
-  if (candidates.length > 0) {
-    return candidates
-      .map((c: unknown) =>
-        collectText((c as { content?: unknown })?.content)
-      )
-      .join("")
-      .trim()
-  }
-
   return ""
 }
 
 /**
- * Parse one Interactions (or legacy generateContent) SSE JSON payload.
+ * Parse one SSE JSON payload from streamGenerateContent.
+ * Each chunk is a generateContent candidate delta.
+ * Also handles legacy Interactions SSE shapes for compatibility.
  */
 export function parseInteractionStreamEvent(parsed: unknown): {
   text: string
@@ -342,38 +308,8 @@ export function parseInteractionStreamEvent(parsed: unknown): {
     return { text: "", grounding: null, done: false }
   }
   const record = parsed as Record<string, unknown>
-  const eventType = typeof record.event_type === "string"
-    ? record.event_type
-    : ""
 
-  if (
-    eventType === "interaction.completed" ||
-    eventType === "interaction.complete"
-  ) {
-    const interaction = record.interaction
-    let grounding: Record<string, unknown> | null = null
-    if (interaction && typeof interaction === "object") {
-      grounding = extractGroundingFromInteraction(
-        interaction as Record<string, unknown>,
-      )
-    }
-    return { text: "", grounding, done: true }
-  }
-
-  if (eventType === "step.delta" || eventType === "content.delta") {
-    const delta = record.delta
-    if (delta && typeof delta === "object") {
-      const d = delta as Record<string, unknown>
-      if (
-        (d.type === "text" || typeof d.text === "string") &&
-        typeof d.text === "string"
-      ) {
-        return { text: d.text, grounding: null, done: false }
-      }
-    }
-    return { text: "", grounding: null, done: false }
-  }
-
+  // streamGenerateContent SSE chunk: { candidates: [{ content: { parts: [...] }, finishReason?, ... }] }
   const candidates = Array.isArray(record.candidates) ? record.candidates : []
   if (candidates.length > 0) {
     const first = candidates[0] as Record<string, unknown>
@@ -382,31 +318,41 @@ export function parseInteractionStreamEvent(parsed: unknown): {
       first?.groundingMetadata && typeof first.groundingMetadata === "object"
         ? first.groundingMetadata as Record<string, unknown>
         : null
-    return { text, grounding, done: false }
+    // finishReason present and not STOP means still streaming; STOP = done
+    const finishReason = typeof first?.finishReason === "string"
+      ? first.finishReason
+      : ""
+    const done = finishReason === "STOP" || finishReason === "MAX_TOKENS"
+    return { text, grounding, done }
+  }
+
+  // Legacy Interactions SSE event shapes
+  const eventType = typeof record.event_type === "string"
+    ? record.event_type
+    : ""
+
+  if (
+    eventType === "interaction.completed" ||
+    eventType === "interaction.complete"
+  ) {
+    return { text: "", grounding: null, done: true }
+  }
+
+  if (eventType === "step.delta" || eventType === "content.delta") {
+    const delta = record.delta
+    if (delta && typeof delta === "object") {
+      const d = delta as Record<string, unknown>
+      if (typeof d.text === "string") {
+        return { text: d.text, grounding: null, done: false }
+      }
+    }
+    return { text: "", grounding: null, done: false }
   }
 
   return { text: "", grounding: null, done: false }
 }
 
-function extractGroundingFromInteraction(
-  interaction: Record<string, unknown>,
-): Record<string, unknown> | null {
-  const steps = Array.isArray(interaction.steps) ? interaction.steps : []
-  const annotations: unknown[] = []
-  for (const step of steps) {
-    if (!step || typeof step !== "object") continue
-    const content = (step as Record<string, unknown>).content
-    if (!Array.isArray(content)) continue
-    for (const block of content) {
-      if (!block || typeof block !== "object") continue
-      const anns = (block as Record<string, unknown>).annotations
-      if (Array.isArray(anns)) annotations.push(...anns)
-    }
-  }
-  if (!annotations.length) return null
-  return { annotations, groundingChunks: annotations }
-}
-
+// Keep legacy exports for callers that import these directly
 export {
   canUseGeminiInteractions,
   hasServiceAccountCredentials,
