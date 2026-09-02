@@ -106,6 +106,127 @@ function toGenerateContentContents(
 }
 
 /**
+ * Convert generateContent-style contents to Interactions-style input steps.
+ * { role: "user"|"model", parts: [...] }[] → { type: "user_input"|"model_output", content: [...] }[]
+ */
+export function contentsToInteractionInput(
+  contents: Array<{ role: string; parts: GeminiPart[] }>,
+): Array<Record<string, unknown>> {
+  return contents.map((c) => {
+    const type = c.role === "model" ? "model_output" : "user_input"
+    const content = c.parts.map((p) => {
+      if ("text" in p) return { type: "text", text: p.text }
+      const id = p as GeminiInlineDataPart
+      return {
+        type: "image",
+        data: id.inlineData.data,
+        mime_type: id.inlineData.mimeType,
+      }
+    })
+    return { type, content }
+  })
+}
+
+/**
+ * Normalize generation config keys from camelCase to snake_case for Interactions API.
+ * e.g. maxOutputTokens → max_output_tokens
+ */
+export function normalizeGenerationConfig(
+  config: Record<string, unknown>,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = { ...config }
+  if ("maxOutputTokens" in result) {
+    result.max_output_tokens = result.maxOutputTokens
+    delete result.maxOutputTokens
+  }
+  if ("topP" in result) {
+    result.top_p = result.topP
+    delete result.topP
+  }
+  if ("topK" in result) {
+    result.top_k = result.topK
+    delete result.topK
+  }
+  return result
+}
+
+/**
+ * Normalize tools array for the Interactions API.
+ * Passes through retrieval and google_search tools; throws on file_search
+ * (not supported on Vertex).
+ */
+export function normalizeInteractionTools(
+  tools: unknown[],
+): Array<Record<string, unknown>> {
+  return tools.map((tool) => {
+    if (!tool || typeof tool !== "object") return tool as Record<string, unknown>
+    const t = tool as Record<string, unknown>
+    if (t.type === "file_search" || t.file_search) {
+      throw new Error(
+        "File Search tools are not supported on the Vertex Interactions API",
+      )
+    }
+    return t
+  })
+}
+
+/**
+ * Build an Interactions API request body.
+ * Accepts both generateContent-style (contents) and Interactions-style (input) bodies.
+ */
+export function buildInteractionRequestBody(
+  body: Record<string, unknown>,
+  model: string,
+): Record<string, unknown> {
+  // Resolve input steps — prefer Interactions-style input, fall back to converting contents
+  let input: Array<Record<string, unknown>>
+  if (Array.isArray(body.input) && body.input.length > 0) {
+    input = body.input as Array<Record<string, unknown>>
+  } else if (Array.isArray(body.contents) && body.contents.length > 0) {
+    input = contentsToInteractionInput(
+      body.contents as Array<{ role: string; parts: GeminiPart[] }>,
+    )
+  } else {
+    input = [{ type: "user_input", content: [{ type: "text", text: "" }] }]
+  }
+
+  const rawConfig = body.generation_config ?? body.generationConfig
+  const generationConfig = rawConfig && typeof rawConfig === "object" &&
+      !Array.isArray(rawConfig)
+    ? normalizeGenerationConfig(rawConfig as Record<string, unknown>)
+    : undefined
+
+  const rawTools = Array.isArray(body.tools) ? body.tools : undefined
+  const tools = rawTools ? normalizeInteractionTools(rawTools) : undefined
+
+  return {
+    model,
+    ...(typeof body.system_instruction === "string"
+      ? { system_instruction: body.system_instruction }
+      : typeof body.systemInstruction === "string"
+      ? { system_instruction: body.systemInstruction }
+      : {}),
+    input,
+    ...(generationConfig ? { generation_config: generationConfig } : {}),
+    ...(tools?.length ? { tools } : {}),
+    ...(body.store !== undefined ? { store: body.store } : {}),
+  }
+}
+
+/**
+ * Build the Vertex Interactions API endpoint URL.
+ * authMode "vertex-interactions" → global Interactions endpoint.
+ */
+export function interactionsEndpoint(
+  _authMode: string,
+  projectId: string,
+  stream: boolean,
+): string {
+  const suffix = stream ? "?alt=sse" : ""
+  return `https://aiplatform.googleapis.com/v1beta1/projects/${projectId}/locations/global/interactions${suffix}`
+}
+
+/**
  * Build a generateContent request body from either a generateContent-style
  * or Interactions-style input body.
  */
@@ -335,7 +456,30 @@ export function parseInteractionStreamEvent(parsed: unknown): {
     eventType === "interaction.completed" ||
     eventType === "interaction.complete"
   ) {
-    return { text: "", grounding: null, done: true }
+    // Extract grounding annotations from model_output steps when present
+    let grounding: Record<string, unknown> | null = null
+    const interaction = record.interaction
+    if (interaction && typeof interaction === "object") {
+      const steps = Array.isArray((interaction as Record<string, unknown>).steps)
+        ? (interaction as Record<string, unknown>).steps as unknown[]
+        : []
+      for (const step of steps) {
+        if (!step || typeof step !== "object") continue
+        const s = step as Record<string, unknown>
+        if (s.type !== "model_output") continue
+        const content = Array.isArray(s.content) ? s.content : []
+        for (const block of content) {
+          if (!block || typeof block !== "object") continue
+          const b = block as Record<string, unknown>
+          if (Array.isArray(b.annotations) && b.annotations.length > 0) {
+            grounding = { annotations: b.annotations }
+            break
+          }
+        }
+        if (grounding) break
+      }
+    }
+    return { text: "", grounding, done: true }
   }
 
   if (eventType === "step.delta" || eventType === "content.delta") {

@@ -27,3 +27,29 @@ paths = [
 [[allowlists]]
 description = "Rotated Google service-account key committed on leona branch (commit 1e0f6bb). Key was invalidated before this allowlist was added."
 commits = ["1e0f6bbe5cdf3195a775ac062ee89f568902d4ca"]
+
+[[allowlists]]
+description = "Example/template file — contains a PEM comment with placeholder content (\\n...\\n), not a real private key."
+paths = [
+  '''(?:^|/)supabase/functions/\.env\.local\.example$''',
+]
+
+[[allowlists]]
+description = "Test fixtures and CI stubs — fake unsigned JWTs and placeholder PEM strings used only in unit/e2e tests and CI environment variables. None of these are valid credentials."
+paths = [
+  '''(?:^|/)backend/tests/conftest\.py$''',
+  '''(?:^|/)backend/tests/test_authz\.py$''',
+  '''(?:^|/)e2e/web-golden-flow\.spec\.ts$''',
+  '''(?:^|/)src/lib/deploymentConfig\.test\.ts$''',
+  '''(?:^|/)src/lib/deploymentConfig\.ts$''',
+  '''(?:^|/)\.github/workflows/ci\.yml$''',
+  '''(?:^|/)scripts/serve-e2e\.mjs$''',
+]
+
+[[allowlists]]
+description = "oauth-helper and config tests contain PEM strings with the text 'secret-test-material' as a test fixture, not a real key."
+paths = [
+  '''(?:^|/)supabase/functions/shared/.*\.test\.ts$''',
+  '''(?:^|/)src/lib/.*\.test\.ts$''',
+  '''(?:^|/)scripts/validate-local-ai-env\.test\.mjs$''',
+]
