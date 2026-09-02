@@ -30,24 +30,19 @@ import {
   validateOwnedStoragePath,
 } from "../shared/storage-path.ts"
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.38.4"
+import { buildCorsHeaders, handleOptions } from "../shared/cors.ts"
 
 declare const EdgeRuntime: {
   waitUntil(promise: Promise<unknown>): void
 }
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-}
-
 const DOC_SELECT =
   "id, title, user_id, rubric_id, storage_path, storage_bucket, mime_type, extracted_text, index_status, index_error, vertex_rag_corpus_name, vertex_rag_file_name"
 
-function jsonResponse(body: unknown, status = 200) {
+function jsonResponse(body: unknown, status = 200, cors: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...cors, "Content-Type": "application/json" },
   })
 }
 
@@ -199,8 +194,10 @@ async function runVertexIndex(
     userId: string
     claimedDoc: Record<string, unknown>
     priorStatus: string | null
+    cors: Record<string, string>
   },
 ): Promise<Response> {
+  const cors = input.cors
   const claimedDoc = input.claimedDoc
   const rubricId = (claimedDoc.rubric_id as string | null) ?? null
   const knowledgeDocumentId = input.knowledgeDocumentId
@@ -358,13 +355,18 @@ async function runVertexIndex(
 }
 
 serve(async (req) => {
+  const cors = buildCorsHeaders(req)
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders })
+    return handleOptions(cors)
   }
+  // Bind cors to jsonResponse for this request so all responses in the
+  // serve handler carry the correct CORS headers.
+  const respond = (body: unknown, status = 200) =>
+    jsonResponse(body, status, cors)
 
   try {
     const auth = await verifyRequest(req)
-    if (!auth) return jsonResponse({ error: "Unauthorized" }, 401)
+    if (!auth) return respond({ error: "Unauthorized" }, 401)
     const { user, db } = auth
 
     const body = await req.json().catch(() => ({})) as Record<string, unknown>
@@ -372,7 +374,7 @@ serve(async (req) => {
       ? body.knowledgeDocumentId.trim()
       : ""
     if (!knowledgeDocumentId) {
-      return jsonResponse({ error: "knowledgeDocumentId is required" }, 400)
+      return respond({ error: "knowledgeDocumentId is required" }, 400)
     }
 
     const { data: doc, error: docError } = await db
@@ -383,15 +385,15 @@ serve(async (req) => {
       .single()
 
     if (docError || !doc) {
-      return jsonResponse({ error: "Document not found or access denied" }, 404)
+      return respond({ error: "Document not found or access denied" }, 404)
     }
 
     if (doc.index_status === "indexed" && doc.vertex_rag_file_name) {
-      return jsonResponse(statusPayload(knowledgeDocumentId, doc))
+      return respond(statusPayload(knowledgeDocumentId, doc))
     }
 
     if (!canUseGeminiInteractions()) {
-      return jsonResponse({
+      return respond({
         error:
           "Vertex AI credentials are not configured for RAG indexing (GOOGLE_PROJECT_ID + service account)",
       }, 503)
@@ -402,7 +404,7 @@ serve(async (req) => {
 
     const claim = await claimIndexingJob(db, knowledgeDocumentId, user.id)
     if (claim.action === "missing") {
-      return jsonResponse({ error: "Document not found or access denied" }, 404)
+      return respond({ error: "Document not found or access denied" }, 404)
     }
     if (claim.action === "replay") {
       const replay = claim.doc
@@ -410,7 +412,7 @@ serve(async (req) => {
         replay.index_status === "indexed" &&
         replay.vertex_rag_file_name
       ) {
-        return jsonResponse(statusPayload(knowledgeDocumentId, {
+        return respond(statusPayload(knowledgeDocumentId, {
           index_status: String(replay.index_status),
           vertex_rag_corpus_name: replay.vertex_rag_corpus_name as
             | string
@@ -419,7 +421,7 @@ serve(async (req) => {
           index_error: replay.index_error as string | null,
         }))
       }
-      return jsonResponse(statusPayload(knowledgeDocumentId, {
+      return respond(statusPayload(knowledgeDocumentId, {
         index_status: "indexing",
         vertex_rag_corpus_name: replay.vertex_rag_corpus_name as string | null,
         vertex_rag_file_name: replay.vertex_rag_file_name as string | null,
@@ -437,6 +439,7 @@ serve(async (req) => {
       userId: user.id,
       claimedDoc: claim.doc,
       priorStatus,
+      cors,
     })
 
     try {
@@ -450,6 +453,6 @@ serve(async (req) => {
     return await work
   } catch (error) {
     console.error("[index-knowledge-document] Error:", error)
-    return jsonResponse({ error: (error as Error).message }, 500)
+    return respond({ error: (error as Error).message }, 500)
   }
 })

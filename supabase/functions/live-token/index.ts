@@ -34,15 +34,10 @@ import {
   vertexLiveModelResource,
   vertexLiveWebSocketUrl,
 } from "../shared/vertex-rag.ts"
+import { buildCorsHeaders, handleOptions } from "../shared/cors.ts"
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-}
 
 const LIVE_SYSTEM_PROMPT =
   `You are StudyPilot, a Socratic academic coach speaking live with a student.
@@ -66,13 +61,6 @@ const SEARCH_RUBRIC_DECLARATION = {
   },
 }
 
-function jsonResponse(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  })
-}
-
 function isUuid(value: string): boolean {
   return UUID_PATTERN.test(value)
 }
@@ -84,8 +72,17 @@ function optionalString(value: unknown, max: number): string | undefined {
 }
 
 serve(async (req) => {
+  const cors = buildCorsHeaders(req)
+
+  function jsonResponse(body: unknown, status = 200) {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { ...cors, "Content-Type": "application/json" },
+    })
+  }
+
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders })
+    return handleOptions(cors)
   }
   if (req.method !== "POST") {
     return jsonResponse({ error: "Method not allowed" }, 405)
