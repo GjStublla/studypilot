@@ -14,6 +14,7 @@ modify their own rubric rows.
 from __future__ import annotations
 
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, StringConstraints
@@ -150,66 +151,48 @@ def create_rubric(
     token: str = Depends(get_token),
 ):
     """
-    Creates a rubric row and inserts all supplied criteria in a single
-    operation. The rubric starts inactive — use PATCH /rubrics/{id}/active
-    to make it the active one for coaching sessions.
+    Creates a rubric row and inserts all supplied criteria atomically via the
+    create_rubric_with_criteria DB function. If the criteria insert fails the
+    rubric insert is automatically rolled back — no orphan rows.
+
+    The rubric starts inactive — use PATCH /rubrics/{id}/active to make it
+    the active one for coaching sessions.
     """
     client = get_user_client(token)
 
-    # --- Insert the rubric row ---
+    criteria_payload = [
+        {"name": c.name, "max_score": c.max_score}
+        for c in body.criteria
+    ]
+
     try:
-        rubric_result = (
-            client.table("rubrics")
-            .insert({
-                "user_id": user_id,
-                "title": body.title,
-                "course": body.course,
-                "active": False,
-                "file_search_status": "not_indexed",
-            })
-            .select("id, title, course")
-            .single()
-            .execute()
-        )
+        result = client.rpc(
+            "create_rubric_with_criteria",
+            {
+                "p_user_id": user_id,
+                "p_title": body.title,
+                "p_course": body.course,
+                "p_criteria": criteria_payload,
+            },
+        ).execute()
     except Exception as e:
-        print(f"[rubrics] create_rubric insert failed for user {user_id}: {e}")
+        print(f"[rubrics] create_rubric_with_criteria rpc failed for user {user_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Could not create rubric. Please try again.",
         )
 
-    rubric_id = rubric_result.data["id"]
-
-    # --- Insert criteria if any were provided ---
-    if body.criteria:
-        criteria_rows = [
-            {
-                "rubric_id": rubric_id,
-                "name": c.name,
-                "score": 0,          # starts ungraded
-                "max_score": c.max_score,
-            }
-            for c in body.criteria
-        ]
-        try:
-            client.table("rubric_criteria").insert(criteria_rows).execute()
-        except Exception as e:
-            # Rubric was created — roll it back so we don't leave an orphan row.
-            print(f"[rubrics] criteria insert failed for rubric {rubric_id}: {e}")
-            try:
-                client.table("rubrics").delete().eq("id", rubric_id).execute()
-            except Exception as rollback_err:
-                # Rollback failed — log so the orphan can be cleaned up manually.
-                print(f"[rubrics] rollback failed for rubric {rubric_id}: {rollback_err}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Could not save rubric criteria. Please try again.",
-            )
+    row = result.data
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not create rubric. Please try again.",
+        )
 
     return CreateRubricResponse(
-        id=rubric_id,
-        title=rubric_result.data["title"],
-        course=rubric_result.data["course"],
+        id=row["id"],
+        title=row["title"],
+        course=row["course"],
     )
 
 
@@ -219,7 +202,7 @@ def create_rubric(
     summary="Delete a rubric and all its criteria",
 )
 def delete_rubric(
-    rubric_id: str,
+    rubric_id: UUID,
     user_id: str = Depends(verify_token),
     token: str = Depends(get_token),
 ):
@@ -233,6 +216,7 @@ def delete_rubric(
     This prevents the extension from silently losing its coaching context.
     """
     client = get_user_client(token)
+    rubric_id = str(rubric_id)
 
     # Fetch the rubric first to check ownership and active status.
     try:
@@ -286,82 +270,56 @@ def delete_rubric(
     summary="Set a rubric as the active one for coaching sessions",
 )
 def set_active_rubric(
-    rubric_id: str,
+    rubric_id: UUID,
     user_id: str = Depends(verify_token),
     token: str = Depends(get_token),
 ):
     """
     Marks the given rubric as active and deactivates all others owned by
-    the same user. Only one rubric can be active at a time.
+    the same user atomically via the set_active_rubric DB function. Both
+    updates happen in a single SQL statement so there is never a window
+    with zero active rubrics.
 
     The active rubric is what the extension and Chat Coach use as context
     during a coaching session.
     """
     client = get_user_client(token)
+    rubric_id = str(rubric_id)
 
-    # Verify the target rubric exists and belongs to this user BEFORE
-    # deactivating everything. If we deactivated first and the rubric doesn't
-    # exist, the user ends up with zero active rubrics.
     try:
-        check = (
-            client.table("rubrics")
-            .select("id")
-            .eq("id", rubric_id)
-            .eq("user_id", user_id)
-            .single()
-            .execute()
-        )
+        result = client.rpc(
+            "set_active_rubric",
+            {
+                "p_rubric_id": rubric_id,
+                "p_user_id": user_id,
+            },
+        ).execute()
     except Exception as e:
         error_str = str(e).lower()
-        if "pgrst116" in error_str or "no rows" in error_str:
+        print(f"[rubrics] set_active_rubric rpc error for rubric {rubric_id}: {e}")
+        if "p0002" in error_str or "rubric not found" in error_str:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Rubric not found.",
             )
-        print(f"[rubrics] set_active_rubric check failed for rubric {rubric_id}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not activate rubric. Please try again.",
-        )
-
-    if not check.data:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Rubric not found.",
-        )
-
-    # Safe to deactivate all — we know the target exists.
-    try:
-        client.table("rubrics").update({"active": False}).eq("user_id", user_id).execute()
-    except Exception as e:
-        print(f"[rubrics] deactivate all failed for user {user_id}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not update rubric. Please try again.",
-        )
-
-    # Activate the target rubric.
-    try:
-        result = (
-            client.table("rubrics")
-            .update({"active": True})
-            .eq("id", rubric_id)
-            .eq("user_id", user_id)
-            .select(
-                "id, title, course, uploaded_at, active, sessions_count, file_search_status, "
-                "rubric_criteria(id, name, score, max_score)"
+        if "42501" in error_str or "unauthorized" in error_str:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to activate this rubric.",
             )
-            .single()
-            .execute()
-        )
-    except Exception as e:
-        print(f"[rubrics] activate failed for rubric {rubric_id}: {e}")
+        print(f"[rubrics] set_active_rubric rpc failed for rubric {rubric_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Could not activate rubric. Please try again.",
         )
 
     row = result.data
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Rubric not found.",
+        )
+
     criteria = [
         RubricCriterion(
             id=c["id"],
@@ -369,7 +327,7 @@ def set_active_rubric(
             score=c["score"] if c["score"] is not None else 0,
             max_score=c["max_score"] if c["max_score"] is not None else 4,
         )
-        for c in (row.get("rubric_criteria") or [])
+        for c in (row.get("criteria") or [])
     ]
 
     return RubricResponse(

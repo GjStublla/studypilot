@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
+from uuid import UUID
 
 from dependencies import verify_token, get_token
 from supabase_client import get_user_client
@@ -87,7 +88,7 @@ def list_action_items(
     summary="Toggle an action item's done state",
 )
 def toggle_action_item(
-    item_id: str,
+    item_id: UUID,
     body: ToggleActionItemRequest,
     user_id: str = Depends(verify_token),
     token: str = Depends(get_token),
@@ -100,23 +101,18 @@ def toggle_action_item(
     belongs to another user returns 404 to avoid leaking whether the ID exists.
     """
     client = get_user_client(token)
+    item_id = str(item_id)
 
     try:
         result = (
             client.table("action_items")
             .update({"done": body.done})
             .eq("id", item_id)
-            .eq("user_id", user_id)   # belt-and-suspenders on top of RLS
-            # select() is required — without it PostgREST returns no data
-            # and we can't confirm the update succeeded or return the row.
-            .select("id, text, session_id, rubric_id, done")
-            .single()
+            .eq("user_id", user_id)
             .execute()
         )
     except Exception as e:
         error_str = str(e).lower()
-        # PGRST116 = .single() found no rows → item doesn't exist or belongs
-        # to another user. Return 404 in both cases (don't leak ownership).
         if "pgrst116" in error_str or "no rows" in error_str:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -128,7 +124,30 @@ def toggle_action_item(
             detail="Could not update action item. Please try again.",
         )
 
-    row = result.data
+    # Fetch the updated row to build the response.
+    try:
+        fetch = (
+            client.table("action_items")
+            .select("id, text, session_id, rubric_id, done")
+            .eq("id", item_id)
+            .eq("user_id", user_id)
+            .single()
+            .execute()
+        )
+    except Exception as e:
+        error_str = str(e).lower()
+        if "pgrst116" in error_str or "no rows" in error_str:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Action item not found.",
+            )
+        print(f"[action-items] toggle_action_item fetch failed for item {item_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not update action item. Please try again.",
+        )
+
+    row = fetch.data
     return ActionItemResponse(
         id=row["id"],
         text=row["text"],
@@ -144,7 +163,7 @@ def toggle_action_item(
     summary="Permanently delete an action item",
 )
 def delete_action_item(
-    item_id: str,
+    item_id: UUID,
     user_id: str = Depends(verify_token),
     token: str = Depends(get_token),
 ):
@@ -158,6 +177,7 @@ def delete_action_item(
     To just mark it complete, use PATCH instead.
     """
     client = get_user_client(token)
+    item_id = str(item_id)
 
     # Fetch first to distinguish a genuine 404 from a DB error.
     try:

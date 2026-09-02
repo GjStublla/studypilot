@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal, NoReturn
 from datetime import datetime, timezone
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, StringConstraints
@@ -218,7 +219,7 @@ def list_sessions(
     summary="Get full session detail including transcript and action items",
 )
 def get_session(
-    session_id: str,
+    session_id: UUID,
     user_id: str = Depends(verify_token),
     token: str = Depends(get_token),
 ):
@@ -227,6 +228,7 @@ def get_session(
     action items.  RLS ensures the user can only fetch their own sessions.
     """
     client = get_user_client(token)
+    session_id = str(session_id)
 
     # --- Fetch session row ---
     try:
@@ -390,7 +392,7 @@ def create_session(
     summary="Append a transcript message to a session",
 )
 def create_message(
-    session_id: str,
+    session_id: UUID,
     body: CreateMessageRequest,
     user_id: str = Depends(verify_token),
     token: str = Depends(get_token),
@@ -405,6 +407,7 @@ def create_message(
     messages incrementally as the session progresses.
     """
     client = get_user_client(token)
+    session_id = str(session_id)
 
     # Verify the session belongs to this user before writing a message.
     # This gives a cleaner 404 than letting the RLS violation surface as a
