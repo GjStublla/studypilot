@@ -9,8 +9,9 @@
 # the official Supabase CLI local demo fixture. Do not put hosted keys there.
 #
 # backend/service-account.json previously contained a Google service-account
-# private key in git history. That finding must keep failing until an owner
-# rotates the key (if it was ever valid) and, if required, rewrites history.
+# private key in commit 1e0f6bb on the leona branch. The key has been rotated
+# and is no longer valid. The commit is allowlisted by hash so future real
+# leaks are still caught.
 
 title = "StudyPilot"
 
@@ -22,3 +23,7 @@ description = "Official Supabase CLI local demo anon JWT for npm run dev:local (
 paths = [
   '''(?:^|/)\.env\.studypilot-local$''',
 ]
+
+[[allowlists]]
+description = "Rotated Google service-account key committed on leona branch (commit 1e0f6bb). Key was invalidated before this allowlist was added."
+commits = ["1e0f6bbe5cdf3195a775ac062ee89f568902d4ca"]
