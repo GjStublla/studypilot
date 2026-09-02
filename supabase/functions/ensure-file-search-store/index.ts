@@ -14,23 +14,20 @@ import {
   ensureRagMetadataSchemas,
 } from "../shared/vertex-rag.ts"
 import { canUseGeminiInteractions } from "../shared/gemini-api.ts"
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-}
-
-function jsonResponse(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  })
-}
+import { buildCorsHeaders, handleOptions } from "../shared/cors.ts"
 
 serve(async (req) => {
+  const cors = buildCorsHeaders(req)
+
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders })
+    return handleOptions(cors)
+  }
+
+  function jsonResponse(body: unknown, status = 200) {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { ...cors, "Content-Type": "application/json" },
+    })
   }
 
   try {

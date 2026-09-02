@@ -25,6 +25,7 @@ import {
 } from "../shared/context.ts";
 import { normalizeCitations } from "../shared/file-search-normalize.ts";
 import { retrieveRagContexts } from "../shared/vertex-rag.ts";
+import { buildCorsHeaders, handleOptions } from "../shared/cors.ts";
 
 const MAX_IMAGES = 2;
 const MAX_IMAGE_BASE64_CHARS = 1_500_000;
@@ -36,20 +37,6 @@ const ALLOWED_IMAGE_MIME_TYPES = new Set([
 const ORIGIN_SURFACES = new Set(["dashboard", "extension", "legacy"]);
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-const streamHeaders = {
-  ...corsHeaders,
-  "Content-Type": "text/event-stream",
-  "Cache-Control": "no-cache",
-  "Connection": "keep-alive",
-};
 
 const SYSTEM_PROMPT =
   `You are StudyPilot, a Socratic academic coach. Your role is to help students improve their own work — never to do it for them.
@@ -133,13 +120,6 @@ type MessageCommit = {
   userSequence: number;
   assistantSequence: number;
 };
-
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
 
 function sseData(value: unknown): string {
   return `data: ${JSON.stringify(value)}\n\n`;
@@ -358,8 +338,23 @@ function commitEvent(
 }
 
 serve(async (req) => {
+  const cors = buildCorsHeaders(req);
+  const streamHeaders = {
+    ...cors,
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive",
+  };
+
+  function jsonResponse(body: unknown, status = 200) {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  }
+
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
+    return handleOptions(cors);
   }
   if (req.method !== "POST") {
     return jsonResponse({ error: "Method not allowed" }, 405);

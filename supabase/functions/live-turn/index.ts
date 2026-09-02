@@ -13,37 +13,34 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { verifyRequest } from "../shared/supabase-clients.ts"
 import { liveTurnRpcHttpStatus, parseLiveTurnTexts } from "./validate.ts"
+import { buildCorsHeaders, handleOptions } from "../shared/cors.ts"
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-}
-
-function jsonResponse(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  })
-}
 
 function isUuid(value: string): boolean {
   return UUID_PATTERN.test(value)
 }
 
-function requireUuid(value: unknown, field: string): string | Response {
-  if (typeof value !== "string" || !isUuid(value.trim())) {
-    return jsonResponse({ error: `${field} must be a UUID` }, 400)
-  }
-  return value.trim()
-}
-
 serve(async (req) => {
+  const cors = buildCorsHeaders(req)
+
+  function jsonResponse(body: unknown, status = 200) {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { ...cors, "Content-Type": "application/json" },
+    })
+  }
+
+  function requireUuid(value: unknown, field: string): string | Response {
+    if (typeof value !== "string" || !isUuid(value.trim())) {
+      return jsonResponse({ error: `${field} must be a UUID` }, 400)
+    }
+    return value.trim()
+  }
+
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders })
+    return handleOptions(cors)
   }
   if (req.method !== "POST") {
     return jsonResponse({ error: "Method not allowed" }, 405)
