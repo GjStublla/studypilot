@@ -198,6 +198,7 @@ export interface RubricsViewProps {
   query: string;
   rubricIndexRequestStates?: Readonly<Record<string, DashboardRequestState>>;
   onSetActive: (id: string) => void;
+  onDelete: (id: string) => void;
   onAskAbout: (id: string) => void;
   onRetryIndex?: (id: string) => void;
   onRubricUploaded: (rubric: UploadedRubric) => void;

@@ -176,3 +176,16 @@ export async function activateRubric(id: string): Promise<void> {
   // the Supabase/Edge adapter instead of crossing the dashboard boundary.
   await getJson(`/rubrics/${id}/active`, { method: 'PATCH' });
 }
+
+export async function deleteRubric(id: string): Promise<void> {
+  const res = await apiFetch(`/rubrics/${id}`, { method: 'DELETE' });
+  if (res.status === 409) {
+    throw new Error('Cannot delete the active rubric. Set another rubric as active first.');
+  }
+  if (res.status === 404) {
+    throw new Error('Rubric not found.');
+  }
+  if (!res.ok) {
+    throw new Error(`Delete failed: ${res.status}`);
+  }
+}

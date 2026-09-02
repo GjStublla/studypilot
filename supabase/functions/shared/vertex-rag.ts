@@ -157,10 +157,26 @@ async function vertexFetch(
 export async function ensureRagEngineServerlessMode(): Promise<void> {
   const { projectId } = requireVertexAuth()
   const location = getVertexRagLocation()
+  const host = vertexAiHost(location)
+  // ragEngineConfig uses v1 not v1beta1, and requires updateMask on PATCH.
   const name = `projects/${projectId}/locations/${location}/ragEngineConfig`
+  const getUrl = `https://${host}/v1/${name}`
+  const patchUrl = `https://${host}/v1/${name}?updateMask=ragManagedDbConfig`
+
+  const doFetch = async (url: string, method: string, body?: string) => {
+    const token = await getAccessToken()
+    return fetch(url, {
+      method,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      ...(body ? { body } : {}),
+    })
+  }
 
   try {
-    const getRes = await vertexFetch(name, { method: "GET", location })
+    const getRes = await doFetch(getUrl, "GET")
     if (getRes.ok) {
       const cfg = await getRes.json() as {
         ragManagedDbConfig?: Record<string, unknown>
@@ -169,6 +185,7 @@ export async function ensureRagEngineServerlessMode(): Promise<void> {
       const managed =
         cfg.ragManagedDbConfig ?? cfg.rag_managed_db_config ?? {}
       if (managed && typeof managed === "object" && "serverless" in managed) {
+        // Already serverless — nothing to do.
         return
       }
     }
@@ -176,23 +193,29 @@ export async function ensureRagEngineServerlessMode(): Promise<void> {
     console.warn("[vertex-rag] GetRagEngineConfig failed:", error)
   }
 
-  const patchRes = await vertexFetch(name, {
-    method: "PATCH",
-    location,
-    body: JSON.stringify({
-      rag_managed_db_config: { serverless: {} },
-    }),
-  })
+  // Switch to serverless mode. The updateMask tells the API exactly which
+  // field to update — without it the PATCH is a no-op.
+  const patchRes = await doFetch(
+    patchUrl,
+    "PATCH",
+    JSON.stringify({ ragManagedDbConfig: { serverless: {} } }),
+  )
+
   if (!patchRes.ok) {
     const text = await patchRes.text()
-    // Some projects already serverless / field mask quirks — log and continue;
-    // createRagCorpus will surface a clearer error if still blocked.
     console.warn(
       "[vertex-rag] UpdateRagEngineConfig(serverless):",
       patchRes.status,
-      describeGeminiApiError(text),
+      text.slice(0, 400),
+    )
+    // Throw so createRagCorpus knows the switch failed instead of proceeding
+    // and hitting the same Spanner restriction error.
+    throw new Error(
+      `Failed to switch RAG Engine to Serverless mode (${patchRes.status}): ${text.slice(0, 300)}`,
     )
   }
+
+  console.log("[vertex-rag] Switched RAG Engine to Serverless mode in", location)
 }
 
 export async function createRagCorpus(input: {

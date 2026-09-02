@@ -42,44 +42,193 @@ import {
 
 } from "../shared/storage-path.ts"
 
+import { buildCorsHeaders, handleOptions } from "../shared/cors.ts"
+
 declare const EdgeRuntime: {
   waitUntil(promise: Promise<unknown>): void
 }
 
-const corsHeaders = {
-
-  'Access-Control-Allow-Origin': '*',
-
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-
-}
-
-
-
-function jsonResponse(body: unknown, status = 200) {
-
-  return new Response(JSON.stringify(body), {
-
-    status,
-
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-
-  })
-
-}
-
-
-
 const IN_FLIGHT = new Set(["uploading", "indexing"])
 
+/**
+ * Extract plain text from a DOCX file (which is a ZIP archive).
+ * Reads word/document.xml and strips all XML tags, leaving only text nodes.
+ */
+async function extractDocxText(bytes: Uint8Array): Promise<string> {
+  // DOCX = ZIP. Find the word/document.xml entry by scanning the ZIP central
+  // directory. We use a simple approach: decompress the specific file entry.
+  // The local file header signature is 0x04034b50 (PK\x03\x04).
+  const target = 'word/document.xml'
+  const targetBytes = new TextEncoder().encode(target)
 
+  let i = 0
+  while (i < bytes.length - 30) {
+    // Look for local file header signature PK\x03\x04
+    if (
+      bytes[i] === 0x50 && bytes[i + 1] === 0x4b &&
+      bytes[i + 2] === 0x03 && bytes[i + 3] === 0x04
+    ) {
+      const compression = bytes[i + 8] | (bytes[i + 9] << 8)
+      const compressedSize = bytes[i + 18] | (bytes[i + 19] << 8) |
+        (bytes[i + 20] << 16) | (bytes[i + 21] << 24)
+      const fnLen = bytes[i + 26] | (bytes[i + 27] << 8)
+      const extraLen = bytes[i + 28] | (bytes[i + 29] << 8)
+      const dataOffset = i + 30 + fnLen + extraLen
+
+      // Check if this entry is word/document.xml
+      const fnBytes = bytes.slice(i + 30, i + 30 + fnLen)
+      if (fnLen === targetBytes.length) {
+        let match = true
+        for (let j = 0; j < fnLen; j++) {
+          if (fnBytes[j] !== targetBytes[j]) { match = false; break }
+        }
+        if (match) {
+          const compressedData = bytes.slice(dataOffset, dataOffset + compressedSize)
+          let xmlBytes: Uint8Array
+          if (compression === 0) {
+            // Stored (no compression)
+            xmlBytes = compressedData
+          } else if (compression === 8) {
+            // Deflate
+            const ds = new DecompressionStream('deflate-raw')
+            const writer = ds.writable.getWriter()
+            const reader = ds.readable.getReader()
+            writer.write(compressedData)
+            writer.close()
+            const chunks: Uint8Array[] = []
+            while (true) {
+              const { done, value } = await reader.read()
+              if (done) break
+              chunks.push(value)
+            }
+            const total = chunks.reduce((s, c) => s + c.length, 0)
+            xmlBytes = new Uint8Array(total)
+            let offset = 0
+            for (const chunk of chunks) {
+              xmlBytes.set(chunk, offset)
+              offset += chunk.length
+            }
+          } else {
+            throw new Error(`Unsupported ZIP compression: ${compression}`)
+          }
+          const xml = new TextDecoder('utf-8', { fatal: false }).decode(xmlBytes)
+          // Strip XML tags and decode common entities
+          return xml
+            .replace(/<\/w:p>/g, '\n')     // paragraph end → newline
+            .replace(/<\/w:tr>/g, '\n')     // table row end → newline
+            .replace(/<[^>]+>/g, '')        // strip all tags
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&apos;/g, "'")
+            .replace(/&#x[0-9a-fA-F]+;/g, ' ')
+            .replace(/[ \t]+/g, ' ')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim()
+        }
+      }
+      i = dataOffset + compressedSize
+    } else {
+      i++
+    }
+  }
+  throw new Error('word/document.xml not found in DOCX archive')
+}
+
+/**
+ * Extract plain text from a PDF by scanning for text between BT/ET markers
+ * and decoding Tj / TJ / ' / " operators. Better than raw ASCII scan.
+ */
+function extractPdfText(bytes: Uint8Array): string {
+  const raw = new TextDecoder('latin1').decode(bytes)
+  const lines: string[] = []
+
+  // Find all BT...ET blocks (PDF text objects)
+  const btEtRegex = /BT[\s\S]*?ET/g
+  let match: RegExpExecArray | null
+  while ((match = btEtRegex.exec(raw)) !== null) {
+    const block = match[0]
+    // Extract string arguments from Tj, TJ, ' and " operators
+    // Tj: (text) Tj   or  <hex> Tj
+    const tjRegex = /\(([^)]*)\)\s*(?:Tj|'|")|<([0-9a-fA-F]+)>\s*(?:Tj|'|")/g
+    let tj: RegExpExecArray | null
+    while ((tj = tjRegex.exec(block)) !== null) {
+      if (tj[1] !== undefined) {
+        // Literal string — unescape PDF escape sequences
+        lines.push(
+          tj[1]
+            .replace(/\\n/g, '\n')
+            .replace(/\\r/g, '\r')
+            .replace(/\\t/g, '\t')
+            .replace(/\\\(/g, '(')
+            .replace(/\\\)/g, ')')
+            .replace(/\\\\/g, '\\')
+        )
+      } else if (tj[2] !== undefined) {
+        // Hex string
+        const hex = tj[2]
+        let str = ''
+        for (let i = 0; i < hex.length - 1; i += 2) {
+          str += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16))
+        }
+        lines.push(str)
+      }
+    }
+    // TJ operator: [(text) spacing (text) ...] TJ
+    const tjArrayRegex = /\[([^\]]*)\]\s*TJ/g
+    let tja: RegExpExecArray | null
+    while ((tja = tjArrayRegex.exec(block)) !== null) {
+      const inner = tja[1]
+      const strRegex = /\(([^)]*)\)|<([0-9a-fA-F]+)>/g
+      let s: RegExpExecArray | null
+      let line = ''
+      while ((s = strRegex.exec(inner)) !== null) {
+        if (s[1] !== undefined) line += s[1]
+        else if (s[2] !== undefined) {
+          const hex = s[2]
+          for (let i = 0; i < hex.length - 1; i += 2) {
+            line += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16))
+          }
+        }
+      }
+      if (line) lines.push(line)
+    }
+  }
+
+  if (lines.length === 0) {
+    // Fallback: raw printable ASCII (old behaviour)
+    const chars: string[] = []
+    for (let i = 0; i < bytes.length; i++) {
+      const b = bytes[i]
+      if ((b >= 32 && b < 127) || b === 9 || b === 10 || b === 13) {
+        chars.push(String.fromCharCode(b))
+      } else {
+        chars.push(' ')
+      }
+    }
+    return chars.join('').replace(/\s{4,}/g, ' ').trim()
+  }
+
+  return lines
+    .join('\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
 
 serve(async (req) => {
+  const cors = buildCorsHeaders(req)
+
+  function jsonResponse(body: unknown, status = 200) {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { ...cors, 'Content-Type': 'application/json' },
+    })
+  }
 
   if (req.method === 'OPTIONS') {
-
-    return new Response(null, { status: 204, headers: corsHeaders })
-
+    return handleOptions(cors)
   }
 
 
@@ -201,59 +350,35 @@ serve(async (req) => {
       if (!downloadError && fileBlob) {
 
         const mimeType = fileBlob.type?.toLowerCase() ?? ''
+        const fileName = validatedPath.path.split('/').pop()?.toLowerCase() ?? ''
+        const isDocx = mimeType.includes('word') ||
+          mimeType.includes('officedocument') ||
+          fileName.endsWith('.docx')
+        const isPdf = mimeType.includes('pdf') || fileName.endsWith('.pdf')
 
-
-
-        if (
-
-          mimeType.includes('pdf') ||
-
-          mimeType.includes('word') ||
-
-          mimeType.includes('octet-stream')
-
-        ) {
-
-          // For binary formats, extract the readable ASCII characters.
-
-          // This is a best-effort approach — it works well for most PDFs
-
-          // since they embed readable text strings in the binary stream.
-
-          const arrayBuffer = await fileBlob.arrayBuffer()
-
-          const bytes = new Uint8Array(arrayBuffer)
-
-          const chars: string[] = []
-
-          for (let i = 0; i < bytes.length; i++) {
-
-            const b = bytes[i]
-
-            // Include printable ASCII and common whitespace
-
-            if ((b >= 32 && b < 127) || b === 9 || b === 10 || b === 13) {
-
-              chars.push(String.fromCharCode(b))
-
-            } else {
-
-              chars.push(' ')
-
-            }
-
+        if (isDocx) {
+          // DOCX files are ZIP archives. Parse word/document.xml to get text.
+          try {
+            const arrayBuffer = await fileBlob.arrayBuffer()
+            const bytes = new Uint8Array(arrayBuffer)
+            sourceText = await extractDocxText(bytes)
+          } catch (err) {
+            console.warn('[extract-rubric] DOCX parse failed, falling back to raw:', err)
+            // Fall back to raw text attempt
+            sourceText = await fileBlob.text().catch(() => '')
           }
+        } else if (isPdf || mimeType.includes('octet-stream')) {
 
-          // Collapse whitespace runs that result from binary noise
-
-          sourceText = chars.join('').replace(/\s{4,}/g, ' ').trim()
+          // For PDFs: use a smarter extraction that looks for text between
+          // PDF stream markers and decodes common PDF text operators.
+          const arrayBuffer = await fileBlob.arrayBuffer()
+          const bytes = new Uint8Array(arrayBuffer)
+          sourceText = extractPdfText(bytes)
 
         } else {
 
           // Plain text, Markdown, CSV, etc.
-
           sourceText = await fileBlob.text()
-
         }
 
       }
@@ -339,8 +464,6 @@ Rules:
       model: geminiModel,
 
       input: prompt,
-
-      store: true,
 
       generation_config: {
 

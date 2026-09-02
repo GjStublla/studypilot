@@ -174,7 +174,7 @@ export const SessionDetailView = memo(function SessionDetailView({
                 <h4 className="ds-card-title ds-card-title-sm">{rubric.title}</h4>
                 <p className="ds-card-sub">{rubric.course}</p>
                 <ul className="ds-criteria">
-                  {rubric.criteria.map((criterion) => (
+                  {(rubric.criteria ?? []).map((criterion) => (
                     <li key={criterion.name}>
                       <span>{criterion.name}</span>
                       <ScoreDots score={criterion.score ?? 0} max={criterion.max ?? 4} />

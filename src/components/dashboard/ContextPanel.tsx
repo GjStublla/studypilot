@@ -21,7 +21,7 @@ export const ContextPanel = memo(function ContextPanel({
   onOpenExtension,
 }: ContextPanelProps) {
   const contextSession = view === 'session-detail' ? selectedSession : chatSession;
-  const visibleCriteria = useMemo(() => activeRubric?.criteria.slice(0, 5) ?? [], [activeRubric]);
+  const visibleCriteria = useMemo(() => (activeRubric?.criteria ?? []).slice(0, 5), [activeRubric]);
 
   return (
     <aside className="ds-context" aria-label="Current context">
