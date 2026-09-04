@@ -41,6 +41,7 @@ class RubricResponse(BaseModel):
     uploaded_at: str
     active: bool
     sessions_count: int
+    knowledge_document_id: str | None = None
     file_search_status: str
     criteria: list[RubricCriterion]
 
@@ -98,7 +99,7 @@ def list_rubrics(
         result = (
             client.table("rubrics")
             .select(
-                "id, title, course, uploaded_at, active, sessions_count, file_search_status, "
+                "id, title, course, uploaded_at, active, sessions_count, knowledge_document_id, file_search_status, "
                 "rubric_criteria(id, name, score, max_score)"
             )
             .eq("user_id", user_id)
@@ -131,6 +132,7 @@ def list_rubrics(
                 uploaded_at=row["uploaded_at"],
                 active=row.get("active") or False,
                 sessions_count=row.get("sessions_count") or 0,
+                knowledge_document_id=row.get("knowledge_document_id"),
                 file_search_status=row.get("file_search_status") or "not_indexed",
                 criteria=criteria,
             )

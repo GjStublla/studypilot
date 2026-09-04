@@ -24,7 +24,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field, StringConstraints
 
 from dependencies import verify_token, get_token
-from supabase_client import get_user_client
+from supabase_client import get_user_client, supabase_admin
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -94,7 +94,7 @@ def _require_session_owner(client, session_id: str, user_id: str) -> dict:
     try:
         result = (
             client.table("sessions")
-            .select("id, title, source, mode, duration_seconds, when_timestamp, rubric_id, summary, active")
+            .select("id, title, source, mode, duration_seconds, when_timestamp, rubric_id, summary, active, screenshot_path")
             .eq("id", session_id)
             .eq("user_id", user_id)
             .single()
@@ -106,6 +106,38 @@ def _require_session_owner(client, session_id: str, user_id: str) -> dict:
     if not result.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
     return result.data
+
+
+def _owned_session_capture_path(path: str | None, user_id: str, session_id: str) -> str | None:
+    """Validate the only Storage prefix the extension may use for session captures."""
+    if not path:
+        return None
+    if path != path.strip() or path.startswith("/") or "\\" in path or ".." in path:
+        return None
+    expected = f"{user_id}/{session_id}/"
+    if not path.startswith(expected):
+        return None
+    remainder = path[len(expected):]
+    if not remainder or "/" in remainder:
+        return None
+    return path
+
+
+def _delete_session_capture(path: str | None, user_id: str, session_id: str) -> None:
+    validated = _owned_session_capture_path(path, user_id, session_id)
+    if path and not validated:
+        print(f"[sessions] skipped untrusted screenshot_path for session {session_id}")
+        return
+    if not validated:
+        return
+    try:
+        supabase_admin.storage.from_("session-captures").remove([validated])
+    except Exception as e:
+        print(f"[sessions] session capture delete failed for session {session_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not delete session capture. Please try again.",
+        )
 
 
 # ─── Response / Request models ────────────────────────────────────────────────
@@ -474,9 +506,9 @@ def delete_session(
     token: str = Depends(get_token),
 ):
     """
-    Permanently deletes a session. The associated session_messages and
-    action_items rows are removed automatically by ON DELETE CASCADE constraints
-    in the DB schema.
+    Permanently deletes a session. The associated session_messages rows are
+    removed by database constraints; action items are deleted explicitly because
+    their session reference is nullable for other workflows.
 
     Returns 404 if the session doesn't exist or belongs to another user.
     """
@@ -484,9 +516,13 @@ def delete_session(
     session_id = str(session_id)
 
     # Verify ownership before deleting so we can distinguish 404 from a DB error.
-    _require_session_owner(client, session_id, user_id)
+    session = _require_session_owner(client, session_id, user_id)
+    _delete_session_capture(session.get("screenshot_path"), user_id, session_id)
 
     try:
+        client.table("action_items").delete().eq("session_id", session_id).eq(
+            "user_id", user_id
+        ).execute()
         result = (
             client.table("sessions")
             .delete()
