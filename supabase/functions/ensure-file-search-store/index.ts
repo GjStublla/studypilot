@@ -13,7 +13,7 @@ import {
   createRagCorpus,
   ensureRagMetadataSchemas,
 } from "../shared/vertex-rag.ts"
-import { canUseGeminiInteractions } from "../shared/gemini-api.ts"
+import { canUseVertexAi } from "../shared/gemini-api.ts"
 import { buildCorsHeaders, handleOptions } from "../shared/cors.ts"
 
 serve(async (req) => {
@@ -54,7 +54,7 @@ serve(async (req) => {
       })
     }
 
-    if (!canUseGeminiInteractions()) {
+    if (!canUseVertexAi()) {
       return jsonResponse({
         error:
           "Vertex AI credentials are not configured for RAG corpus creation",

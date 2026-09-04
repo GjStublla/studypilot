@@ -8,7 +8,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { verifyRequest } from "../shared/supabase-clients.ts"
 import { queryVertexRag } from "../shared/vertex-rag.ts"
-import { canUseGeminiInteractions } from "../shared/gemini-api.ts"
+import { canUseVertexAi } from "../shared/gemini-api.ts"
 import { buildCorsHeaders, handleOptions } from "../shared/cors.ts"
 
 const UUID_PATTERN =
@@ -149,7 +149,7 @@ serve(async (req) => {
 
     const corpusName = profile?.vertex_rag_corpus_name as string | null
     const indexed = rubric.file_search_status === "indexed" && corpusName &&
-      canUseGeminiInteractions()
+      canUseVertexAi()
 
     if (!indexed) {
       const criteria = ((rubric.rubric_criteria as

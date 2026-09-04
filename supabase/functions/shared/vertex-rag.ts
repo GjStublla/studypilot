@@ -76,6 +76,11 @@ export function ragCorpusPath(
   return `${ragCorpusParent(projectId, location)}/ragCorpora/${corpusIdOrName}`
 }
 
+export function vertexResourceLocation(resourceName: string): string | null {
+  const match = /\/locations\/([^/]+)/.exec(resourceName)
+  return match?.[1] ?? null
+}
+
 const RAG_FILE_NAME_PATTERN =
   /^projects\/([^/]+)\/locations\/([^/]+)\/ragCorpora\/([^/]+)\/ragFiles\/([^/]+)$/
 
@@ -121,7 +126,7 @@ async function vertexFetch(
   init: RequestInit & { location?: string } = {},
 ): Promise<Response> {
   const projectId = requireVertexProjectId()
-  const location = init.location ?? getVertexRagLocation()
+  const location = init.location ?? vertexResourceLocation(path) ?? getVertexRagLocation()
   const { location: _drop, headers, ...rest } = init
   const host = vertexAiHost(location)
   const url = path.startsWith("http")
@@ -362,10 +367,15 @@ export async function uploadRagFile(input: {
   description?: string
 }): Promise<{ name: string; displayName: string }> {
   requireVertexAuth()
-  const location = getVertexRagLocation()
+  const location = vertexResourceLocation(input.corpusName) ?? getVertexRagLocation()
   const host = vertexAiHost(location)
   const url =
     `https://${host}/upload/v1beta1/${input.corpusName}/ragFiles:upload`
+
+  console.info("[vertex-rag] uploadRagFile", {
+    uploadFilename: input.displayName,
+    mimeType: input.mimeType,
+  })
 
   const boundary = `studypilot_${crypto.randomUUID().replace(/-/g, "")}`
   const metadata = JSON.stringify({
@@ -386,13 +396,14 @@ export async function uploadRagFile(input: {
   })
 
   const enc = new TextEncoder()
-  const mid = enc.encode(
+const mid = enc.encode(
+  `--${boundary}\r\n` +
+    `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
+    `${metadata}\r\n` +
     `--${boundary}\r\n` +
-      `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
-      `${metadata}\r\n` +
-      `--${boundary}\r\n` +
-      `Content-Type: ${input.mimeType || "application/octet-stream"}\r\n\r\n`,
-  )
+    `Content-Disposition: form-data; name="file"; filename="${input.displayName}"\r\n` +
+    `Content-Type: ${input.mimeType || "application/octet-stream"}\r\n\r\n`,
+)
   const end = enc.encode(`\r\n--${boundary}--\r\n`)
   const body = new Uint8Array(mid.length + input.bytes.length + end.length)
   body.set(mid, 0)
@@ -485,6 +496,29 @@ export async function deleteRagFile(
   return { deleted: true, alreadyGone: false }
 }
 
+export async function deleteRagCorpus(
+  corpusName: string,
+): Promise<{ deleted: boolean; alreadyGone: boolean }> {
+  const res = await vertexFetch(`${corpusName}?force=true`, { method: "DELETE" })
+  if (res.status === 404) return { deleted: true, alreadyGone: true }
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(
+      `Vertex RAG corpus delete failed (${res.status}): ${describeGeminiApiError(text)}`,
+    )
+  }
+  const text = await res.text()
+  if (text) {
+    const data = JSON.parse(text) as { name?: string; done?: boolean }
+    if (data.name?.includes("/operations/") && !data.done) {
+      await waitForVertexOperation(data.name, {
+        location: corpusName.split("/locations/")[1]?.split("/")[0],
+      })
+    }
+  }
+  return { deleted: true, alreadyGone: false }
+}
+
 export async function getVertexOperation(
   operationName: string,
   options?: { location?: string },
@@ -558,7 +592,7 @@ export async function retrieveRagContexts(input: {
   text: string
 }> {
   const { projectId } = requireVertexAuth()
-  const location = getVertexRagLocation()
+  const location = vertexResourceLocation(input.corpusName) ?? getVertexRagLocation()
   const parent = ragCorpusParent(projectId, location)
   const corpusName = ragCorpusPath(projectId, input.corpusName, location)
 
@@ -687,7 +721,7 @@ export async function queryVertexRag(input: {
   })
 
   let answer = retrieved.text
-  const { createGeminiInteraction, extractInteractionText } = await import(
+  const { createVertexGenerateContent, extractGenerateContentText } = await import(
     "./gemini.ts"
   )
   const { getGeminiRagModel } = await import("./gemini-api.ts")
@@ -697,7 +731,7 @@ export async function queryVertexRag(input: {
     try {
       const prompt =
         `${input.systemInstruction ?? "Extract compact evidence from the retrieved rubric passages. Quote short passages. If nothing relevant, say so clearly."}\n\nQuestion: ${input.query}\n\nRetrieved passages:\n${retrieved.text}`
-      const res = await createGeminiInteraction({
+      const res = await createVertexGenerateContent({
         model,
         input: prompt,
         store: true,
@@ -705,7 +739,7 @@ export async function queryVertexRag(input: {
       })
       if (res.ok) {
         const data = await res.json()
-        const synthesized = extractInteractionText(data).trim()
+        const synthesized = extractGenerateContentText(data).trim()
         if (synthesized) answer = synthesized
       }
     } catch (error) {
