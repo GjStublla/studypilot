@@ -124,6 +124,8 @@ export interface SettingsViewProps {
   savedNotice: string | null;
   onSetCoachMode: (mode: CoachMode) => void;
   onSignOut: () => void;
+  onDeleteAllData: () => Promise<void>;
+  onDeleteAccount: () => Promise<void>;
   onSetTheme: (theme: Theme) => void;
 }
 

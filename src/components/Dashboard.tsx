@@ -14,6 +14,7 @@ import { ExtensionHelpModal } from './dashboard/ExtensionHelpModal';
 import { useDashboardData } from './dashboard/useDashboardData';
 export { ChatView } from './dashboard/ChatView';
 import { clearAuth, apiFetch } from '../lib/api';
+import { supabase } from '../lib/supabaseClient';
 import { AUTH_REQUIRED } from '../lib/authConfig';
 import {
   createDashboardChat,
@@ -23,7 +24,7 @@ import {
   retryRubricIndexing,
   updateDashboardChat,
 } from '../lib/studypilot-api';
-import { fetchActionItems, fetchSessionTranscript, setActionItemDone, activateRubric, deleteRubric, deleteActionItem, deleteSession } from '../lib/dashboardApi';
+import { fetchActionItems, fetchSessionTranscript, setActionItemDone, activateRubric, deleteRubric, deleteActionItem, deleteSession, deleteAllUserData, deleteUserAccount } from '../lib/dashboardApi';
 import type { Rubric, Session } from '../lib/dashboard-types';
 import { sendCoachingMessage } from '../lib/socraticCoach';
 import type { DashboardChat } from '../lib/studypilot-types';
@@ -791,6 +792,25 @@ export default function Dashboard({
     clearAuth();
     window.location.hash = AUTH_REQUIRED ? '#auth' : '#dashboard';
   }, []);
+  const handleDeleteAllData = useCallback(async () => {
+    await deleteAllUserData();
+    setSessions([]);
+    setRubrics([]);
+    setActionItems([]);
+    setChats([]);
+    setTranscripts({});
+    setTranscriptStates({});
+    setActiveChatId(null);
+    setActiveRubricId('');
+    setSelectedSessionId('');
+    replaceChatRoute(null);
+  }, [replaceChatRoute, setActionItems, setActiveChatId, setChats, setRubrics, setSelectedSessionId, setSessions, setTranscripts, setTranscriptStates]);
+  const handleDeleteAccount = useCallback(async () => {
+    await deleteUserAccount();
+    await supabase.auth.signOut();
+    clearAuth();
+    window.location.hash = '#auth';
+  }, []);
 
   return (
     <main
@@ -964,6 +984,8 @@ export default function Dashboard({
                   savedNotice={savedNotice}
                   onSetCoachMode={changeCoachMode}
                   onSignOut={signOut}
+                  onDeleteAllData={handleDeleteAllData}
+                  onDeleteAccount={handleDeleteAccount}
                   onSetTheme={applyTheme}
                 />
               )}

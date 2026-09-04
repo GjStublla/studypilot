@@ -6,6 +6,7 @@
 // never touches raw API payloads.
 
 import { apiFetch } from './api';
+import { injectStoredToken, supabase } from './supabaseClient';
 import type { ActionItem, FileSearchStatus, Rubric, Session, TranscriptLine } from './dashboard-types';
 
 export type { ActionItem, FileSearchStatus, Rubric, RubricCriterion, Session, TranscriptLine } from './dashboard-types';
@@ -201,3 +202,12 @@ export async function deleteRubric(id: string): Promise<void> {
     throw new Error(`Delete failed: ${res.status}`);
   }
 }
+
+async function deleteUserResource(mode: 'data' | 'account'): Promise<void> {
+  if (!(await injectStoredToken())) throw new Error('Session expired. Please log in again.');
+  const { error } = await supabase.functions.invoke('delete-user-data', { body: { mode } });
+  if (error) throw new Error('Deletion could not be completed. Please try again.');
+}
+
+export const deleteAllUserData = (): Promise<void> => deleteUserResource('data');
+export const deleteUserAccount = (): Promise<void> => deleteUserResource('account');

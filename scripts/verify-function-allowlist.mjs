@@ -21,6 +21,7 @@ const EXPECTED = {
   'socratic-coach': true,
   'summarize-session': true,
   'delete-knowledge-document': true,
+  'delete-user-data': true,
 };
 
 if (!TOKEN) {

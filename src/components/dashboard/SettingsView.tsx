@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { Check } from 'lucide-react';
 import { DsButton } from './DashboardPrimitives';
 import { SETTINGS_COACH_MODES, type SettingsViewProps } from './dashboard-types';
@@ -11,8 +11,41 @@ export const SettingsView = memo(function SettingsView({
   savedNotice,
   onSetCoachMode,
   onSignOut,
+  onDeleteAllData,
+  onDeleteAccount,
   onSetTheme,
 }: SettingsViewProps) {
+  const [pending, setPending] = useState<'data' | 'account' | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [deletionError, setDeletionError] = useState<string | null>(null);
+  const [deletionSuccess, setDeletionSuccess] = useState<string | null>(null);
+
+  async function confirmDeletion(kind: 'data' | 'account') {
+    if (busy) return;
+    if (pending !== kind) {
+      setPending(kind);
+      setDeletionError(null);
+      setDeletionSuccess(null);
+      return;
+    }
+    setBusy(true);
+    setDeletionError(null);
+    setDeletionSuccess(null);
+    try {
+      if (kind === 'data') {
+        await onDeleteAllData();
+        setDeletionSuccess('All saved data was permanently deleted.');
+      } else {
+        await onDeleteAccount();
+      }
+      setPending(null);
+    } catch (error) {
+      setDeletionError(error instanceof Error ? error.message : 'Deletion could not be completed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="ds-view ds-view-settings">
       <header className="ds-view-head">
@@ -106,9 +139,10 @@ export const SettingsView = memo(function SettingsView({
           </div>
           <p className="ds-prose">
             Live microphone audio is processed by Google Vertex AI while a session is active. Screenshots are sent only
-            when you enable them. Chat and session history save only when "Save to dashboard" is on.
+            when you enable them. AI chats may be retained for conversation continuity; "Save to dashboard" controls
+            session and capture syncing.
           </p>
-          <p className="ds-prose ds-prose-quiet">Cloud sync is a single toggle, never a default.</p>
+          <p className="ds-prose ds-prose-quiet">Session and capture syncing is controlled by a single toggle.</p>
         </article>
 
         <article className="ds-card">
@@ -116,8 +150,24 @@ export const SettingsView = memo(function SettingsView({
             <span>Data retention</span>
           </div>
           <p className="ds-prose">
-            Imported sessions are kept until you delete them. Action items archive after 60 days once marked done.
+            Imported sessions and completed action items are kept until you delete them.
           </p>
+        </article>
+
+        <article className="ds-card">
+          <div className="ds-card-eyebrow"><span>Danger zone</span></div>
+          <p className="ds-prose">Deletion is permanent. This removes your saved sessions, transcripts, action items, rubrics, captures, chats, and indexed documents.</p>
+          {deletionError ? <p className="ds-prose" role="alert">{deletionError}</p> : null}
+          {deletionSuccess ? <p className="ds-prose" role="status">{deletionSuccess}</p> : null}
+          <div className="ds-settings-actions">
+            <DsButton variant="ghost" disabled={busy} onClick={() => void confirmDeletion('data')}>
+              {busy && pending === 'data' ? 'Deleting...' : pending === 'data' ? 'Confirm delete all data' : 'Delete all data'}
+            </DsButton>
+            <DsButton variant="ghost" disabled={busy} onClick={() => void confirmDeletion('account')}>
+              {busy && pending === 'account' ? 'Deleting...' : pending === 'account' ? 'Confirm delete account' : 'Delete account'}
+            </DsButton>
+          </div>
+          {pending ? <p className="ds-card-sub">Click the same action again to permanently confirm deletion.</p> : null}
         </article>
       </div>
     </div>
