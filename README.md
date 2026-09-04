@@ -4,7 +4,7 @@ StudyPilot is a rubric-aware coaching loop across the browser and dashboard: it 
 
 The beta uses your microphone and the page context you choose to share. Answers can cite retrieved rubric or uploaded-document evidence when grounding is available. Sign in once to connect the extension and dashboard.
 
-Live microphone audio is processed by Google Vertex AI while a session is active. Screenshots are sent only when you enable them. Chat and session history save only when “Save to dashboard” is on.
+Live microphone audio is processed by Google Vertex AI while a session is active. Screenshots are sent only when you enable them. AI chats may be retained for conversation continuity. Dashboard save stay off unless you enable “Save to dashboard”; this controls session and capture syncing.
 
 Built with React, TypeScript, Vite, FastAPI, Supabase, Vertex AI/Gemini, and a
 Manifest V3 Chrome extension. Model credentials and privileged database keys
@@ -124,7 +124,7 @@ npm run local:stop
 | Supabase status reports a missing container         | Start Docker Desktop, run `npm run local:stop`, then `npm run local:start`; each computer needs its own local Supabase stack.                                |
 | The extension calls `127.0.0.1` on another computer | Loopback always means that friend's computer, not yours. They must run their own local stack and local Edge Functions.                                       |
 
-The default model IDs are intentional: text/RAG uses `gemini-3.5-flash`, Live
+The default model IDs are intentional: text/RAG uses `gemini-2.5-flash`, Live
 uses `gemini-3.1-flash-live-preview`, Vertex interactions default to `global`,
 and Vertex RAG defaults to `us-central1`.
 
