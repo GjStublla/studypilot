@@ -1,39 +1,31 @@
 /**
  * Gemini auth + model helpers — Vertex-only production path.
  *
- * Text / Interactions / RAG / Live use service-account OAuth against Vertex AI.
- * GEMINI_API_KEY is optional and unused by production Edge paths (kept only for
- * local experiments; do not require it).
+ * Text / RAG / Live use service-account OAuth against Vertex AI.
+ * GEMINI_API_KEY is intentionally unused by production Edge paths.
  */
-
-export const GENERATIVE_LANGUAGE_BASE =
-  "https://generativelanguage.googleapis.com/v1beta"
-
-/** @deprecated Google AI Studio Live ephemeral tokens — not used on Vertex-only. */
-export const LIVE_AUTH_TOKENS_PATH = "auth_tokens"
 
 /** Vertex Live WebSocket API revision. */
 export const LIVE_API_VERSION = "v1beta1"
 
-/** Interactions REST revision header required by Google. */
-export const INTERACTIONS_API_REVISION = "2026-05-20"
-
 export const DEFAULT_EMBEDDING_MODEL = "models/gemini-embedding-2"
-/** Spec: gemini-3.5-flash for text/RAG. Vertex serves this id (not a 3-flash remap). */
-export const DEFAULT_TEXT_MODEL = "gemini-3.5-flash"
-export const DEFAULT_RAG_MODEL = "gemini-3.5-flash"
+/** Stable Vertex model fallback for text/RAG when secrets are not configured. */
+export const DEFAULT_TEXT_MODEL = "gemini-2.5-flash"
+export const DEFAULT_RAG_MODEL = "gemini-2.5-flash"
 export const DEFAULT_LIVE_MODEL = "gemini-3.1-flash-live-preview"
 
 /**
  * Strip `models/` and remap retired Gemini 1.5 / 2.0 ids only.
- * Pass through gemini-3.5-flash and gemini-3.1-flash-live-preview when env
- * asks for them — do not rewrite 3.5 → gemini-3-flash-preview.
+ * Pass through configured model IDs while remapping known retired text models
+ * to the stable text fallback.
  */
 export function normalizeGeminiModelId(model: string): string {
   const trimmed = model.trim()
   if (!trimmed) return DEFAULT_TEXT_MODEL
   const lower = trimmed.toLowerCase().replace(/^models\//, "")
   if (
+    lower === "gemini-3.5-flash" || // retired configuration alias
+    lower === "gemini-3.6-flash" ||
     lower === "gemini-2.0-flash" ||
     lower === "gemini-1.5-flash" ||
     lower === "gemini-1.5-pro" ||
@@ -43,19 +35,6 @@ export function normalizeGeminiModelId(model: string): string {
     return DEFAULT_TEXT_MODEL
   }
   return trimmed.replace(/^models\//i, "")
-}
-
-export type GeminiAuthMode = "vertex-interactions"
-
-/** Optional — unused by Vertex production paths. */
-export function getGeminiApiKey(): string | undefined {
-  const key = Deno.env.get("GEMINI_API_KEY")?.trim()
-  return key || undefined
-}
-
-/** @deprecated Prefer hasServiceAccountCredentials / canUseGeminiInteractions. */
-export function hasGeminiApiKey(): boolean {
-  return Boolean(getGeminiApiKey())
 }
 
 /** True when split GOOGLE_* secrets or full SA JSON is configured. */
@@ -91,33 +70,31 @@ export function getGeminiEmbeddingModel(): string {
   return Deno.env.get("GEMINI_EMBEDDING_MODEL")?.trim() || DEFAULT_EMBEDDING_MODEL
 }
 
-/** Vertex Interactions / Live location (default global). */
+/** Vertex generateContent / Live location (default global). */
 export function getVertexLocation(): string {
   const raw =
     Deno.env.get("VERTEX_LOCATION")?.trim() ||
     Deno.env.get("GEMINI_LOCATION")?.trim() ||
     "global"
-  return normalizeVertexInteractionsLocation(raw)
+  return normalizeVertexLocation(raw)
 }
 
 /**
- * Interactions API only accepts global | us | eu — not regional codes like
- * us-central1 (those remain valid for VERTEX_RAG_LOCATION / RAG Engine).
- * Prefer `global` for regional secrets so the Interactions host stays
- * aiplatform.googleapis.com (us-aiplatform.googleapis.com 404s).
+ * Normalize general Vertex model serving locations. Regional RAG Engine
+ * locations remain controlled separately by VERTEX_RAG_LOCATION.
  */
-export function normalizeVertexInteractionsLocation(location: string): string {
+export function normalizeVertexLocation(location: string): string {
   const lower = location.trim().toLowerCase()
   if (!lower) return "global"
   if (lower === "global" || lower === "us" || lower === "eu") return lower
-  // Regional Vertex codes (us-central1, europe-west1, …) → global for Interactions.
+  // Regional Vertex codes use the regional host/path directly.
+  if (/^[a-z]+-[a-z]+[0-9]+$/.test(lower)) return lower
   return "global"
 }
 
 /**
  * Vertex RAG Engine location. RAG corpora are regional (not global).
- * Default us-west1 — avoids the Spanner capacity restriction on us-central1
- * for new GCP projects. Override with VERTEX_RAG_LOCATION.
+ * Default us-west1 for regional RAG resources. Override with VERTEX_RAG_LOCATION.
  */
 export function getVertexRagLocation(): string {
   return (
@@ -167,12 +144,8 @@ function requireProjectIdLazy(): {
   }
 }
 
-/**
- * Vertex Interactions only — no Generative Language / API-key fallback.
- */
-export function resolveInteractionsAuthMode(
-  projectId: string | undefined,
-): GeminiAuthMode {
+/** Vertex service-account auth only — no Generative Language / API-key fallback. */
+export function requireVertexAiConfig(projectId: string | undefined): void {
   if (!hasServiceAccountCredentials()) {
     throw new Error(
       "No Vertex auth configured. Set GOOGLE_PROJECT_ID + service-account credentials " +
@@ -181,14 +154,13 @@ export function resolveInteractionsAuthMode(
   }
   if (!projectId) {
     throw new Error(
-      "GOOGLE_PROJECT_ID is required for Vertex Interactions (no Gemini API key fallback).",
+      "GOOGLE_PROJECT_ID is required for Vertex AI (no Gemini API key fallback).",
     )
   }
-  return "vertex-interactions"
 }
 
-/** Text/Interactions/RAG/Live require Vertex SA + project. */
-export function canUseGeminiInteractions(): boolean {
+/** Text/RAG/Live require Vertex service-account credentials + project. */
+export function canUseVertexAi(): boolean {
   if (!hasServiceAccountCredentials()) return false
   try {
     requireVertexProjectId()
@@ -199,24 +171,7 @@ export function canUseGeminiInteractions(): boolean {
 }
 
 export function canUseVertexLive(): boolean {
-  return canUseGeminiInteractions()
-}
-
-export function interactionsHeaders(
-  mode: GeminiAuthMode,
-  accessToken?: string,
-  _apiKey?: string,
-  _projectId?: string,
-): Record<string, string> {
-  if (mode !== "vertex-interactions") {
-    throw new Error(`Unsupported Interactions auth mode: ${mode}`)
-  }
-  if (!accessToken) throw new Error("OAuth access token missing for Vertex Interactions")
-  return {
-    "Content-Type": "application/json",
-    "Api-Revision": INTERACTIONS_API_REVISION,
-    Authorization: `Bearer ${accessToken}`,
-  }
+  return canUseVertexAi()
 }
 
 export function describeGeminiApiError(errText: string): string {

@@ -5,11 +5,11 @@ import {
   normalizeGeminiModelId,
 } from "./gemini-api.ts"
 
-Deno.test("normalizeGeminiModelId keeps gemini-3.5-flash", () => {
-  assertEquals(normalizeGeminiModelId("gemini-3.5-flash"), "gemini-3.5-flash")
+Deno.test("normalizeGeminiModelId keeps gemini-2.5-flash", () => {
+  assertEquals(normalizeGeminiModelId("gemini-2.5-flash"), "gemini-2.5-flash")
   assertEquals(
-    normalizeGeminiModelId("models/gemini-3.5-flash"),
-    "gemini-3.5-flash",
+    normalizeGeminiModelId("models/gemini-2.5-flash"),
+    "gemini-2.5-flash",
   )
 })
 
@@ -21,10 +21,20 @@ Deno.test("normalizeGeminiModelId keeps Live preview id", () => {
 })
 
 Deno.test("normalizeGeminiModelId remaps retired 1.5 and 2.0 ids", () => {
-  assertEquals(normalizeGeminiModelId("gemini-1.5-flash"), DEFAULT_TEXT_MODEL)
+  assertEquals(
+    normalizeGeminiModelId("gemini-1.5-flash"),
+    DEFAULT_TEXT_MODEL,
+  )
   assertEquals(normalizeGeminiModelId("gemini-2.0-flash"), DEFAULT_TEXT_MODEL)
-  assertEquals(DEFAULT_TEXT_MODEL, "gemini-3.5-flash")
+  assertEquals(DEFAULT_TEXT_MODEL, "gemini-2.5-flash")
   assertEquals(DEFAULT_LIVE_MODEL, "gemini-3.1-flash-live-preview")
+})
+
+Deno.test("normalizeGeminiModelId remaps unavailable 3.6 alias", () => {
+  assertEquals(
+    normalizeGeminiModelId("gemini-3.6-flash"),
+    "gemini-2.5-flash",
+  )
 })
 
 Deno.test("normalizeGeminiModelId does not rewrite 3-flash-preview", () => {

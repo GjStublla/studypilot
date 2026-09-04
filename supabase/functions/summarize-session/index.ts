@@ -10,9 +10,9 @@ import {
   QUOTA_UNAVAILABLE_MESSAGE,
 } from "../shared/ai-usage.ts";
 import {
-  createGeminiInteraction,
+  createVertexGenerateContent,
   describeGeminiError,
-  extractInteractionText,
+  extractGenerateContentText,
   getGeminiTextModel,
 } from "../shared/gemini.ts";
 import { buildCorsHeaders, handleOptions } from "../shared/cors.ts";
@@ -226,7 +226,7 @@ Rules:
 - followUpPrompts: 2-3 questions the student might ask in a future chat session
 - Never write content that would replace the student's own work`;
 
-    const geminiResponse = await createGeminiInteraction({
+    const geminiResponse = await createVertexGenerateContent({
       model: getGeminiTextModel(),
       input: prompt,
       store: true,
@@ -251,7 +251,7 @@ Rules:
       }, 502);
     }
 
-    const rawText = extractInteractionText(await geminiResponse.json());
+    const rawText = extractGenerateContentText(await geminiResponse.json());
     let parsed = parseSummaryJson(rawText);
     if (!parsed) {
       console.error(
