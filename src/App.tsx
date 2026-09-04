@@ -35,7 +35,7 @@ const productSvg = '/assets/studypilot-modal-demo.svg';
 const footerLockupWebp = '/assets/01_main_horizontal_lockup_transparent.webp';
 
 export const PROCESSING_DISCLOSURE =
-  'Live microphone audio is processed by Google Vertex AI while a session is active. Screenshots are sent only when you enable them. Chat and session history save only when “Save to dashboard” is on.';
+  'Live microphone audio is processed by Google Vertex AI while a session is active. Screenshots are sent only when you enable them. AI chats may be retained for conversation continuity; “Save to dashboard” controls session and capture syncing.';
 
 const modes = [
   {
@@ -445,7 +445,7 @@ function Hero({ user, onLogout }: { user: ReturnType<typeof getStoredUser>; onLo
                 <div>
                   <dt>Built by</dt>
                   <dd>
-                    <span>Edion Islami</span>, <span>Gjin Stublla</span>, <span>Leona Selishta</span>
+                     <span>Gjin Stublla</span>, <span>Leona Selishta</span>,  <span>Lorik Bajrami</span>,  <span>Gresa Jerliu</span>
                   </dd>
                 </div>
               </m.dl>

@@ -52,5 +52,8 @@ verify_jwt = true
 [functions.delete-knowledge-document]
 verify_jwt = true
 
+[functions.delete-user-data]
+verify_jwt = true
+
 [analytics]
 enabled = false

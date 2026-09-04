@@ -19,7 +19,7 @@ Coaching in this beta uses the student's microphone and the page context they ch
 
 An account connection is required for real coaching. Sign in once to connect the extension and dashboard.
 
-Live microphone audio is processed by Google Vertex AI while a session is active. Screenshots are sent only when the student enables them. Chat and session history save only when “Save to dashboard” is on. Those storage choices default off.
+Live microphone audio is processed by Google Vertex AI while a session is active. Screenshots are sent only when the student enables them. AI chats may be retained for conversation continuity. Dashboard save stay off unless the student enables “Save to dashboard”; this controls session and capture syncing.
 
 ## 2. Problem Statement
 
