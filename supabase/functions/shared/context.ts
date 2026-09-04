@@ -11,8 +11,8 @@
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.38.4"
 import {
-  createGeminiInteraction,
-  extractInteractionText,
+  createVertexGenerateContent,
+  extractGenerateContentText,
 } from "./gemini.ts"
 import { getGeminiTextModel } from "./gemini-api.ts"
 import {
@@ -228,14 +228,14 @@ export async function maybeAdvanceContextSummary(
 
   let newSummary = input.existingSummary
   try {
-    const res = await createGeminiInteraction({
+    const res = await createVertexGenerateContent({
       model: getGeminiTextModel(),
       input: prompt,
       generation_config: { temperature: 0.2, maxOutputTokens: 800 },
     })
     if (res.ok) {
       const data = await res.json()
-      const text = extractInteractionText(data).trim()
+      const text = extractGenerateContentText(data).trim()
       if (text) newSummary = text
     } else {
       console.warn(

@@ -1,84 +1,96 @@
 /**
- * Unit tests for Interactions request shaping and stream parsing.
- * No network — pure helpers only.
+ * Unit tests for Vertex generateContent request shaping and stream parsing.
+ * No network -- pure helpers only.
  */
 
 import {
   assertEquals,
   assertExists,
-  assertThrows,
 } from "https://deno.land/std@0.168.0/testing/asserts.ts"
 import {
-  buildInteractionRequestBody,
-  contentsToInteractionInput,
-  extractInteractionText,
-  interactionsEndpoint,
-  normalizeGenerationConfig,
-  normalizeInteractionTools,
-  parseInteractionStreamEvent,
+  buildVertexGenerateContentRequestBody,
+  extractGenerateContentText,
+  generateContentEndpoint,
+  parseVertexStreamEvent,
 } from "./gemini.ts"
 import { metadataFilterForRubric } from "./file-search-normalize.ts"
 import { vertexRagToolConfig } from "./vertex-rag.ts"
 
-Deno.test("contentsToInteractionInput maps user/model roles", () => {
-  const steps = contentsToInteractionInput([
-    { role: "user", parts: [{ text: "Hi" }] },
-    { role: "model", parts: [{ text: "Hello" }] },
-    {
-      role: "user",
-      parts: [
-        { text: "See this" },
-        { inlineData: { mimeType: "image/jpeg", data: "abc" } },
-      ],
-    },
-  ])
-  assertEquals(steps[0], {
-    type: "user_input",
-    content: [{ type: "text", text: "Hi" }],
-  })
-  assertEquals(steps[1], {
-    type: "model_output",
-    content: [{ type: "text", text: "Hello" }],
-  })
-  assertEquals(steps[2]?.type, "user_input")
-  const content = (steps[2] as { content: unknown[] }).content
-  assertEquals(content.length, 2)
-  assertEquals(content[1], {
-    type: "image",
-    data: "abc",
-    mime_type: "image/jpeg",
-  })
-})
-
-Deno.test("normalizeInteractionTools accepts Vertex retrieval tools", () => {
-  const tools = normalizeInteractionTools([
-    {
-      type: "retrieval",
-      retrieval: {
-        vertex_rag_store: {
-          rag_resources: [{ rag_corpus: "projects/p/locations/us-central1/ragCorpora/1" }],
-        },
+Deno.test("buildVertexGenerateContentRequestBody preserves full serialized coaching context", () => {
+  const body = buildVertexGenerateContentRequestBody({
+    contents: [
+      { role: "user", parts: [{ text: "My thesis is X." }] },
+      { role: "model", parts: [{ text: "Good start. What evidence supports X?" }] },
+      {
+        role: "user",
+        parts: [
+          {
+            text:
+              'How does this compare?\n\n---\nRETRIEVED RUBRIC EVIDENCE (Vertex RAG):\nrubric_id == "rub-1"\nUse primary sources.',
+          },
+          { inlineData: { mimeType: "image/jpeg", data: "abc123" } },
+        ],
       },
-    },
-    { type: "google_search" },
-  ])
-  assertExists(tools)
-  assertEquals((tools[0] as { type: string }).type, "retrieval")
-  assertEquals(tools[1], { type: "google_search" })
+    ],
+    system_instruction: "Be Socratic.",
+    tools: [{
+      type: "retrieval",
+      retrieval: { vertex_rag_store: { rag_resources: [{ rag_corpus: "c" }] } },
+    }],
+    generation_config: { temperature: 0.7, maxOutputTokens: 1024 },
+    stream: true,
+  })
+
+  const serialized = JSON.parse(JSON.stringify(body))
+  assertEquals(serialized.contents.length, 3)
+  assertEquals(serialized.contents[0].role, "user")
+  assertEquals(serialized.contents[0].parts[0].text, "My thesis is X.")
+  assertEquals(serialized.contents[1].role, "model")
+  assertEquals(
+    serialized.contents[1].parts[0].text,
+    "Good start. What evidence supports X?",
+  )
+  assertEquals(serialized.contents[2].role, "user")
+  assertEquals(
+    serialized.contents[2].parts[0].text.includes("RETRIEVED RUBRIC EVIDENCE"),
+    true,
+  )
+  assertEquals(serialized.contents[2].parts[1].inlineData, {
+    mimeType: "image/jpeg",
+    data: "abc123",
+  })
+  assertEquals(serialized.systemInstruction, {
+    parts: [{ text: "Be Socratic." }],
+  })
+  assertEquals(serialized.generationConfig.maxOutputTokens, 1024)
+  assertEquals(serialized.tools[0].type, "retrieval")
 })
 
-Deno.test("normalizeInteractionTools rejects File Search on Vertex", () => {
-  assertThrows(
-    () =>
-      normalizeInteractionTools([
-        {
-          type: "file_search",
-          file_search_store_names: ["fileSearchStores/abc"],
-        },
-      ]),
-    Error,
-    "File Search",
-  )
+Deno.test("buildVertexGenerateContentRequestBody supports normal single-turn input", () => {
+  const body = buildVertexGenerateContentRequestBody({
+    input: "Coach me on my introduction.",
+  })
+  const serialized = JSON.parse(JSON.stringify(body))
+  assertEquals(serialized, {
+    contents: [{
+      role: "user",
+      parts: [{ text: "Coach me on my introduction." }],
+    }],
+  })
+})
+
+Deno.test("buildVertexGenerateContentRequestBody drops non-Vertex file_search tools", () => {
+  const body = buildVertexGenerateContentRequestBody({
+    input: "Use the rubric.",
+    tools: [
+      { type: "file_search", file_search_store_names: ["fileSearchStores/abc"] },
+      { type: "retrieval", retrieval: { vertex_rag_store: {} } },
+    ],
+  })
+  const serialized = JSON.parse(JSON.stringify(body))
+  assertEquals(serialized.tools, [
+    { type: "retrieval", retrieval: { vertex_rag_store: {} } },
+  ])
 })
 
 Deno.test("metadataFilterForRubric uses Vertex CEL equality", () => {
@@ -100,88 +112,49 @@ Deno.test("vertexRagToolConfig builds retrieval tool with filter", () => {
   )
 })
 
-Deno.test("normalizeGenerationConfig maps camelCase tokens", () => {
-  assertEquals(normalizeGenerationConfig({
-    temperature: 0.2,
-    maxOutputTokens: 800,
-  }), {
-    temperature: 0.2,
-    max_output_tokens: 800,
-  })
-})
-
-Deno.test("buildInteractionRequestBody prefers contents when input empty", () => {
-  const body = buildInteractionRequestBody({
-    contents: [{ role: "user", parts: [{ text: "Coach me" }] }],
-    system_instruction: "Be Socratic",
-    tools: [{
-      type: "retrieval",
-      retrieval: { vertex_rag_store: { rag_resources: [{ rag_corpus: "c" }] } },
-    }],
-    generation_config: { maxOutputTokens: 100 },
-    store: true,
-  }, "gemini-3-flash-preview")
-
-  assertEquals(body.model, "gemini-3-flash-preview")
-  assertEquals(body.store, true)
-  assertEquals(body.system_instruction, "Be Socratic")
-  assertEquals(
-    (body.generation_config as Record<string, unknown>).max_output_tokens,
-    100,
-  )
-  assertEquals(body.input, [{
-    type: "user_input",
-    content: [{ type: "text", text: "Coach me" }],
-  }])
-})
-
-Deno.test("interactionsEndpoint builds Vertex global URL", () => {
-  const url = interactionsEndpoint("vertex-interactions", "my-proj", true)
+Deno.test("generateContentEndpoint builds Vertex streaming URL", () => {
+  const url = generateContentEndpoint("my-proj", "gemini-2.5-flash", true)
   assertEquals(
     url,
-    "https://aiplatform.googleapis.com/v1beta1/projects/my-proj/locations/global/interactions?alt=sse",
+    "https://aiplatform.googleapis.com/v1/projects/my-proj/locations/us-central1/publishers/google/models/gemini-2.5-flash:streamGenerateContent?alt=sse",
   )
 })
 
-Deno.test("extractInteractionText reads model_output steps", () => {
-  const text = extractInteractionText({
-    steps: [
-      { type: "thought", signature: "x" },
-      {
-        type: "model_output",
-        content: [{ type: "text", text: "Revise the thesis." }],
-      },
-    ],
-  })
-  assertEquals(text, "Revise the thesis.")
-})
+Deno.test("extractGenerateContentText reads candidates and legacy fallback", () => {
+  assertEquals(
+    extractGenerateContentText({
+      candidates: [{ content: { parts: [{ text: "Coach response" }] } }],
+    }),
+    "Coach response",
+  )
 
-Deno.test("extractInteractionText falls back to candidates", () => {
-  const text = extractInteractionText({
-    candidates: [{
-      content: { parts: [{ text: "Legacy" }] },
-    }],
-  })
-  assertEquals(text, "Legacy")
-})
-
-Deno.test("parseInteractionStreamEvent reads step.delta text", () => {
-  const a = parseInteractionStreamEvent({
-    event_type: "step.delta",
-    delta: { type: "text", text: "Hello " },
-  })
-  assertEquals(a.text, "Hello ")
-  assertEquals(a.done, false)
-
-  const b = parseInteractionStreamEvent({
-    event_type: "interaction.completed",
-    interaction: {
+  assertEquals(
+    extractGenerateContentText({
       steps: [{
         type: "model_output",
-        content: [{ type: "text", text: "done", annotations: [{ title: "x" }] }],
+        content: [{ type: "text", text: "Legacy response" }],
       }],
-    },
+    }),
+    "Legacy response",
+  )
+})
+
+Deno.test("parseVertexStreamEvent reads generateContent and legacy chunks", () => {
+  const vertex = parseVertexStreamEvent({
+    candidates: [{
+      content: { parts: [{ text: "Hello " }] },
+      groundingMetadata: { source: "rag" },
+      finishReason: "STOP",
+    }],
   })
-  assertEquals(b.done, true)
-  assertExists(b.grounding)
+  assertEquals(vertex.text, "Hello ")
+  assertEquals(vertex.done, true)
+  assertExists(vertex.grounding)
+
+  const legacy = parseVertexStreamEvent({
+    event_type: "step.delta",
+    delta: { type: "text", text: "there" },
+  })
+  assertEquals(legacy.text, "there")
+  assertEquals(legacy.done, false)
 })

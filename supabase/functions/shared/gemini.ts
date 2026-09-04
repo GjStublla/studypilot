@@ -15,20 +15,18 @@ import {
   invalidateToken,
 } from "./oauth-helper.ts"
 import {
-  type GeminiAuthMode,
   getGeminiTextModel as getTextModelFromApi,
   getVertexLocation,
   hasServiceAccountCredentials,
-  interactionsHeaders,
   normalizeGeminiModelId,
-  resolveInteractionsAuthMode,
+  requireVertexAiConfig,
 } from "./gemini-api.ts"
 
 type GeminiTextPart = { text: string }
 type GeminiInlineDataPart = { inlineData: { mimeType: string; data: string } }
 type GeminiPart = GeminiTextPart | GeminiInlineDataPart
 
-/** Prefer GEMINI_TEXT_MODEL / gemini-3.5-flash (see gemini-api.ts). */
+/** Prefer the caller's purpose-specific model or GEMINI_TEXT_MODEL. */
 export function getGeminiTextModel(): string {
   return getTextModelFromApi()
 }
@@ -55,19 +53,14 @@ function buildUserParts(body: Record<string, unknown>): GeminiPart[] {
   return [{ text: input }]
 }
 
-/**
- * Convert Interactions-style input steps back to generateContent contents.
- * Also handles generateContent-style contents passthrough.
- */
 function toGenerateContentContents(
   body: Record<string, unknown>,
 ): Array<Record<string, unknown>> {
-  // Already in generateContent format
   if (Array.isArray(body.contents) && body.contents.length > 0) {
     return body.contents as Array<Record<string, unknown>>
   }
 
-  // Interactions-style: input is an array of steps
+  // Legacy adapter input: an array of user/model steps.
   if (Array.isArray(body.input)) {
     const contents: Array<Record<string, unknown>> = []
     for (const step of body.input) {
@@ -106,133 +99,10 @@ function toGenerateContentContents(
 }
 
 /**
- * Convert generateContent-style contents to Interactions-style input steps.
- * { role: "user"|"model", parts: [...] }[] → { type: "user_input"|"model_output", content: [...] }[]
+ * Build the canonical Vertex generateContent request body.
  */
-export function contentsToInteractionInput(
-  contents: Array<{ role: string; parts: GeminiPart[] }>,
-): Array<Record<string, unknown>> {
-  return contents.map((c) => {
-    const type = c.role === "model" ? "model_output" : "user_input"
-    const content = c.parts.map((p) => {
-      if ("text" in p) return { type: "text", text: p.text }
-      const id = p as GeminiInlineDataPart
-      return {
-        type: "image",
-        data: id.inlineData.data,
-        mime_type: id.inlineData.mimeType,
-      }
-    })
-    return { type, content }
-  })
-}
-
-/**
- * Normalize generation config keys from camelCase to snake_case for Interactions API.
- * e.g. maxOutputTokens → max_output_tokens
- */
-export function normalizeGenerationConfig(
-  config: Record<string, unknown>,
-): Record<string, unknown> {
-  const result: Record<string, unknown> = { ...config }
-  if ("maxOutputTokens" in result) {
-    result.max_output_tokens = result.maxOutputTokens
-    delete result.maxOutputTokens
-  }
-  if ("topP" in result) {
-    result.top_p = result.topP
-    delete result.topP
-  }
-  if ("topK" in result) {
-    result.top_k = result.topK
-    delete result.topK
-  }
-  return result
-}
-
-/**
- * Normalize tools array for the Interactions API.
- * Passes through retrieval and google_search tools; throws on file_search
- * (not supported on Vertex).
- */
-export function normalizeInteractionTools(
-  tools: unknown[],
-): Array<Record<string, unknown>> {
-  return tools.map((tool) => {
-    if (!tool || typeof tool !== "object") return tool as Record<string, unknown>
-    const t = tool as Record<string, unknown>
-    if (t.type === "file_search" || t.file_search) {
-      throw new Error(
-        "File Search tools are not supported on the Vertex Interactions API",
-      )
-    }
-    return t
-  })
-}
-
-/**
- * Build an Interactions API request body.
- * Accepts both generateContent-style (contents) and Interactions-style (input) bodies.
- */
-export function buildInteractionRequestBody(
+export function buildVertexGenerateContentRequestBody(
   body: Record<string, unknown>,
-  model: string,
-): Record<string, unknown> {
-  // Resolve input steps — prefer Interactions-style input, fall back to converting contents
-  let input: Array<Record<string, unknown>>
-  if (Array.isArray(body.input) && body.input.length > 0) {
-    input = body.input as Array<Record<string, unknown>>
-  } else if (Array.isArray(body.contents) && body.contents.length > 0) {
-    input = contentsToInteractionInput(
-      body.contents as Array<{ role: string; parts: GeminiPart[] }>,
-    )
-  } else {
-    input = [{ type: "user_input", content: [{ type: "text", text: "" }] }]
-  }
-
-  const rawConfig = body.generation_config ?? body.generationConfig
-  const generationConfig = rawConfig && typeof rawConfig === "object" &&
-      !Array.isArray(rawConfig)
-    ? normalizeGenerationConfig(rawConfig as Record<string, unknown>)
-    : undefined
-
-  const rawTools = Array.isArray(body.tools) ? body.tools : undefined
-  const tools = rawTools ? normalizeInteractionTools(rawTools) : undefined
-
-  return {
-    model,
-    ...(typeof body.system_instruction === "string"
-      ? { system_instruction: body.system_instruction }
-      : typeof body.systemInstruction === "string"
-      ? { system_instruction: body.systemInstruction }
-      : {}),
-    input,
-    ...(generationConfig ? { generation_config: generationConfig } : {}),
-    ...(tools?.length ? { tools } : {}),
-    ...(body.store !== undefined ? { store: body.store } : {}),
-  }
-}
-
-/**
- * Build the Vertex Interactions API endpoint URL.
- * authMode "vertex-interactions" → global Interactions endpoint.
- */
-export function interactionsEndpoint(
-  _authMode: string,
-  projectId: string,
-  stream: boolean,
-): string {
-  const suffix = stream ? "?alt=sse" : ""
-  return `https://aiplatform.googleapis.com/v1beta1/projects/${projectId}/locations/global/interactions${suffix}`
-}
-
-/**
- * Build a generateContent request body from either a generateContent-style
- * or Interactions-style input body.
- */
-export function buildGenerateContentRequestBody(
-  body: Record<string, unknown>,
-  model: string,
 ): Record<string, unknown> {
   const contents = toGenerateContentContents(body)
 
@@ -242,11 +112,10 @@ export function buildGenerateContentRequestBody(
     ? { parts: [{ text: body.systemInstruction }] }
     : undefined
 
-  // Normalize generation config keys (camelCase → camelCase for generateContent)
   const rawConfig = body.generation_config ?? body.generationConfig
   const generationConfig = rawConfig && typeof rawConfig === "object" &&
       !Array.isArray(rawConfig)
-    ? rawConfig as Record<string, unknown>
+    ? normalizeVertexGenerationConfig(rawConfig as Record<string, unknown>)
     : undefined
 
   // Only include Vertex-compatible tools (no file_search)
@@ -265,6 +134,25 @@ export function buildGenerateContentRequestBody(
     ...(generationConfig ? { generationConfig } : {}),
     ...(tools?.length ? { tools } : {}),
   }
+}
+
+function normalizeVertexGenerationConfig(
+  config: Record<string, unknown>,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = { ...config }
+  if ("max_output_tokens" in result && !("maxOutputTokens" in result)) {
+    result.maxOutputTokens = result.max_output_tokens
+    delete result.max_output_tokens
+  }
+  if ("top_p" in result && !("topP" in result)) {
+    result.topP = result.top_p
+    delete result.top_p
+  }
+  if ("top_k" in result && !("topK" in result)) {
+    result.topK = result.top_k
+    delete result.top_k
+  }
+  return result
 }
 
 /**
@@ -289,23 +177,18 @@ export function generateContentEndpoint(
 }
 
 /**
- * Main entry point — same signature as the old createGeminiInteraction so
- * all callers (socratic-coach, summarize-session, extract-rubric) are unchanged.
- *
  * Calls Vertex AI streamGenerateContent / generateContent instead of the
- * Agent Platform Interactions API, which works on any standard Vertex project.
+ * legacy Agent Platform APIs.
  */
-export async function createGeminiInteraction(
+export async function createVertexGenerateContent(
   body: Record<string, unknown>,
 ): Promise<Response> {
   const projectId = getGoogleProjectId()
-  // Validate credentials are present (same guard as before)
-  resolveInteractionsAuthMode(projectId)
+  requireVertexAiConfig(projectId)
   const stream = body.stream === true
 
   const model = normalizeGeminiModelId(
-    Deno.env.get("VERTEX_MODEL")?.trim() ||
-      (typeof body.model === "string" ? body.model : undefined) ||
+    (typeof body.model === "string" ? body.model : undefined) ||
       getGeminiTextModel(),
   )
 
@@ -313,7 +196,7 @@ export async function createGeminiInteraction(
     throw new Error("GOOGLE_PROJECT_ID is required for Vertex AI")
   }
 
-  const requestBody = buildGenerateContentRequestBody(body, model)
+  const requestBody = buildVertexGenerateContentRequestBody(body)
   const url = generateContentEndpoint(projectId, model, stream)
 
   const doFetch = async () => {
@@ -375,9 +258,9 @@ function collectText(value: unknown): string {
 
 /**
  * Extract assistant text from a generateContent response (candidates array).
- * Also handles legacy Interactions response shapes for compatibility.
+ * Also handles legacy response shapes for compatibility.
  */
-export function extractInteractionText(response: unknown): string {
+export function extractGenerateContentText(response: unknown): string {
   if (!response || typeof response !== "object") return ""
   const record = response as Record<string, unknown>
 
@@ -392,7 +275,7 @@ export function extractInteractionText(response: unknown): string {
       .trim()
   }
 
-  // Legacy Interactions response shapes (kept for compatibility)
+  // Legacy response shapes kept only so old stored/replayed test fixtures parse.
   const steps = Array.isArray(record.steps) ? record.steps : []
   if (steps.length > 0) {
     const texts: string[] = []
@@ -418,9 +301,9 @@ export function extractInteractionText(response: unknown): string {
 /**
  * Parse one SSE JSON payload from streamGenerateContent.
  * Each chunk is a generateContent candidate delta.
- * Also handles legacy Interactions SSE shapes for compatibility.
+ * Also handles legacy SSE shapes for compatibility.
  */
-export function parseInteractionStreamEvent(parsed: unknown): {
+export function parseVertexStreamEvent(parsed: unknown): {
   text: string
   grounding: Record<string, unknown> | null
   done: boolean
@@ -447,7 +330,7 @@ export function parseInteractionStreamEvent(parsed: unknown): {
     return { text, grounding, done }
   }
 
-  // Legacy Interactions SSE event shapes
+  // Legacy SSE event shapes.
   const eventType = typeof record.event_type === "string"
     ? record.event_type
     : ""
@@ -498,6 +381,6 @@ export function parseInteractionStreamEvent(parsed: unknown): {
 
 // Keep legacy exports for callers that import these directly
 export {
-  canUseGeminiInteractions,
+  canUseVertexAi,
   hasServiceAccountCredentials,
 } from "./gemini-api.ts"
