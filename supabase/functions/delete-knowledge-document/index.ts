@@ -11,7 +11,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { verifyRequest } from "../shared/supabase-clients.ts"
 import { deleteRagFile, isOwnedVertexRagFileName } from "../shared/vertex-rag.ts"
-import { canUseGeminiInteractions } from "../shared/gemini-api.ts"
+import { canUseVertexAi } from "../shared/gemini-api.ts"
 import { getGoogleProjectId } from "../shared/oauth-helper.ts"
 import {
   RUBRICS_STORAGE_BUCKET,
@@ -77,7 +77,7 @@ serve(async (req) => {
         console.warn(
           "[delete-knowledge-document] Skipping Vertex RAG delete; file is not under the user's corpus",
         )
-      } else if (!canUseGeminiInteractions()) {
+      } else if (!canUseVertexAi()) {
         console.warn(
           "[delete-knowledge-document] Vertex credentials missing; skipping RAG delete",
         )
@@ -117,6 +117,9 @@ serve(async (req) => {
           "[delete-knowledge-document] Storage deletion failed:",
           storageError.message,
         )
+        return jsonResponse({
+          error: "Failed to delete uploaded document from Storage. Please try again.",
+        }, 502)
       }
     }
 

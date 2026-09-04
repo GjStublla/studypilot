@@ -22,7 +22,7 @@ import {
   uploadRagFile,
 } from "../shared/vertex-rag.ts"
 import {
-  canUseGeminiInteractions,
+  canUseVertexAi,
   getGeminiEmbeddingModel,
 } from "../shared/gemini-api.ts"
 import {
@@ -31,6 +31,8 @@ import {
 } from "../shared/storage-path.ts"
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.38.4"
 import { buildCorsHeaders, handleOptions } from "../shared/cors.ts"
+import { jsonResponse } from "../shared/http-response.ts"
+import { ensureFileExtension, hasSupportedFileExtension } from "../shared/file-name.ts"
 
 declare const EdgeRuntime: {
   waitUntil(promise: Promise<unknown>): void
@@ -39,12 +41,6 @@ declare const EdgeRuntime: {
 const DOC_SELECT =
   "id, title, user_id, rubric_id, storage_path, storage_bucket, mime_type, extracted_text, index_status, index_error, vertex_rag_corpus_name, vertex_rag_file_name"
 
-function jsonResponse(body: unknown, status = 200, cors: Record<string, string> = {}) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...cors, "Content-Type": "application/json" },
-  })
-}
 
 async function markFailed(
   db: SupabaseClient,
@@ -159,9 +155,10 @@ async function claimIndexingJob(
     .maybeSingle()
 
   if (!current) return { action: "missing" }
+  const currentRecord = current as unknown as Record<string, unknown>
 
-  const status = String(current.index_status ?? "")
-  const updatedAt = Date.parse(String((current as { updated_at?: string }).updated_at ?? ""))
+  const status = String(currentRecord.index_status ?? "")
+  const updatedAt = Date.parse(String(currentRecord.updated_at ?? ""))
   const stale =
     (status === "uploading" || status === "indexing") &&
     Number.isFinite(updatedAt) &&
@@ -184,7 +181,7 @@ async function claimIndexingJob(
     }
   }
 
-  return { action: "replay", doc: current as Record<string, unknown> }
+  return { action: "replay", doc: currentRecord }
 }
 
 async function runVertexIndex(
@@ -208,14 +205,14 @@ async function runVertexIndex(
       index_status: input.priorStatus === "failed" ? "failed" : "pending",
       index_error: QUOTA_UNAVAILABLE_MESSAGE.slice(0, 2000),
     }).eq("id", knowledgeDocumentId)
-    return jsonResponse({ error: QUOTA_UNAVAILABLE_MESSAGE }, 503)
+    return jsonResponse({ error: QUOTA_UNAVAILABLE_MESSAGE }, 503, cors)
   }
   if (!aiUsage.usage.allowed) {
     await db.from("knowledge_documents").update({
       index_status: input.priorStatus === "failed" ? "failed" : "pending",
       index_error: limitReachedMessage(aiUsage.usage).slice(0, 2000),
     }).eq("id", knowledgeDocumentId)
-    return jsonResponse({ error: limitReachedMessage(aiUsage.usage) }, 429)
+    return jsonResponse({ error: limitReachedMessage(aiUsage.usage) }, 429, cors)
   }
 
   const { data: profile } = await db
@@ -255,6 +252,7 @@ async function runVertexIndex(
     "application/octet-stream"
   let displayName =
     (typeof claimedDoc.title === "string" && claimedDoc.title) || "document"
+  let sourceFilename = displayName
 
   const validated = rubricId
     ? validateOwnedStoragePath(
@@ -282,7 +280,10 @@ async function runVertexIndex(
       bytes = new Uint8Array(await fileBlob.arrayBuffer())
       if (fileBlob.type) mimeType = fileBlob.type
       const base = validated.path.split("/").pop()
-      if (base) displayName = base
+      if (base) {
+        sourceFilename = base
+        displayName = base
+      }
     }
   }
 
@@ -299,12 +300,23 @@ async function runVertexIndex(
           ? "No file bytes or extracted text available to index"
           : "No trusted storage path or extracted text available to index",
       )
-      return jsonResponse({ error: "No content available to index" }, 400)
+      return jsonResponse({ error: "No content available to index" }, 400, cors)
     }
     bytes = new TextEncoder().encode(extracted)
     mimeType = "text/plain"
-    displayName = `${displayName}.txt`
+    displayName = ensureFileExtension(displayName, mimeType)
   }
+
+  displayName = ensureFileExtension(displayName, mimeType)
+  if (!hasSupportedFileExtension(displayName)) {
+    await markFailed(db, knowledgeDocumentId, rubricId, "Source filename has no supported extension")
+    return jsonResponse({ error: "Source filename has no supported extension" }, 400, cors)
+  }
+  console.info("[index-knowledge-document] Vertex upload input", {
+    sourceFilename,
+    uploadFilename: displayName,
+    mimeType,
+  })
 
   try {
     const ragFile = await uploadRagFile({
@@ -337,7 +349,7 @@ async function runVertexIndex(
       ragFileName: ragFile.name,
       fileSearchStoreName: corpusName,
       fileSearchDocumentName: ragFile.name,
-    })
+    }, 200, cors)
   } catch (error) {
     console.error("[index-knowledge-document] Vertex RAG upload failed:", error)
     await markFailed(
@@ -350,7 +362,7 @@ async function runVertexIndex(
       error: (error as Error).message,
       knowledgeDocumentId,
       status: "failed",
-    }, 502)
+    }, 502, cors)
   }
 }
 
@@ -392,7 +404,7 @@ serve(async (req) => {
       return respond(statusPayload(knowledgeDocumentId, doc))
     }
 
-    if (!canUseGeminiInteractions()) {
+    if (!canUseVertexAi()) {
       return respond({
         error:
           "Vertex AI credentials are not configured for RAG indexing (GOOGLE_PROJECT_ID + service account)",
@@ -442,14 +454,6 @@ serve(async (req) => {
       cors,
     })
 
-    try {
-      if (typeof EdgeRuntime !== "undefined" && EdgeRuntime.waitUntil) {
-        // Still await — indexing is sync on Vertex and we need the response body.
-        return await work
-      }
-    } catch {
-      // fall through
-    }
     return await work
   } catch (error) {
     console.error("[index-knowledge-document] Error:", error)

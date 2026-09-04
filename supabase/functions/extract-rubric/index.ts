@@ -32,7 +32,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4"
 
 import { consumeAiRequest, limitReachedMessage, QUOTA_UNAVAILABLE_MESSAGE } from "../shared/ai-usage.ts"
 
-import { createGeminiInteraction, describeGeminiError, extractInteractionText, getGeminiTextModel } from "../shared/gemini.ts"
+import { createVertexGenerateContent, describeGeminiError, extractGenerateContentText, getGeminiTextModel } from "../shared/gemini.ts"
 
 import {
 
@@ -334,6 +334,7 @@ serve(async (req) => {
     // Prefer the owned uploaded file; fall back to previously extracted text.
 
     let sourceText = rubric.extracted_text || ''
+    let sourceMimeType = ''
 
 
 
@@ -350,6 +351,7 @@ serve(async (req) => {
       if (!downloadError && fileBlob) {
 
         const mimeType = fileBlob.type?.toLowerCase() ?? ''
+        sourceMimeType = mimeType
         const fileName = validatedPath.path.split('/').pop()?.toLowerCase() ?? ''
         const isDocx = mimeType.includes('word') ||
           mimeType.includes('officedocument') ||
@@ -459,7 +461,7 @@ Rules:
 
 
 
-    const geminiRes = await createGeminiInteraction({
+    const geminiRes = await createVertexGenerateContent({
 
       model: geminiModel,
 
@@ -493,7 +495,7 @@ Rules:
 
     const geminiData = await geminiRes.json()
 
-    const rawText = extractInteractionText(geminiData)
+    const rawText = extractGenerateContentText(geminiData)
 
 
 
@@ -612,6 +614,7 @@ Rules:
         .update({
 
           extracted_text: sourceText,
+          mime_type: sourceMimeType || null,
 
           title: rubric.title,
 
@@ -642,6 +645,7 @@ Rules:
         storage_path: validatedPath?.path ?? null,
 
         extracted_text: sourceText,
+        mime_type: sourceMimeType || null,
 
         index_status: 'pending',
 

@@ -10,13 +10,13 @@ import {
   shouldBypassAiUsageLimits,
 } from "../shared/ai-usage.ts";
 import {
-  createGeminiInteraction,
+  createVertexGenerateContent,
   describeGeminiError,
   getGeminiTextModel,
-  parseInteractionStreamEvent,
+  parseVertexStreamEvent,
 } from "../shared/gemini.ts";
 import {
-  canUseGeminiInteractions,
+  canUseVertexAi,
   getGeminiRagModel,
 } from "../shared/gemini-api.ts";
 import {
@@ -666,7 +666,7 @@ serve(async (req) => {
     return jsonResponse({ error: "Unable to load chat context" }, 503);
   }
 
-  if (!canUseGeminiInteractions()) {
+  if (!canUseVertexAi()) {
     await finishTurn(
       "failed",
       null,
@@ -722,7 +722,7 @@ serve(async (req) => {
 
   let geminiResponse: Response;
   try {
-    geminiResponse = await createGeminiInteraction({
+    geminiResponse = await createVertexGenerateContent({
       model,
       system_instruction: contextSnapshot.systemInstruction,
       contents,
@@ -773,7 +773,7 @@ serve(async (req) => {
       if (!raw || raw === "[DONE]") return;
       try {
         const parsed = JSON.parse(raw);
-        const { text, grounding } = parseInteractionStreamEvent(parsed);
+        const { text, grounding } = parseVertexStreamEvent(parsed);
         if (text) {
           fullResponse += text;
           await writer.write(encoder.encode(sseChunk(text)));

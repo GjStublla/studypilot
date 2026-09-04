@@ -2,6 +2,7 @@ import { assertEquals } from "https://deno.land/std@0.168.0/testing/asserts.ts"
 import {
   isOwnedVertexRagFileName,
   ownedRagFilePrefix,
+  vertexResourceLocation,
 } from "./vertex-rag.ts"
 
 const corpus =
@@ -10,6 +11,11 @@ const ownedFile = `${corpus}/ragFiles/file-1`
 
 Deno.test("ownedRagFilePrefix appends ragFiles/", () => {
   assertEquals(ownedRagFilePrefix(corpus), `${corpus}/ragFiles/`)
+})
+
+Deno.test("vertexResourceLocation follows an existing corpus resource", () => {
+  assertEquals(vertexResourceLocation(corpus), "us-central1")
+  assertEquals(vertexResourceLocation("not-a-vertex-resource"), null)
 })
 
 Deno.test("isOwnedVertexRagFileName accepts files under the user corpus", () => {
