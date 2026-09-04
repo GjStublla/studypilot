@@ -202,6 +202,12 @@ export async function uploadRubricFile(file: File, title: string, course: string
   } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
+  const supportedExtensions = new Set(['.pdf', '.doc', '.docx', '.txt', '.md', '.csv', '.png', '.jpg', '.jpeg']);
+  const extension = file.name.match(/\.[a-z0-9]+$/i)?.[0].toLowerCase();
+  if (!extension || !supportedExtensions.has(extension)) {
+    throw new Error('Please upload a PDF, DOC, DOCX, TXT, MD, CSV, PNG, JPG, or JPEG file.');
+  }
+
   const { count: existingCount } = await supabase
     .from('rubrics')
     .select('id', { count: 'exact', head: true })
@@ -230,7 +236,10 @@ export async function uploadRubricFile(file: File, title: string, course: string
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const storagePath = `${user.id}/${rubric.id}/${safeName}`;
 
-  const { error: uploadError } = await supabase.storage.from('rubrics').upload(storagePath, file, { upsert: true });
+  const { error: uploadError } = await supabase.storage.from('rubrics').upload(storagePath, file, {
+    upsert: true,
+    contentType: file.type || 'application/octet-stream',
+  });
 
   if (uploadError) {
     await supabase.from('rubrics').delete().eq('id', rubric.id);

@@ -6,11 +6,23 @@ import {
   fetchSessionTranscript,
   fetchSessions,
   setActionItemDone,
+  deleteAllUserData,
+  deleteUserAccount,
 } from './dashboardApi';
 import { apiFetch } from './api';
 
 vi.mock('./api', () => ({
   apiFetch: vi.fn(),
+}));
+
+const supabaseMocks = vi.hoisted(() => ({
+  invoke: vi.fn(),
+  injectStoredToken: vi.fn(),
+}));
+
+vi.mock('./supabaseClient', () => ({
+  supabase: { functions: { invoke: supabaseMocks.invoke } },
+  injectStoredToken: supabaseMocks.injectStoredToken,
 }));
 
 describe('dashboardApi.activateRubric', () => {
@@ -94,6 +106,7 @@ describe('dashboardApi dashboard mapping boundary', () => {
           id: 'rubric-1',
           title: 'Essay rubric',
           course: 'ENG 102',
+          knowledge_document_id: 'document-1',
           uploaded_at: '2026-08-01T00:00:00Z',
           active: null,
           sessions_count: null,
@@ -107,6 +120,7 @@ describe('dashboardApi dashboard mapping boundary', () => {
     const [rubric] = await fetchRubrics();
     expect(rubric).toMatchObject({
       id: 'rubric-1',
+      knowledgeDocumentId: 'document-1',
       active: false,
       sessionsCount: 0,
       fileSearchStatus: 'indexing',
@@ -159,5 +173,30 @@ describe('dashboardApi dashboard mapping boundary', () => {
       method: 'PATCH',
       body: JSON.stringify({ done: true }),
     });
+  });
+});
+
+describe('dashboardApi user deletion boundary', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    supabaseMocks.injectStoredToken.mockResolvedValue(true);
+    supabaseMocks.invoke.mockResolvedValue({ data: { success: true }, error: null });
+  });
+
+  it('invokes data deletion without accepting a user id', async () => {
+    await deleteAllUserData();
+    expect(supabaseMocks.invoke).toHaveBeenCalledWith('delete-user-data', { body: { mode: 'data' } });
+  });
+
+  it('invokes account deletion only after authenticated token setup', async () => {
+    await deleteUserAccount();
+    expect(supabaseMocks.injectStoredToken).toHaveBeenCalledOnce();
+    expect(supabaseMocks.invoke).toHaveBeenCalledWith('delete-user-data', { body: { mode: 'account' } });
+  });
+
+  it('does not invoke deletion when the session cannot be established', async () => {
+    supabaseMocks.injectStoredToken.mockResolvedValue(false);
+    await expect(deleteAllUserData()).rejects.toThrow('Session expired');
+    expect(supabaseMocks.invoke).not.toHaveBeenCalled();
   });
 });
