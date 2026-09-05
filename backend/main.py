@@ -15,9 +15,14 @@ import supabase_client
 DEFAULT_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+    "http://localhost:5175",
+    "http://127.0.0.1:5175",
     "http://localhost:5180",
     "http://127.0.0.1:5180",
     "http://localhost:4173",
+    "http://127.0.0.1:4173",
     "https://studypilot.app",
 ]
 
@@ -50,7 +55,7 @@ def create_app(db_client: Any = None) -> FastAPI:
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
     # Store db_client on app state for dependency injection/testing
-    app.state.db_client = db_client or supabase_client.supabase
+    app.state.db_client = db_client or supabase_client.supabase_admin
 
     # CORS configuration with strict origin validation
     origins = parse_cors_origins()
