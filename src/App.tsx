@@ -301,7 +301,7 @@ function App() {
   );
 }
 
-function ChromeInstallCta({ variant = 'button' }: { variant?: 'button' | 'nav' | 'footer' }) {
+function ChromeInstallCta({ variant = 'button' }: { variant?: 'button' | 'footer' }) {
   const storeUrl = getChromeWebStoreUrl();
 
   if (storeUrl) {
@@ -431,7 +431,19 @@ function Hero({ user, onLogout }: { user: ReturnType<typeof getStoredUser>; onLo
                 variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
                 transition={{ duration: 0.36, ease: [0.23, 1, 0.32, 1] }}
               >
-                <ChromeInstallCta />
+                {user ? (
+                  <Button
+                    href="#dashboard"
+                    onMouseEnter={prefetchDashboard}
+                    onFocus={prefetchDashboard}
+                  >
+                    Dashboard <ArrowRight size={14} />
+                  </Button>
+                ) : (
+                  <Button href="#auth">
+                    Sign in <ArrowRight size={14} />
+                  </Button>
+                )}
                 <Button href="#workflow" variant="secondary">
                   See the flow <ArrowUpRight size={14} />
                 </Button>
@@ -495,7 +507,6 @@ function Hero({ user, onLogout }: { user: ReturnType<typeof getStoredUser>; onLo
                   <StudyPilotMark size={48} />
                 </div>
                 <p className="hero-installed-text">Pinned &amp; ready.</p>
-                <ChromeInstallCta />
               </m.div>
             </m.div>
           </div>
@@ -518,7 +529,6 @@ function HeroNav({ user, onLogout }: { user: ReturnType<typeof getStoredUser>; o
         </a>
         <a href="#capabilities">Features</a>
         <a href="#workflow">How it works</a>
-        <ChromeInstallCta variant="nav" />
         {user ? (
           <a href="#dashboard" onMouseEnter={prefetchDashboard} onFocus={prefetchDashboard}>
             Dashboard
