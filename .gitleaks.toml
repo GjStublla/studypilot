@@ -8,10 +8,8 @@
 # A path allowlist trusts the entire file. .env.studypilot-local must remain
 # the official Supabase CLI local demo fixture. Do not put hosted keys there.
 #
-# backend/service-account.json previously contained a Google service-account
-# private key in commit 1e0f6bb on the leona branch. The key has been rotated
-# and is no longer valid. The commit is allowlisted by hash so future real
-# leaks are still caught.
+# Never allowlist a historical credential leak by commit. If one is found,
+# revoke it and remove the containing path from history.
 
 title = "StudyPilot"
 
@@ -23,10 +21,6 @@ description = "Official Supabase CLI local demo anon JWT for npm run dev:local (
 paths = [
   '''(?:^|/)\.env\.studypilot-local$''',
 ]
-
-[[allowlists]]
-description = "Rotated Google service-account key committed on leona branch (commit 1e0f6bb). Key was invalidated before this allowlist was added."
-commits = ["1e0f6bbe5cdf3195a775ac062ee89f568902d4ca"]
 
 [[allowlists]]
 description = "Example/template file — contains a PEM comment with placeholder content (\\n...\\n), not a real private key."
@@ -43,6 +37,7 @@ paths = [
   '''(?:^|/)src/lib/deploymentConfig\.test\.ts$''',
   '''(?:^|/)src/lib/deploymentConfig\.ts$''',
   '''(?:^|/)\.github/workflows/ci\.yml$''',
+  '''(?:^|/)scripts/quality-check\.mjs$''',
   '''(?:^|/)scripts/serve-e2e\.mjs$''',
 ]
 
