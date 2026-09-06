@@ -165,8 +165,8 @@ export async function ensureRagEngineServerlessMode(): Promise<void> {
   const host = vertexAiHost(location)
   // ragEngineConfig uses v1 not v1beta1, and requires updateMask on PATCH.
   const name = `projects/${projectId}/locations/${location}/ragEngineConfig`
-  const getUrl = `https://${host}/v1/${name}`
-  const patchUrl = `https://${host}/v1/${name}?updateMask=ragManagedDbConfig`
+  const getUrl = `https://${host}/v1beta1/${name}`
+  const patchUrl = `https://${host}/v1beta1/${name}`
 
   const doFetch = async (url: string, method: string, body?: string) => {
     const token = await getAccessToken()

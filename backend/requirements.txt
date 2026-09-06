@@ -1,0 +1,5 @@
+fastapi[standard]==0.141.1
+supabase==2.31.0
+python-dotenv==1.0.1
+pydantic[email]==2.13.5
+slowapi==0.1.9

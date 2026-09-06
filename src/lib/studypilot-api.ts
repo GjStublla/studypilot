@@ -3,6 +3,7 @@
 // These functions provide a typed interface to the Supabase database
 // and Edge Functions, following the patterns established in the existing
 // dashboardApi.ts but adapted for the new Supabase-first architecture.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 import { supabase, injectStoredToken } from './supabaseClient';
 import type {
@@ -136,26 +137,20 @@ export async function getRubricById(rubricId: string): Promise<Rubric | null> {
 export async function setActiveRubric(activeId: string): Promise<void> {
   await injectStoredToken();
 
-  // Prefer the atomic ownership-checked RPC when available.
-  const { error: rpcError } = await supabase.rpc('set_active_rubric', {
-    p_rubric_id: activeId,
+  const response = await fetch(`${API_BASE_URL}/rubrics/${activeId}/active`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${injectStoredToken()}`,
+      'Content-Type': 'application/json',
+    },
   });
 
-  if (!rpcError) return;
-
-  // Fallback for environments where the migration is not applied yet.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error(rpcError.message || 'Not authenticated');
-
-  const { error: clearActive } = await supabase.from('rubrics').update({ active: false }).eq('user_id', user.id);
-
-  if (clearActive) throw clearActive;
-
-  const { error: setActive } = await supabase.from('rubrics').update({ active: true }).eq('id', activeId);
-
-  if (setActive) throw setActive;
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `PATCH /rubrics/${activeId}/active failed: ${response.status} ${errorText}`,
+    );
+  }
 }
 
 export async function createRubric(rubric: Omit<Rubric, 'id' | 'created_at' | 'updated_at'>): Promise<Rubric> {
