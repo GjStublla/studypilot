@@ -34,7 +34,8 @@
     "validate:pitch": "node scripts/validate-claims.mjs --include-pitch-brief --require-pitch-brief",
     "validate:pilot": "node scripts/validate-pilot-results.mjs",
     "summarize:pilot": "node scripts/validate-pilot-results.mjs --markdown",
-    "extension:build": "npm run build --prefix ../studypilot-extension"
+    "extension:build": "npm run build --prefix ../studypilot-extension",
+    "show-config": "powershell -ExecutionPolicy Bypass -File scripts/show-config.ps1"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
