@@ -136,6 +136,10 @@ def _delete_session_capture(path: str | None, user_id: str, session_id: str) -> 
         # Non-fatal — log and continue. A failed Storage delete must not
         # prevent the session row from being deleted.
         print(f"[sessions] session capture delete failed for session {session_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not delete session capture. please try again.",
+        )
 
 
 # ─── Response / Request models ────────────────────────────────────────────────
