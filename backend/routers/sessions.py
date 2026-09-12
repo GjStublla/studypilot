@@ -94,7 +94,7 @@ def _require_session_owner(client, session_id: str, user_id: str) -> dict:
     try:
         result = (
             client.table("sessions")
-            .select("id, title, source, mode, duration_seconds, when_timestamp, rubric_id, summary, active, screenshot_path")
+            .select("id, title, source, mode, duration_seconds, when_timestamp, rubric_id, summary, active, screenshot_path, chat_id")
             .eq("id", session_id)
             .eq("user_id", user_id)
             .single()
@@ -151,6 +151,8 @@ class SessionSummary(BaseModel):
     when: str
     rubric_id: str | None
     summary: str | None
+    chat_id: str | None = None
+    screenshot_path: str | None = None
 
 
 class TranscriptMessage(BaseModel):
@@ -175,6 +177,8 @@ class SessionDetail(BaseModel):
     when: str
     rubric_id: str | None
     summary: str | None
+    chat_id: str | None = None
+    screenshot_path: str | None = None
     transcript: list[TranscriptMessage]
     action_items: list[ActionItemInSession]
 
@@ -254,7 +258,7 @@ def list_sessions(
         client = get_user_client(token)
         query = (
             client.table("sessions")
-            .select("id, title, source, mode, duration_seconds, when_timestamp, rubric_id, summary")
+            .select("id, title, source, mode, duration_seconds, when_timestamp, rubric_id, summary, chat_id, screenshot_path")
             .eq("user_id", user_id)
             .order("when_timestamp", desc=True)
             .range(offset, offset + limit - 1)
@@ -280,6 +284,8 @@ def list_sessions(
             when=_when_str(row["when_timestamp"]),
             rubric_id=row.get("rubric_id"),
             summary=row.get("summary"),
+            chat_id=row.get("chat_id"),
+            screenshot_path=row.get("screenshot_path"),
         )
         for row in (result.data or [])
     ]
@@ -362,6 +368,8 @@ def get_session(
         when=_when_str(session["when_timestamp"]),
         rubric_id=session.get("rubric_id"),
         summary=session.get("summary"),
+        chat_id=session.get("chat_id"),
+        screenshot_path=session.get("screenshot_path"),
         transcript=transcript,
         action_items=action_items,
     )
