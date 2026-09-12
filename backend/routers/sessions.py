@@ -536,6 +536,7 @@ def delete_session(
             .delete()
             .eq("id", session_id)
             .eq("user_id", user_id)
+            .select("id")
             .execute()
         )
     except Exception as e:

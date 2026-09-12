@@ -163,6 +163,7 @@ def delete_action_item(
             .delete()
             .eq("id", item_id)
             .eq("user_id", user_id)
+            .select("id")
             .execute()
         )
     except Exception as e:
