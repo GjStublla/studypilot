@@ -78,6 +78,17 @@
   gap: 10px;
   font-size: 12px;
   color: var(--ds-muted);
+  min-width: 0;
+}
+.app-dashboard .ds-mini-criteria li > span:first-child {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-dashboard .ds-mini-criteria li > :last-child {
+  flex-shrink: 0;
 }
 
 .app-dashboard .ds-context-source {

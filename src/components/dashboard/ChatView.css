@@ -115,6 +115,62 @@
   height: 6px;
 }
 
+/* ── Markdown rendering for AI messages ── */
+.app-dashboard .ds-msg-markdown {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--ds-ink);
+}
+.app-dashboard .ds-msg-markdown p {
+  margin: 0 0 8px;
+  color: var(--ds-ink);
+  font-size: 14px;
+  line-height: 1.65;
+}
+.app-dashboard .ds-msg-markdown p:last-child {
+  margin-bottom: 0;
+}
+.app-dashboard .ds-msg-list {
+  margin: 4px 0 8px;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.app-dashboard .ds-msg-list:last-child {
+  margin-bottom: 0;
+}
+.app-dashboard .ds-msg-list li {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ds-ink);
+}
+.app-dashboard .ds-msg-code {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  background: var(--ds-surface-raised, rgba(255,255,255,0.06));
+  border: 1px solid var(--ds-line);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.app-dashboard .ds-msg-blockquote {
+  margin: 4px 0 8px;
+  padding: 4px 12px;
+  border-left: 3px solid var(--ds-line);
+  color: var(--ds-quiet);
+  font-size: 13.5px;
+}
+.app-dashboard .ds-msg-markdown strong {
+  font-weight: 600;
+  color: var(--ds-ink);
+}
+.app-dashboard .ds-msg-markdown em {
+  font-style: italic;
+}
+.app-dashboard .ds-msg-gap {
+  height: 8px;
+}
+
 .app-dashboard .ds-msg-rag-tag {
   margin-left: 4px;
   padding: 1px 6px;

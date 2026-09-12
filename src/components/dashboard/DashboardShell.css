@@ -715,10 +715,12 @@
   gap: 2px;
   margin-inline-start: auto;
   opacity: 0;
+  pointer-events: none;
 }
 .app-dashboard .ds-chat-row:hover .ds-chat-actions,
 .app-dashboard .ds-chat-row:focus-within .ds-chat-actions {
   opacity: 1;
+  pointer-events: auto;
 }
 .app-dashboard .ds-chat-action {
   display: inline-grid;
@@ -734,6 +736,27 @@
 .app-dashboard .ds-chat-action:hover {
   background: var(--ds-line);
   color: var(--ds-ink);
+}
+/* Inline delete confirmation */
+.app-dashboard .ds-chat-delete-confirm {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  gap: 4px;
+}
+.app-dashboard .ds-chat-action-yes {
+  padding: 0 6px;
+  width: auto;
+  font-size: 11px;
+  font-weight: 500;
+  color: #ff6b6b;
+  border-radius: 4px;
+}
+.app-dashboard .ds-chat-action-yes:hover {
+  background: rgba(255, 107, 107, 0.12);
+  color: #ff4444;
+}
+.app-dashboard .ds-chat-action-no {
+  color: var(--ds-quiet);
 }
 .app-dashboard .ds-chat-rename-input {
   min-width: 0;

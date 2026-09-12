@@ -287,8 +287,20 @@ export function useDashboardData({
       if (payload.eventType === 'INSERT') {
         setRubrics((prev) => [payload.new as Rubric, ...prev]);
       } else if (payload.eventType === 'UPDATE') {
+        const incoming = payload.new as Record<string, unknown>;
         setRubrics((prev) =>
-          prev.map((r) => (r.id === (payload.new as Record<string, unknown>).id ? (payload.new as Rubric) : r)),
+          prev.map((r) => {
+            if (r.id !== incoming.id) return r;
+            // Realtime rows come from the rubrics table only — no joined criteria.
+            // Merge so that criteria (loaded via the full fetch) are never wiped.
+            return {
+              ...r,
+              ...(incoming as Partial<Rubric>),
+              // Preserve criteria from the existing local object if the incoming
+              // row doesn't carry them (which it never does via Realtime).
+              criteria: (incoming.criteria as Rubric['criteria'] | undefined) ?? r.criteria,
+            };
+          }),
         );
       } else if (payload.eventType === 'DELETE') {
         const deletedId = (payload.old as Record<string, unknown>).id;

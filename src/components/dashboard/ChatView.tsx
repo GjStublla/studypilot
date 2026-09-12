@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArrowUp,
   BookOpen,
@@ -337,10 +337,23 @@ const ChatListRow = memo(function ChatListRow({
 }: ChatListRowProps) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(chat.title);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   useEffect(() => {
     if (!editing) setTitle(chat.title);
   }, [chat.title, editing]);
+
+  // Dismiss the confirm state when the user clicks anywhere outside
+  useEffect(() => {
+    if (!confirmingDelete) return;
+    const dismiss = () => setConfirmingDelete(false);
+    // Delay so the confirm buttons themselves can receive their own click first
+    const id = setTimeout(() => window.addEventListener('click', dismiss, { once: true }), 50);
+    return () => {
+      clearTimeout(id);
+      window.removeEventListener('click', dismiss);
+    };
+  }, [confirmingDelete]);
 
   const commitRename = useCallback(() => {
     const nextTitle = title.trim() || chat.title;
@@ -358,11 +371,11 @@ const ChatListRow = memo(function ChatListRow({
       className={`ds-chat-row ${active ? 'is-active' : ''}`}
       role="button"
       tabIndex={0}
-      onClick={() => onSelect(chat.id)}
+      onClick={() => { if (!confirmingDelete) onSelect(chat.id); }}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
-          onSelect(chat.id);
+          if (!confirmingDelete) onSelect(chat.id);
         }
       }}
     >
@@ -409,36 +422,108 @@ const ChatListRow = memo(function ChatListRow({
         </span>
       )}
       {!editing && (
-        <span className="ds-chat-actions">
-          <button
-            type="button"
-            className="ds-chat-action"
-            aria-label={`Rename ${chat.title}`}
-            onClick={(event) => {
-              event.stopPropagation();
-              setEditing(true);
-            }}
-            onKeyDown={(event) => event.stopPropagation()}
-          >
-            <MoreHorizontal size={14} strokeWidth={1.8} />
-          </button>
-          <button
-            type="button"
-            className="ds-chat-action"
-            aria-label={`Delete ${chat.title}`}
-            onClick={(event) => {
-              event.stopPropagation();
-              if (window.confirm(`Delete “${chat.title}”? This cannot be undone.`)) onDelete(chat.id);
-            }}
-            onKeyDown={(event) => event.stopPropagation()}
-          >
-            <span aria-hidden="true">×</span>
-          </button>
-        </span>
+        confirmingDelete ? (
+          <span className="ds-chat-actions ds-chat-delete-confirm">
+            <button
+              type="button"
+              className="ds-chat-action ds-chat-action-yes"
+              aria-label="Confirm delete"
+              onClick={(event) => {
+                event.stopPropagation();
+                setConfirmingDelete(false);
+                onDelete(chat.id);
+              }}
+            >
+              Delete
+            </button>
+            <button
+              type="button"
+              className="ds-chat-action ds-chat-action-no"
+              aria-label="Cancel delete"
+              onClick={(event) => {
+                event.stopPropagation();
+                setConfirmingDelete(false);
+              }}
+            >
+              <span aria-hidden="true">×</span>
+            </button>
+          </span>
+        ) : (
+          <span className="ds-chat-actions">
+            <button
+              type="button"
+              className="ds-chat-action"
+              aria-label={`Rename ${chat.title}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                setEditing(true);
+              }}
+              onKeyDown={(event) => event.stopPropagation()}
+            >
+              <MoreHorizontal size={14} strokeWidth={1.8} />
+            </button>
+            <button
+              type="button"
+              className="ds-chat-action"
+              aria-label={`Delete ${chat.title}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                setConfirmingDelete(true);
+              }}
+              onKeyDown={(event) => event.stopPropagation()}
+            >
+              <span aria-hidden="true">×</span>
+            </button>
+          </span>
+        )
       )}
     </div>
   );
 });
+
+/**
+ * Render message lines with minimal inline formatting.
+ * Handles **bold**, bullet lines (- / * / •), and blank line spacing.
+ * Works identically during streaming and after persist — no DOM restructuring on status change.
+ */
+function renderInline(text: string): React.ReactNode {
+  // Split on **bold** markers and alternate between plain and bold segments
+  const parts = text.split(/\*\*([^*]+)\*\*/g);
+  if (parts.length === 1) return text;
+  return parts.map((part, i) =>
+    i % 2 === 1 ? <strong key={i}>{part}</strong> : part,
+  );
+}
+
+function renderMessageLines(lines: readonly string[]): React.ReactNode {
+  const nodes: React.ReactNode[] = [];
+  let listItems: React.ReactNode[] = [];
+
+  const flushList = () => {
+    if (listItems.length === 0) return;
+    nodes.push(<ul key={`list-${nodes.length}`} className="ds-msg-list">{listItems}</ul>);
+    listItems = [];
+  };
+
+  lines.forEach((line, i) => {
+    const bulletMatch = line.match(/^[\s]*[-*•]\s+(.*)/);
+    if (bulletMatch) {
+      listItems.push(<li key={i}>{renderInline(bulletMatch[1])}</li>);
+    } else {
+      flushList();
+      if (!line.trim()) {
+        // Blank line — only add spacing if we already have content
+        if (nodes.length > 0) nodes.push(<div key={`gap-${i}`} className="ds-msg-gap" />);
+      } else {
+        // Strip leading markdown heading markers (## Heading → plain text)
+        const stripped = line.replace(/^#{1,4}\s+/, '');
+        nodes.push(<p key={i}>{renderInline(stripped)}</p>);
+      }
+    }
+  });
+  flushList();
+  return nodes;
+}
 
 const MessageBubble = memo(function MessageBubble({ message, student, thinking = false }: MessageBubbleProps) {
   const citations = message.citations ?? [];
@@ -461,7 +546,9 @@ const MessageBubble = memo(function MessageBubble({ message, student, thinking =
             <span className="ds-typing-dot" />
           </div>
         ) : (
-          message.lines.map((line, i) => <p key={i}>{line || ' '}</p>)
+          <div className="ds-msg-markdown">
+            {renderMessageLines(message.lines)}
+          </div>
         )}
         {!thinking && citations.length > 0 ? (
           <ul className="ds-citations" aria-label="Sources">
