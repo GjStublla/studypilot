@@ -22,6 +22,7 @@ const EXPECTED = {
   'summarize-session': true,
   'delete-knowledge-document': true,
   'delete-user-data': true,
+   'show-config': false,
 };
 
 if (!TOKEN) {
