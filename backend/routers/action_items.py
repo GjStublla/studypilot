@@ -112,6 +112,7 @@ def toggle_action_item(
             .update({"done": body.done})
             .eq("id", item_id)
             .eq("user_id", user_id)
+            .select("id, text, session_id, rubric_id, done")
             .execute()
         )
     except Exception as e:
