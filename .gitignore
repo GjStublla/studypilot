@@ -96,3 +96,6 @@ tmp/
 test-results/
 /output/
 
+
+# Kiro IDE steering/agent configuration — local only
+.kiro/
