@@ -1046,6 +1046,10 @@ export default function Dashboard({
         onGoTo={navigateToView}
         onContinueInChat={continueContextInChat}
         onOpenExtension={openExtension}
+        onSendMessage={(text) => {
+          if (view !== 'chat') navigateToView('chat');
+          sendChatMessage(text);
+        }}
       />
 
       {extensionHelpOpen && <ExtensionHelpModal onClose={() => setExtensionHelpOpen(false)} />}

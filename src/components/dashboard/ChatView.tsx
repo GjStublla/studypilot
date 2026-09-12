@@ -21,9 +21,9 @@ import type { ChatListRowProps, ChatViewProps, CitationItemProps, MessageBubbleP
 
 const QUICK_PROMPTS = [
   'What should I revise first?',
-  'Explain this rubric',
-  'Turn my feedback into a checklist',
-  'Ask me Socratic questions',
+  'Explain the rubric criteria',
+  'Give me Socratic questions to test my understanding',
+  'Turn my feedback into a step-by-step checklist',
 ] as const;
 
 const NEW_CHAT_DRAFT_KEY = '__new-chat__';
@@ -254,7 +254,7 @@ export const ChatView = memo(function ChatView({
           </div>
 
           <div className="ds-composer-wrap">
-            <div className="ds-quick-prompts" role="group" aria-label="Quick prompts">
+            <div className="ds-quick-prompts" role="group" aria-label="Quick prompts" aria-hidden={messages.length > 0 ? 'true' : undefined} style={messages.length > 0 ? { display: 'none' } : undefined}>
               {QUICK_PROMPTS.map((p) => (
                 <button
                   key={p}

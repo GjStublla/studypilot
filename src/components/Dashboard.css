@@ -62,6 +62,14 @@
   color: var(--ds-quiet);
   margin-top: -4px;
 }
+.app-dashboard .ds-context-rubric-prose {
+  margin: 4px 0 0;
+  padding-top: 8px;
+  border-top: 1px dashed var(--ds-line);
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--ds-muted);
+}
 .app-dashboard .ds-mini-criteria {
   list-style: none;
   margin: 4px 0 0;

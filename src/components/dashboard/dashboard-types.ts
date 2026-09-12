@@ -147,6 +147,7 @@ export interface ContextPanelProps {
   onGoTo: (view: View) => void;
   onContinueInChat: () => void;
   onOpenExtension: () => void;
+  onSendMessage?: (text: string) => void;
 }
 
 export interface SessionDetailViewProps {
