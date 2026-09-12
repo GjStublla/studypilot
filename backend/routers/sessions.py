@@ -94,7 +94,7 @@ def _require_session_owner(client, session_id: str, user_id: str) -> dict:
     try:
         result = (
             client.table("sessions")
-            .select("id, title, source, mode, duration_seconds, when_timestamp, rubric_id, summary, active, screenshot_path, chat_id")
+            .select("id, title, source, mode, duration_seconds, when_timestamp, rubric_id, summary, screenshot_path, chat_id")
             .eq("id", session_id)
             .eq("user_id", user_id)
             .single()
@@ -363,10 +363,10 @@ def get_session(
             try:
                 chat_messages_result = (
                     client.table("dashboard_chat_messages")
-                    .select("id, role, text, server_sequence")
+                    .select("id, role, text, created_at")
                     .eq("chat_id", chat_id)
                     .eq("user_id", user_id)
-                    .order("server_sequence", desc=False)
+                    .order("created_at", desc=False)
                     .execute()
                 )
                 sequence = 0
@@ -375,13 +375,11 @@ def get_session(
                     text = msg.get("text", "")
                     if not text:
                         continue
-                    seq = msg.get("server_sequence") or sequence
-                    # Convert sequence number to a MM:SS offset for display.
                     transcript.append(TranscriptMessage(
                         id=msg["id"],
                         who="You" if role == "user" else "StudyPilot",
                         text=text,
-                        t=_t_label(int(seq) if isinstance(seq, (int, float)) else 0),
+                        t=_t_label(sequence),
                     ))
                     sequence += 1
             except Exception as e:
