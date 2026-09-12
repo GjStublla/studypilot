@@ -19,6 +19,7 @@ import { AUTH_REQUIRED } from '../lib/authConfig';
 import {
   createDashboardChat,
   deleteDashboardChat,
+  getDashboardChatMessages,
   getOrCreateRubricChat,
   getOrCreateSessionChat,
   retryRubricIndexing,
@@ -651,11 +652,30 @@ export default function Dashboard({
     if (!selectedSessionId || summarizing) return;
     setSummarizing(true);
     try {
-      await summarizeSession(selectedSessionId);
+      // Build a transcript string from chat messages when session_messages is
+      // empty (dashboard-originated sessions store turns in dashboard_chat_messages).
+      let transcriptText: string | undefined;
+      const session = sessionsRef.current.find((s) => s.id === selectedSessionId);
+      const chatId = session?.chatId ?? session?.chat_id ?? null;
+      if (chatId) {
+        try {
+          const chatMessages = await getDashboardChatMessages(chatId);
+          if (chatMessages.length > 0) {
+            transcriptText = chatMessages
+              .filter((m) => m.text?.trim())
+              .map((m) => `${m.role === 'user' ? 'Student' : 'StudyPilot'}: ${m.text.trim()}`)
+              .join('\n');
+          }
+        } catch {
+          // Non-fatal — fall through and let the edge function try session_messages.
+        }
+      }
+
+      await summarizeSession(selectedSessionId, transcriptText);
       // Refresh action items so newly-created ones appear immediately.
       const rows = await fetchActionItems().catch(() => null);
       if (rows && dashboardMountedRef.current) setActionItems(rows);
-      // Re-fetch the session so the updated summary shows.
+      // Re-fetch sessions so the updated summary shows.
       const updatedSessions = await fetchSessions().catch(() => null);
       if (updatedSessions && dashboardMountedRef.current) setSessions(updatedSessions);
     } catch (error) {
@@ -663,7 +683,7 @@ export default function Dashboard({
     } finally {
       if (dashboardMountedRef.current) setSummarizing(false);
     }
-  }, [dashboardMountedRef, selectedSessionId, setActionItems, setSessions, summarizing]);
+  }, [dashboardMountedRef, selectedSessionId, sessionsRef, setActionItems, setSessions, summarizing]);
   const setActiveRubricOnServer = useCallback(
     async (rubricId: string) => {
       const previousId = activeRubricId;

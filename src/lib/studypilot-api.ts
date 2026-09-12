@@ -695,7 +695,7 @@ export async function createActivityLog(log: Omit<ActivityLog, 'id' | 'created_a
 
 // ─── Edge Function: Summarize Session ─────────────────────────────────────────────
 
-export async function summarizeSession(sessionId: string): Promise<SummarizeSessionResponse> {
+export async function summarizeSession(sessionId: string, transcript?: string): Promise<SummarizeSessionResponse> {
   const token = await getEdgeFunctionToken();
 
   const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/summarize-session`, {
@@ -705,7 +705,7 @@ export async function summarizeSession(sessionId: string): Promise<SummarizeSess
       Authorization: `Bearer ${token}`,
       apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
     },
-    body: JSON.stringify({ sessionId }),
+    body: JSON.stringify({ sessionId, ...(transcript ? { transcript } : {}) }),
   });
 
   if (!response.ok) {
