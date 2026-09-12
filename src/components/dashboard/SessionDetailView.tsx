@@ -21,6 +21,8 @@ export const SessionDetailView = memo(function SessionDetailView({
   onBack,
   onContinueInChat,
   onRetryTranscript,
+  onSummarize,
+  summarizing,
 }: SessionDetailViewProps) {
   const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
   const [screenshotError, setScreenshotError] = useState(false);
@@ -149,11 +151,25 @@ export const SessionDetailView = memo(function SessionDetailView({
           </article>
 
           <article className="ds-card">
-            <div className="ds-card-eyebrow">
+            <div className="ds-card-eyebrow ds-card-eyebrow-row">
               <span>Action items from this session</span>
+              {onSummarize && actionItems.length === 0 && !summarizing ? (
+                <button type="button" className="ds-link" onClick={onSummarize}>
+                  Generate <ChevronRight size={12} strokeWidth={1.7} />
+                </button>
+              ) : null}
             </div>
-            {actionItems.length === 0 ? (
-              <EmptyState title="No action items." body="Nothing was flagged in this session." />
+            {summarizing ? (
+              <div className="ds-state ds-state-loading ds-state-inline">
+                <span className="ds-state-spinner" aria-hidden="true" />
+                <p>Generating summary and action items…</p>
+              </div>
+            ) : actionItems.length === 0 ? (
+              <EmptyState
+                title="No action items."
+                body="Nothing was flagged in this session."
+                action={onSummarize ? { label: 'Generate now', onClick: onSummarize } : undefined}
+              />
             ) : (
               <ul className="ds-todo">
                 {actionItems.map((item) => (

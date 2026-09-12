@@ -160,6 +160,8 @@ export interface SessionDetailViewProps {
   onBack: () => void;
   onContinueInChat: () => void;
   onRetryTranscript?: () => void;
+  onSummarize?: () => void;
+  summarizing?: boolean;
 }
 
 export interface FileSearchStatusBadgeProps {

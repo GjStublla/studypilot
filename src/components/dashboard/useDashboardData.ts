@@ -269,13 +269,22 @@ export function useDashboardData({
     },
     onActionItemChanged: (payload) => {
       if (!dashboardMountedRef.current) return;
+      // Realtime payloads are raw Postgres rows (snake_case). Map them to the
+      // camelCase ActionItem shape before storing, otherwise sessionId/rubricId
+      // are undefined and items can never match their session.
+      const mapRaw = (raw: Record<string, unknown>): ActionItem => ({
+        id: raw.id as string,
+        text: raw.text as string,
+        sessionId: (raw.session_id as string | null) ?? null,
+        rubricId: (raw.rubric_id as string | null) ?? null,
+        done: Boolean(raw.done),
+      });
       if (payload.eventType === 'INSERT') {
-        setActionItems((prev) => [payload.new as ActionItem, ...prev]);
+        setActionItems((prev) => [mapRaw(payload.new as Record<string, unknown>), ...prev]);
       } else if (payload.eventType === 'UPDATE') {
+        const updated = mapRaw(payload.new as Record<string, unknown>);
         setActionItems((prev) =>
-          prev.map((item) =>
-            item.id === (payload.new as Record<string, unknown>).id ? (payload.new as ActionItem) : item,
-          ),
+          prev.map((item) => item.id === updated.id ? updated : item),
         );
       } else if (payload.eventType === 'DELETE') {
         const deletedId = (payload.old as Record<string, unknown>).id;

@@ -22,9 +22,10 @@ import {
   getOrCreateRubricChat,
   getOrCreateSessionChat,
   retryRubricIndexing,
+  summarizeSession,
   updateDashboardChat,
 } from '../lib/studypilot-api';
-import { fetchActionItems, fetchSessionTranscript, setActionItemDone, activateRubric, deleteRubric, deleteActionItem, deleteSession, deleteAllUserData, deleteUserAccount } from '../lib/dashboardApi';
+import { fetchActionItems, fetchSessions, fetchSessionTranscript, setActionItemDone, activateRubric, deleteRubric, deleteActionItem, deleteSession, deleteAllUserData, deleteUserAccount } from '../lib/dashboardApi';
 import type { Rubric, Session } from '../lib/dashboard-types';
 import { sendCoachingMessage } from '../lib/socraticCoach';
 import type { DashboardChat } from '../lib/studypilot-types';
@@ -108,6 +109,7 @@ export default function Dashboard({
   // Default coach mode also comes from the profile; persisted back via PATCH /users/me.
   const [coachMode, setCoachMode] = useState<CoachMode>('essay');
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
+  const [summarizing, setSummarizing] = useState(false);
   const savedNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function flashSavedNotice(message: string) {
@@ -644,6 +646,24 @@ export default function Dashboard({
     if (chatSession) openInChat(chatSession.id);
   }, [chatSession, openInChat]);
   const backToSessions = useCallback(() => navigateToView('sessions'), [navigateToView]);
+
+  const handleSummarize = useCallback(async () => {
+    if (!selectedSessionId || summarizing) return;
+    setSummarizing(true);
+    try {
+      await summarizeSession(selectedSessionId);
+      // Refresh action items so newly-created ones appear immediately.
+      const rows = await fetchActionItems().catch(() => null);
+      if (rows && dashboardMountedRef.current) setActionItems(rows);
+      // Re-fetch the session so the updated summary shows.
+      const updatedSessions = await fetchSessions().catch(() => null);
+      if (updatedSessions && dashboardMountedRef.current) setSessions(updatedSessions);
+    } catch (error) {
+      console.error('[Dashboard] summarizeSession failed:', error);
+    } finally {
+      if (dashboardMountedRef.current) setSummarizing(false);
+    }
+  }, [dashboardMountedRef, selectedSessionId, setActionItems, setSessions, summarizing]);
   const setActiveRubricOnServer = useCallback(
     async (rubricId: string) => {
       const previousId = activeRubricId;
@@ -923,6 +943,8 @@ export default function Dashboard({
                   onBack={backToSessions}
                   onContinueInChat={continueSelectedInChat}
                   onRetryTranscript={selectedSession ? () => ensureTranscript(selectedSession.id, true) : undefined}
+                  onSummarize={selectedSession ? handleSummarize : undefined}
+                  summarizing={summarizing}
                 />
               )}
 

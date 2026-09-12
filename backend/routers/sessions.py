@@ -354,6 +354,40 @@ def get_session(
         for msg in (messages_result.data or [])
     ]
 
+    # If session_messages is empty (e.g. a dashboard-only chat session where
+    # messages are stored in dashboard_chat_messages instead), fall back to
+    # loading the linked chat's messages so the transcript is never blank.
+    if not transcript:
+        chat_id = session.get("chat_id")
+        if chat_id:
+            try:
+                chat_messages_result = (
+                    client.table("dashboard_chat_messages")
+                    .select("id, role, text, server_sequence")
+                    .eq("chat_id", chat_id)
+                    .eq("user_id", user_id)
+                    .order("server_sequence", desc=False)
+                    .execute()
+                )
+                sequence = 0
+                for msg in (chat_messages_result.data or []):
+                    role = msg.get("role", "")
+                    text = msg.get("text", "")
+                    if not text:
+                        continue
+                    seq = msg.get("server_sequence") or sequence
+                    # Convert sequence number to a MM:SS offset for display.
+                    transcript.append(TranscriptMessage(
+                        id=msg["id"],
+                        who="You" if role == "user" else "StudyPilot",
+                        text=text,
+                        t=_t_label(int(seq) if isinstance(seq, (int, float)) else 0),
+                    ))
+                    sequence += 1
+            except Exception as e:
+                # Non-fatal — return empty transcript rather than erroring.
+                print(f"[sessions] chat_messages fallback failed for session {session_id}: {e}")
+
     action_items = [
         ActionItemInSession(id=a["id"], text=a["text"], done=a["done"])
         for a in (actions_result.data or [])
