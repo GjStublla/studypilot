@@ -3,10 +3,6 @@ import { ArrowRight, Chrome } from 'lucide-react';
 import { DsButton } from './DashboardPrimitives';
 import type { ContextPanelProps } from './dashboard-types';
 
-/**
- * Prompts are shown in the panel and fire as real chat messages.
- * They cover the most useful coaching questions regardless of context.
- */
 const PANEL_PROMPTS = [
   'What should I revise first?',
   'Explain the rubric criteria to me',
@@ -15,25 +11,14 @@ const PANEL_PROMPTS = [
   'What are my main weaknesses based on this rubric?',
 ] as const;
 
-/**
- * Build a one-sentence prose summary of the rubric so the panel card
- * reads naturally instead of showing a bullet list.
- */
 function rubricProse(rubric: { title: string; course: string; criteria?: { name: string }[] }): string {
   const criteria = rubric.criteria ?? [];
-  if (criteria.length === 0) {
-    return `${rubric.title} for ${rubric.course}. No criteria loaded yet.`;
-  }
+  if (criteria.length === 0) return `${rubric.title} for ${rubric.course}. No criteria loaded yet.`;
   if (criteria.length <= 3) {
-    const names = criteria.map((c) => c.name).join(', ');
-    return `${rubric.title} for ${rubric.course} — assesses ${names}.`;
+    return `${rubric.title} for ${rubric.course} — assesses ${criteria.map((c) => c.name).join(', ')}.`;
   }
-  const shown = criteria
-    .slice(0, 3)
-    .map((c) => c.name)
-    .join(', ');
-  const rest = criteria.length - 3;
-  return `${rubric.title} for ${rubric.course} — assesses ${shown} and ${rest} more criteria.`;
+  const shown = criteria.slice(0, 3).map((c) => c.name).join(', ');
+  return `${rubric.title} for ${rubric.course} — assesses ${shown} and ${criteria.length - 3} more criteria.`;
 }
 
 export const ContextPanel = memo(function ContextPanel({
@@ -44,23 +29,11 @@ export const ContextPanel = memo(function ContextPanel({
   openActionItemCount,
   aiUsage,
   onGoTo,
-  onContinueInChat,
   onOpenExtension,
   onSendMessage,
 }: ContextPanelProps) {
   const contextSession = view === 'session-detail' ? selectedSession : chatSession;
-  const rubricSummary = useMemo(
-    () => (activeRubric ? rubricProse(activeRubric) : null),
-    [activeRubric],
-  );
-
-  const handlePrompt = (text: string) => {
-    if (onSendMessage) {
-      onSendMessage(text);
-    } else {
-      onContinueInChat();
-    }
-  };
+  const rubricSummary = useMemo(() => (activeRubric ? rubricProse(activeRubric) : null), [activeRubric]);
 
   return (
     <aside className="ds-context" aria-label="Current context">
@@ -93,9 +66,7 @@ export const ContextPanel = memo(function ContextPanel({
               </span>
               <div>
                 <b>{contextSession.title}</b>
-                <em>
-                  {contextSession.mode} · {contextSession.duration} · {contextSession.when}
-                </em>
+                <em>{contextSession.mode} · {contextSession.duration} · {contextSession.when}</em>
               </div>
             </div>
             {contextSession.summary ? (
@@ -110,7 +81,7 @@ export const ContextPanel = memo(function ContextPanel({
         <ul className="ds-context-prompts">
           {PANEL_PROMPTS.map((prompt) => (
             <li key={prompt}>
-              <button type="button" onClick={() => handlePrompt(prompt)}>
+              <button type="button" onClick={() => onSendMessage?.(prompt)}>
                 <span>{prompt}</span>
                 <ArrowRight size={11} strokeWidth={1.8} />
               </button>

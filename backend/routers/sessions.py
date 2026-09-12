@@ -133,11 +133,9 @@ def _delete_session_capture(path: str | None, user_id: str, session_id: str) -> 
     try:
         supabase_admin.storage.from_("session-captures").remove([validated])
     except Exception as e:
+        # Non-fatal — log and continue. A failed Storage delete must not
+        # prevent the session row from being deleted.
         print(f"[sessions] session capture delete failed for session {session_id}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not delete session capture. Please try again.",
-        )
 
 
 # ─── Response / Request models ────────────────────────────────────────────────
@@ -504,6 +502,7 @@ def update_session(
             .update(updates)
             .eq("id", session_id)
             .eq("user_id", user_id)
+            .select("id, title, source, mode, duration_seconds, when_timestamp, rubric_id, summary, chat_id, screenshot_path")
             .execute()
         )
     except Exception as e:

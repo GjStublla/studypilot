@@ -113,11 +113,11 @@ export default function Dashboard({
   const [summarizing, setSummarizing] = useState(false);
   const savedNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  function flashSavedNotice(message: string) {
+  const flashSavedNotice = useCallback((message: string) => {
     setSavedNotice(message);
     if (savedNoticeTimer.current) clearTimeout(savedNoticeTimer.current);
     savedNoticeTimer.current = setTimeout(() => setSavedNotice(null), 2500);
-  }
+  }, []);
   const replaceChatRoute = useCallback(replaceDashboardHash, []);
 
   const {
@@ -643,9 +643,6 @@ export default function Dashboard({
   const continueSelectedInChat = useCallback(() => {
     if (selectedSession) openInChat(selectedSession.id);
   }, [openInChat, selectedSession]);
-  const continueContextInChat = useCallback(() => {
-    if (chatSession) openInChat(chatSession.id);
-  }, [chatSession, openInChat]);
   const backToSessions = useCallback(() => navigateToView('sessions'), [navigateToView]);
 
   const handleSummarize = useCallback(async () => {
@@ -1044,7 +1041,6 @@ export default function Dashboard({
         openActionItemCount={openActionItems.length}
         aiUsage={aiUsage}
         onGoTo={navigateToView}
-        onContinueInChat={continueContextInChat}
         onOpenExtension={openExtension}
         onSendMessage={(text) => {
           if (view !== 'chat') navigateToView('chat');

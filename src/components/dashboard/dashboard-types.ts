@@ -145,7 +145,6 @@ export interface ContextPanelProps {
   openActionItemCount: number;
   aiUsage: DashboardAiUsage | null;
   onGoTo: (view: View) => void;
-  onContinueInChat: () => void;
   onOpenExtension: () => void;
   onSendMessage?: (text: string) => void;
 }
