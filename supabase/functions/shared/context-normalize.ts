@@ -78,6 +78,10 @@ export function formatRubricBlock(rubric: ContextRubric): string {
     : "  (no criteria extracted yet)"
   let block =
     `RUBRIC: "${rubric.title}" (${rubric.course})\nCRITERIA:\n${criteriaText}`
+  const summary = boundRubricSummary(rubric.summary)
+  if (summary) {
+    block += `\n\nRUBRIC SUMMARY:\n${summary}`
+  }
   if (rubric.fileSearchStatus && rubric.fileSearchStatus !== "indexed") {
     block +=
       `\n\nNOTE: Rubric document indexing status is "${rubric.fileSearchStatus}". Do not claim to have searched the uploaded file via Vertex RAG.`
