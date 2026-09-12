@@ -339,6 +339,7 @@ def set_active_rubric(
         uploaded_at=row["uploaded_at"],
         active=row["active"],
         sessions_count=row.get("sessions_count") or 0,
+        knowledge_document_id=row.get("knowledge_document_id"),
         file_search_status=row.get("file_search_status") or "not_indexed",
         criteria=criteria,
     )
