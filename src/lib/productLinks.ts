@@ -21,7 +21,12 @@ export function parseChromeWebStoreUrl(raw: string | undefined | null): string |
     if (url.protocol !== 'https:') return null;
     if (url.username || url.password) return null;
     if (url.hostname !== CHROME_WEBSTORE_HOST) return null;
-    if (url.hash.slice(1).toLowerCase().startsWith('javascript:')) return null;
+    const hashValue = url.hash.slice(1).toLowerCase();
+    if (
+      hashValue.startsWith('javascript:') ||
+      hashValue.startsWith('data:') ||
+      hashValue.startsWith('vbscript:')
+    ) return null;
     return url.href;
   } catch {
     return null;
