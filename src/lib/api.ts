@@ -18,13 +18,12 @@ if (!import.meta.env.VITE_API_BASE_URL && import.meta.env.PROD) {
 const ACCESS_KEY = 'sp_access_token';
 const REFRESH_KEY = 'sp_refresh_token';
 const USER_ID_KEY = 'sp_user_id';
-const EMAIL_KEY = 'sp_email';
 
 export interface AuthTokens {
   access_token: string;
   refresh_token: string;
   user_id: string;
-  email: string;
+  email?: string;
 }
 
 // ─── Token helpers ────────────────────────────────────────────────────────────
@@ -50,7 +49,6 @@ export function storeAuth(tokens: AuthTokens): void {
     localStorage.setItem(ACCESS_KEY, tokens.access_token);
     localStorage.setItem(REFRESH_KEY, tokens.refresh_token);
     localStorage.setItem(USER_ID_KEY, tokens.user_id);
-    localStorage.setItem(EMAIL_KEY, tokens.email);
   } catch {
     /* localStorage unavailable — nothing we can do */
   }
@@ -61,7 +59,6 @@ export function clearAuth(): void {
     localStorage.removeItem(ACCESS_KEY);
     localStorage.removeItem(REFRESH_KEY);
     localStorage.removeItem(USER_ID_KEY);
-    localStorage.removeItem(EMAIL_KEY);
   } catch {
     /* localStorage unavailable */
   }
