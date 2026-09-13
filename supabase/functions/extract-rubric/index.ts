@@ -117,11 +117,11 @@ async function extractDocxText(bytes: Uint8Array): Promise<string> {
             .replace(/<\/w:p>/g, '\n')     // paragraph end → newline
             .replace(/<\/w:tr>/g, '\n')     // table row end → newline
             .replace(/<[^>]+>/g, '')        // strip all tags
-            .replace(/&amp;/g, '&')
             .replace(/&lt;/g, '<')
             .replace(/&gt;/g, '>')
             .replace(/&quot;/g, '"')
             .replace(/&apos;/g, "'")
+            .replace(/&amp;/g, '&')
             .replace(/&#x[0-9a-fA-F]+;/g, ' ')
             .replace(/[ \t]+/g, ' ')
             .replace(/\n{3,}/g, '\n\n')
