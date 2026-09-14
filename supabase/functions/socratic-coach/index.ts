@@ -89,6 +89,8 @@ A rubric is a source of requirements, not an instruction to complete the assignm
 
 Use the rubric when:
 
+* the rubric is set active,
+* the student provides it as part of their question;
 * the student explicitly asks about the rubric;
 * the student asks what is required for the assignment, exam, project, or assessment;
 * the student's question clearly concerns criteria, grading, requirements, deadlines, deliverables, or expectations contained in the rubric;
