@@ -99,3 +99,8 @@ test-results/
 
 # Kiro IDE steering/agent configuration — local only
 .kiro/
+
+# CodeQL database and results
+codeql-db/
+codeql-results.sarif
+codeql-results.csv
