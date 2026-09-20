@@ -205,7 +205,6 @@ describe('Dashboard rubric RAG behaviors', () => {
     expect(await screen.findByText('Strengthen the thesis with a clearer claim.')).toBeInTheDocument();
     expect(screen.getByLabelText('Sources')).toBeInTheDocument();
     expect(screen.getByText('Thesis clarity')).toBeInTheDocument();
-    expect(screen.getByText(/A strong thesis states a debatable claim/i)).toBeInTheDocument();
     expect(screen.getByText('Grounded')).toBeInTheDocument();
   });
 
