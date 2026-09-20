@@ -72,7 +72,7 @@ let liveCachedToken: CachedToken | null = null;
 let liveWinningScopes: string[] | null = null;
 
 export function usesCloudPlatformScope(scopes: readonly string[]): boolean {
-  return scopes.includes(CLOUD_PLATFORM_SCOPE);
+  return scopes.some((scope) => scope === CLOUD_PLATFORM_SCOPE);
 }
 
 function getSigningIdentity(): SigningIdentity {
