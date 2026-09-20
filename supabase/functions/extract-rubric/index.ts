@@ -112,19 +112,29 @@ async function extractDocxText(bytes: Uint8Array): Promise<string> {
             throw new Error(`Unsupported ZIP compression: ${compression}`)
           }
           const xml = new TextDecoder('utf-8', { fatal: false }).decode(xmlBytes)
-          // Strip XML tags and decode common entities
-          return xml
-            .replace(/<\/w:p>/g, '\n')     // paragraph end → newline
-            .replace(/<\/w:tr>/g, '\n')     // table row end → newline
-            .replace(/<[^>]+>/g, '')        // strip all tags
-            .replace(/&lt;/g, '‹')
-            .replace(/&gt;/g, '›')
-            .replace(/&quot;/g, '"')
-            .replace(/&apos;/g, "'")
-            .replace(/&amp;/g, '&')
-            .replace(/&#x[0-9a-fA-F]+;/g, ' ')
+
+          // Extract text directly from DOCX XML instead of sanitizing XML with regexes.
+          // This avoids treating XML markup as plain text and avoids incomplete
+          // multi-character sanitization.
+          const textParts: string[] = []
+
+          const textRegex = /<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g
+          let textMatch: RegExpExecArray | null
+
+          while ((textMatch = textRegex.exec(xml)) !== null) {
+            const text = textMatch[1]
+              .replace(/&lt;/g, '‹')
+              .replace(/&gt;/g, '›')
+              .replace(/&quot;/g, '"')
+              .replace(/&apos;/g, "'")
+              .replace(/&amp;/g, '＆')
+
+            textParts.push(text)
+          }
+
+          return textParts
+            .join(' ')
             .replace(/[ \t]+/g, ' ')
-            .replace(/\n{3,}/g, '\n\n')
             .trim()
         }
       }
