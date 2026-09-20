@@ -21,15 +21,21 @@ def test_health_returns_503_when_db_unreachable(client_unreachable):
 
 def test_cors_origins_includes_defaults():
     origins = parse_cors_origins("")
-    assert "https://studypilot.app" in origins
-    assert "http://localhost:5173" in origins
+    assert {
+        "https://studypilot.app",
+        "http://localhost:5173",
+    }.issubset(set(origins))
 
 
 def test_cors_origins_parses_extra_origins():
-    origins = parse_cors_origins("https://custom.studypilot.app, https://preview.studypilot.app")
-    assert "https://custom.studypilot.app" in origins
-    assert "https://preview.studypilot.app" in origins
-    assert "https://studypilot.app" in origins
+    origins = parse_cors_origins(
+        "https://custom.studypilot.app, https://preview.studypilot.app"
+    )
+    assert {
+        "https://custom.studypilot.app",
+        "https://preview.studypilot.app",
+        "https://studypilot.app",
+    }.issubset(set(origins))
 
 
 def test_cors_rejects_wildcard_with_credentials():
