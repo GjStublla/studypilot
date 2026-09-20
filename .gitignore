@@ -104,3 +104,4 @@ test-results/
 codeql-db/
 codeql-results.sarif
 codeql-results.csv
+scripts/codeql.ps1
